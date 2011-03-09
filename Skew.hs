@@ -8,81 +8,120 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE UndecidableInstances #-}
 
-module Skew (
-module Data.HList,
-module Data.HList.Label4,
-module Data.HList.TypeEqGeneric1,
-module Data.HList.TypeCastGeneric1,
-HNil(..),
-HCons(..)
-) where
+module Skew (hSkewNil,(.*.)) where
 
-import Data.HList hiding (HNil, HCons, HasField', hLookupByLabel', hExtend')
+import Data.HList (HCons(..), HNil(..), LVPair(..), labelLVPair)
+import qualified Data.HList
+import Data.HList.FakePrelude
 import Data.HList.Label4
 import Data.HList.TypeEqGeneric1
 import Data.HList.TypeCastGeneric1
 
-data HNil = HNil
-data HCons e l1 l2 l3 = HCons e l1 l2 l3
+newtype SkewRecord r = SkewRecord r
+newtype HLeaf e
+    = HLeaf e
+data HNode e t t'
+    = HNode e t t'
 
-instance (HList l1, HList l2, HList l3)
-      => HList (HCons e l1 l2 l3)
+class HBalanced t h | t -> h
+instance HBalanced (HLeaf e) HZero
+instance (HBalanced t h, HBalanced t' h) => HBalanced (HNode e t t') (HSucc h)
 
-instance (HLength l1 n1, HNat n1, HList l1, HList l2, HList l3)
-      => HLength (HCons a l1 l2 l3) (HSucc n1)
+hHeight :: HBalanced t h => t -> h
+hHeight = undefined
 
-class HExtend' l2 l3 l4 where
-  hExtend' :: e1 -> l2 -> HCons e1 l2 l3 l4
-instance HExtend' l2 l2 l2 where
-  hExtend' e1 l2 = HCons e1 l2 l2 l2
+hSkewNil = SkewRecord HNil
 
-instance HExtend e HNil (HCons e HNil HNil HNil) where
-  hExtend e HNil = HCons e HNil HNil HNil
-instance HExtend' (HCons e2 l3 l4 l5) l6 l7 => HExtend e1 (HCons e2 l3 l4 l5) (HCons e1 (HCons e2 l3 l4 l5) l6 l7) where
-  hExtend e1 l2 = hExtend' e1 l2
+infixr 2 .*.
+class HExtend e ts ets | e ts -> ets where
+    (.*.) :: e -> ts -> ets
+--instance Data.HList.HExtend e ts ets => HExtend e ts ets where
+--    (.*.) = Data.HList.hExtend
+instance HExtend2 e ts ets => HExtend e (SkewRecord ts) (SkewRecord ets) where
+    e .*. SkewRecord ts = SkewRecord $ hExtend e ts
 
-{--instance HExtend e (HCons e l1 l2 HNil) (HCons e (HCons e l1 l2 HNil) (HCons e l1 l2 HNil) (HCons e l1 l2 HNil)) where
-  hExtend e1 l = HCons e1 l l l
-instance HExtend
-         e1
-         (HCons e2 l1 l2 (HCons e3 l3 l4 l5))
-         (HCons
-          e1
-          (HCons e2 l1 l2 (HCons e3 l3 l4 l5))
-          (HCons e2 l1 l2 (HCons e3 l3 l4 l5))
-          (HCons e2 l1 l2 (HCons e3 l3 l4 l5))) where
-  hExtend e l = HCons e l l l
---}
+class HExtend2 e ts ets | e ts -> ets where
+    hExtend :: e -> ts -> ets
+instance HExtend2 e HNil (HCons (HLeaf e) HNil) where
+    hExtend e ts = (HCons (HLeaf e) ts)
+instance HExtend2 e (HCons t HNil) (HCons (HLeaf e) (HCons t HNil)) where
+    hExtend e ts = (HCons (HLeaf e) ts)
+instance
+    (HBalanced t h
+    ,HBalanced t' h'
+    ,HEq h h' b
+    ,HExtend' b e t t' ts ett'ts)
+    => HExtend2 e (HCons t (HCons t' ts)) ett'ts where
+    hExtend e tt'ts@(HCons t (HCons t' ts)) =
+        hExtend' (hEq (hHeight t) (hHeight t')) e tt'ts
+
+class HExtend' b e t t' ts ett'ts | b e t t' ts -> ett'ts where
+    hExtend' :: b -> e -> (HCons t (HCons t' ts)) -> ett'ts
+instance HExtend' HTrue e t t' ts (HCons (HNode e t t') ts) where
+    hExtend' _ e (HCons t (HCons t' ts)) = (HCons (HNode e t t') ts)
+instance HExtend' HFalse e t t' ts (HCons (HLeaf e) (HCons t (HCons t' ts))) where
+    hExtend' _ e tt'ts = (HCons (HLeaf e) tt'ts)
+
+instance HasField l ts v => Data.HList.HasField l (SkewRecord ts) v where
+    hLookupByLabel l (SkewRecord ts) = hLookupByLabel l ts
+
+class HasField l ts v | l ts -> v where
+    hLookupByLabel :: l -> ts -> v
+instance
+   (HasFieldB l t bt
+   ,HasFieldB l ts bts
+   ,HasField_HCons bt bts l t ts v) =>
+    HasField l (HCons t ts) v where
+    hLookupByLabel l (HCons t ts) =
+        hLookupByLabel_HCons (hasField l t) (hasField l ts) l t ts
+instance HasField l (HLeaf (LVPair l v)) v where
+    hLookupByLabel l (HLeaf (LVPair v)) = v
+instance
+    (HEq l l' bl'
+    ,HasFieldB l t bt
+    ,HasFieldB l t' bt'
+    ,HasField_HNode bl' bt bt' l v' t t' v)
+    => HasField l (HNode (LVPair l' v') t t') v where
+    hLookupByLabel l (HNode f@(LVPair v') t t') =
+        hLookupByLabel_HNode
+        (hEq l (labelLVPair f))
+        (hasField l t)
+        (hasField l t')
+        l
+        v'
+        t
+        t'
 
 class HasFieldB l r b | l r -> b where
 instance HasFieldB l HNil HFalse
 instance (HasFieldB l t bt, HasFieldB l ts bts, HOr bt bts b)
-    => HasFieldB l (HCons t ts ts2 ts3) b
-instance HEq l l' b => HasFieldB l (LVPair l' v) b
+    => HasFieldB l (HCons t ts) b
+instance HEq l l' b => HasFieldB l (HLeaf (LVPair l' v)) b
+instance
+    (HEq l l' bl
+    ,HasFieldB l l1 b1
+    ,HasFieldB l l2 b2
+    ,HOr bl b1 bl1
+    ,HOr bl1 b2 bl12)
+    => HasFieldB l (HNode (LVPair l' v) l1 l2) bl12
 hasField :: HasFieldB l r b => l -> r -> b
 hasField = undefined
 
-class HasField' l e be l1 b1 l2 b2 l3 b3 v where
-  hLookupByLabel' :: l -> e -> be -> l1 -> b1 -> l2 -> b2 -> l3 -> b3 -> v
-instance (HasField l l3 v) => HasField' l e be l1 b1 l2 b2 l3 HTrue v where
-  hLookupByLabel' l e be l1 b1 l2 b2 l3 b3 = hLookupByLabel l l3
-instance (HasField l l2 v) => HasField' l e be l1 b1 l2 HTrue l3 HFalse v where
-  hLookupByLabel' l e be l1 b1 l2 b2 l3 b3 = hLookupByLabel l l2
-instance (HasField l l1 v) => HasField' l e be l1 HTrue l2 HFalse l3 HFalse v where
-  hLookupByLabel' l e be l1 b1 l2 b2 l3 b3 = hLookupByLabel l l1
-instance HasField' l (LVPair l v) HTrue l1 HFalse l2 HFalse l3 HFalse v where
-  hLookupByLabel' l e be l1 b1 l2 b2 l3 b3 = valueLVPair e
 
-instance (HasFieldB l e be,
-          HasFieldB l l1 b1,
-          HasFieldB l l2 b2,
-          HasFieldB l l3 b3,
-          HasField' l e be l1 b1 l2 b2 l3 b3 v) =>
-         HasField l (HCons e l1 l2 l3) v where
-  hLookupByLabel l (HCons e l1 l2 l3) = 
-    hLookupByLabel'
-     l
-     e (hasField l e)
-     l1 (hasField l l1)
-     l2 (hasField l l2)
-     l3 (hasField l l3)
+class HasField_HCons bt bts l t ts v where
+    hLookupByLabel_HCons :: bt -> bts -> l -> t -> ts -> v
+instance
+    HasField l t v =>
+    HasField_HCons HTrue bts l t ts v where
+    hLookupByLabel_HCons _ _ l t ts = hLookupByLabel l t
+instance HasField l ts v => HasField_HCons HFalse HTrue l t ts v where
+    hLookupByLabel_HCons _ _ l t ts = hLookupByLabel l ts
+
+class HasField_HNode be bt bt' l e t t' v where
+    hLookupByLabel_HNode :: be -> bt -> bt' -> l -> e -> t -> t' -> v
+instance HasField_HNode HTrue bt bt' l (LVPair l v) t t' v where
+    hLookupByLabel_HNode _ _ _ l e t t' = valueLVPair e
+instance HasField l t v => HasField_HNode HFalse HTrue bt' l e t t' v where
+    hLookupByLabel_HNode _ _ _ l e t t' = hLookupByLabel l t
+instance HasField l t' v => HasField_HNode HFalse HFalse HTrue l e t t' v where
+    hLookupByLabel_HNode _ _ _ l e t t' = hLookupByLabel l t'
