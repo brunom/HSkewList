@@ -2,4 +2,12 @@
 *.hi
 *.o
 *.exe
-/core.txt
+*.aux
+*.bbl
+*.blg
+*.dvi
+*.log
+*.pdf
+*.ptb
+*.tex
+dump.txt
