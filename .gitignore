@@ -10,4 +10,5 @@
 *.pdf
 *.ptb
 *.tex
+paper.hs
 dump.txt

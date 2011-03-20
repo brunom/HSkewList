@@ -1,5 +1,3 @@
-{-# LANGUAGE TypeFamilies #-}
-{-# LANGUAGE RecordWildCards #-}
 {-# LANGUAGE EmptyDataDecls #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE TypeOperators #-}
@@ -33,25 +31,20 @@ hHeight = undefined
 hSkewNil = SkewRecord HNil
 
 infixr 2 .*.
-class HExtend e ts ets | e ts -> ets where
-    (.*.) :: e -> ts -> ets
---instance Data.HList.HExtend e ts ets => HExtend e ts ets where
---    (.*.) = Data.HList.hExtend
-instance HExtend2 e ts ets => HExtend e (SkewRecord ts) (SkewRecord ets) where
-    e .*. SkewRecord ts = SkewRecord $ hExtend e ts
+e .*. SkewRecord ts = SkewRecord $ hExtend e ts
 
-class HExtend2 e ts ets | e ts -> ets where
+class HExtend e ts ets | e ts -> ets where
     hExtend :: e -> ts -> ets
-instance HExtend2 e HNil (HCons (HLeaf e) HNil) where
+instance HExtend e HNil (HCons (HLeaf e) HNil) where
     hExtend e ts = (HCons (HLeaf e) ts)
-instance HExtend2 e (HCons t HNil) (HCons (HLeaf e) (HCons t HNil)) where
+instance HExtend e (HCons t HNil) (HCons (HLeaf e) (HCons t HNil)) where
     hExtend e ts = (HCons (HLeaf e) ts)
 instance
     (HBalanced t h
     ,HBalanced t' h'
     ,HEq h h' b
     ,HExtend' b e t t' ts ett'ts)
-    => HExtend2 e (HCons t (HCons t' ts)) ett'ts where
+    => HExtend e (HCons t (HCons t' ts)) ett'ts where
     hExtend e tt'ts@(HCons t (HCons t' ts)) =
         hExtend' (hEq (hHeight t) (hHeight t')) e tt'ts
 
