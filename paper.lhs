@@ -202,28 +202,6 @@ with type |HCons Bool (HCons String HNil)|.
 %% instance  HList l => HList (HCons e l)
 %% \end{code}
 
-%% The library includes a multi-parameter class |HExtend| to model the extension of heterogeneous collections.
-
-%% \begin{code}
-%% class HExtend e l l' | e l -> l'
-%%     where hExtend :: e -> l -> l'
-%% \end{code}
-
-%% The functional dependency |e l -> l'| makes |HExtend| a type-level function, instead of a relation:
-%% once |e| and |l| are fixed |l'| is uniquely determined.
-%% It fixes the type |l'| of a collection, resulting from extending a collection of type |l| with an element of type |e|.
-%% The member |hExtend| performs the same computation at the level of values.
-
-%% We remove |l' -> e l|, an additional dependency present in the original HList formulation.
-%% The compiler refuses our instances implementing Skew lists because it can't prove that the instances satisfy the dependency.
-
-%% The instance of |HExtend| for heterogeneous lists includes the well-formedness condition:
-
-%% \begin{code}
-%% instance HList l => HExtend e l (HCons e l)
-%%     where hExtend = HCons
-%% \end{code}
-
 %% The main reason for introducing the class |HExtend| is to make it possible
 %% to encode constraints on the things which can be |HCons|-ed;
 %% here we have expressed that the second parameter should be a list again.
@@ -276,16 +254,44 @@ by choosing a different phantom type for each label to be represented we can dis
 data Proxy e ; proxy = undefined :: Proxy e
 \end{spec}
 
+
+
+To mix and match both kinds of records we introduce a multi-parameter class |HExtend|.
+
+\begin{code}
+class HExtend e l l' | e l -> l'
+    where (.*.) :: e -> l -> l'
+\end{code}
+
+%if style==newcode
+infixr 2 .*.
+infixr 4 .=.
+%endif
+
+The functional dependency |e l -> l'| makes |HExtend| a type-level function, instead of a relation:
+once |e| and |l| are fixed |l'| is uniquely determined.
+It fixes the type |l'| of a collection,
+resulting from extending a collection of type |l| with an element of type |e|.
+The member |hExtend| performs the same computation at the level of values.
+
+We remove |l' -> e l|, an additional dependency present in the original HList formulation.
+The compiler refuses our instances implementing Skew lists because it can't prove that the instances satisfy the dependency.
+
+\begin{code}
+instance HExtend e (Record l) (Record (HCons e l))
+    where e .*. Record l = Record (HCons e l)
+\end{code}
+
 \noindent Thus, the following declarations define a record (|myR|) with two elements, labelled by |Label1| and |Label2|:
 
 \begin{code}
 data Label1; label1 = proxy :: Proxy Label1
 data Label2; label2 = proxy :: Proxy Label2
 
-field1 = LVPair True   :: LVPair (Proxy Label1) Bool
-field2 = LVPair "bla"  :: LVPair (Proxy Label2) [Char]
+field1  = label1  .=.  True
+field2  = label2  .=.  "bla"
 
-myR = Record $ HCons field1 $ HCons field2 $ HNil
+myR = field1 .*. field2 .*. emptyRecord
 \end{code}
 
 %% $
@@ -410,6 +416,33 @@ Paper.sq3 =
 %% r  #    l  =  hLookupByLabel l r
 %% \end{code}
 
+When the number of fields increases,
+as in EDSLs that use extensible records internally \cite{FlyFirstClass},
+we just bump GHC's context reduction stack and the program compiles.
+At runtime, however, we may hurt from the linear time lookup algorithm.
+The natural replacement when lookup in a linked list is slow
+is usually a search tree.
+We would need to define a |HOrd| type-function
+analogue to HList's magic |HEq|
+and port some staple balanced tree to compile-time,
+tricky rotations and all.
+As unappealing as this is,
+the real roadblock is |HOrd|.
+Without help from the compiler,
+defining such type function for
+unstructured labels is beyond (our) reach.
+
+The key insight is that sub-linear behavior is only needed at runtime.
+We are willing to keep the work done at compile-time superlinear
+if it helps us to speed up our programs at runtime.
+|HasField| already looks for our label at compile-time
+to fail compilation if we require a field for a record
+wihout such label.
+So we just store our field unordered in a structure
+that allows fast random access and depend on the compiler to
+hardcode the path to our fields.
+Following, \cite{OkaThesis} we leaned on Skew Binary Random-Access Lists.
+
 \section{Skew Binary Random-Access List}\label{sec:hlist}
 
 We'll describe Skew Binary Random-Access List \cite{Mye83} in a less principled
@@ -469,8 +502,11 @@ instance
 hHeight :: HBalanced t h => t -> h
 hHeight = undefined
 
-f .*. SkewRecord l =
-    SkewRecord (hSkewExtend f l)
+instance
+    (HSkewExtend e l l') =>
+    HExtend e (SkewRecord l) (SkewRecord l') where
+    e .*. SkewRecord l =
+        SkewRecord (hSkewExtend e l)
 
 class HSkewExtend e l l' | e l -> l'
     where hSkewExtend :: e -> l -> l'
@@ -522,6 +558,91 @@ For the latter, only when the first two lists are the same size,
 as indicated by |HBalanced|,
 we insert a new |HNode|.
 In all other cases, we use |HLeaf|.
+
+The missing piece is |HasField| for |SkewRecord|.
+As already mentioned,
+we explore all paths at compile-time
+but follow only the right one at runtime.
+
+\begin{code}
+instance
+    HasFieldSkew l ts v =>
+    HasField l (SkewRecord ts) v where
+    hLookupByLabel l (SkewRecord ts) =
+        hSkewLookupByLabel l ts
+
+class HasFieldSkew l ts v | l ts -> v where
+    hSkewLookupByLabel :: l -> ts -> v
+instance
+    (HasFieldB l t bt
+    ,HasFieldB l ts bts
+    ,HasFieldCons bt bts l t ts v) =>
+    HasFieldSkew l (HCons t ts) v where
+    hSkewLookupByLabel l (HCons t ts) =
+        hConsLookupByLabel (hasField l t) (hasField l ts) l t ts
+instance
+    HasFieldSkew l (HLeaf (LVPair l v)) v where
+    hSkewLookupByLabel l (HLeaf (LVPair v)) = v
+instance
+    (HEq l l' bl'
+    ,HasFieldB l t bt
+    ,HasFieldB l t' bt'
+    ,HasFieldNode bl' bt bt' l v' t t' v)
+    => HasFieldSkew l (HNode (LVPair l' v') t t') v where
+    hSkewLookupByLabel l (HNode f@(LVPair v') t t') =
+        hNodeLookupByLabel
+        (hEq l (labelLVPair f))
+        (hasField l t)
+        (hasField l t')
+        l
+        v'
+        t
+        t'
+
+class HasFieldB l r b | l r -> b where
+instance HasFieldB l HNil HFalse
+instance (HasFieldB l t bt, HasFieldB l ts bts, HOr bt bts b)
+    => HasFieldB l (HCons t ts) b
+instance HEq l l' b => HasFieldB l (HLeaf (LVPair l' v)) b
+instance
+    (HEq l l' bl
+    ,HasFieldB l l1 b1
+    ,HasFieldB l l2 b2
+    ,HOr bl b1 bl1
+    ,HOr bl1 b2 bl12)
+    => HasFieldB l (HNode (LVPair l' v) l1 l2) bl12
+hasField :: HasFieldB l r b => l -> r -> b
+hasField = undefined
+
+
+class HasFieldCons bt bts l t ts v where
+    hConsLookupByLabel :: bt -> bts -> l -> t -> ts -> v
+instance
+    HasFieldSkew l t v =>
+    HasFieldCons HTrue bts l t ts v where
+    hConsLookupByLabel _ _ l t ts = hSkewLookupByLabel l t
+instance
+    HasFieldSkew l ts v =>
+    HasFieldCons HFalse HTrue l t ts v where
+    hConsLookupByLabel _ _ l t ts =
+        hSkewLookupByLabel l ts
+
+class HasFieldNode be bt bt' l e t t' v where
+    hNodeLookupByLabel :: be -> bt -> bt' -> l -> e -> t -> t' -> v
+instance
+    HasFieldNode HTrue bt bt' l (LVPair l v) t t' v where
+    hNodeLookupByLabel _ _ _ l e t t' = valueLVPair e
+instance
+    HasFieldSkew l t v =>
+    HasFieldNode HFalse HTrue bt' l e t t' v where
+    hNodeLookupByLabel _ _ _ l e t t' =
+        hSkewLookupByLabel l t
+instance
+    HasFieldSkew l t' v =>
+    HasFieldNode HFalse HFalse HTrue l e t t' v where
+    hNodeLookupByLabel _ _ _ l e t t' =
+        hSkewLookupByLabel l t'
+\end{code}
 
 \bibliographystyle{plainnat}
 
