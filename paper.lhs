@@ -491,65 +491,72 @@ we remove them and insert a new |HNode| built
 of the new element and the two trees removed.
 Else, we just insert a |HLeaf| of the new element.
 
+We define a new tag |SkewRecord|
+and the corresponding |HExtend| instance
+to be able to use |(.*.)|.
+|HSkewRecord| does the actual work.
 \begin{code}
 newtype SkewRecord r = SkewRecord r
 emptySkewRecord :: SkewRecord HNil
 emptySkewRecord = SkewRecord HNil
-
-class HBalanced t h | t -> h
-instance HBalanced (HLeaf e) HZero
-instance
-    (HBalanced t h, HBalanced t' h) =>
-    HBalanced (HNode e t t') (HSucc h)
-
-hHeight :: HBalanced t h => t -> h
-hHeight = undefined
 
 instance
     (HSkewExtend e l l') =>
     HExtend e (SkewRecord l) (SkewRecord l') where
     e .*. SkewRecord l =
         SkewRecord (hSkewExtend e l)
+\end{code}
+
+|HComplete| below checks that all root to leaf paths have the same length
+and returns it.
+\begin{code}
+class HComplete t h | t -> h
+instance HComplete (HLeaf e) HZero
+instance
+    (HComplete t h, HComplete t' h) =>
+    HComplete (HNode e t t') (HSucc h)
+\end{code}
+
+|HSkewCarry|, named as
+\begin{code}
+class HSkewCarry l b | l -> b
+instance HSkewCarry HNil HFalse
+instance HSkewCarry (HCons t HNil) HFalse
+instance
+    (HComplete t h
+    ,HComplete t' h'
+    ,HEq h h' b)
+    => HSkewCarry (HCons t (HCons t' ts)) b
+hSkewCarry :: HSkewCarry l b => l -> b
+hSkewCarry = undefined
 
 class HSkewExtend e l l' | e l -> l'
     where hSkewExtend :: e -> l -> l'
+instance
+    (HSkewCarry l b
+    ,HSkewExtend' b e l l') =>
+    HSkewExtend e l l' where
+    hSkewExtend e l = hSkewExtend' (hSkewCarry l) e l
 
-instance
-    HSkewExtend
-        e
-        HNil
-        (HCons (HLeaf e) HNil) where
-    hSkewExtend e ts = (HCons (HLeaf e) ts)
-instance
-    HSkewExtend
-        e
-        (HCons t HNil)
-        (HCons (HLeaf e) (HCons t HNil)) where
-    hSkewExtend e ts = (HCons (HLeaf e) ts)
-instance
-    (HBalanced t h
-    ,HBalanced t' h'
-    ,HEq h h' b
-    ,HSkewExtend' b e t t' ts ett'ts)
-    => HSkewExtend e (HCons t (HCons t' ts)) ett'ts where
-    hSkewExtend e tt'ts@(HCons t (HCons t' ts)) =
-        hSkewExtend' (hEq (hHeight t) (hHeight t')) e tt'ts
 
-class
-    HSkewExtend' b e t t' ts ett'ts
-    | b e t t' ts -> ett'ts where
-    hSkewExtend' :: b -> e -> (HCons t (HCons t' ts)) -> ett'ts
+class HSkewExtend' b e l l' where
+    hSkewExtend' :: b -> e -> l -> l'
 instance
     HSkewExtend'
-        HTrue e t t' ts
-        (HCons (HNode e t t') ts) where
-    hSkewExtend' _ e (HCons t (HCons t' ts)) =
-        (HCons (HNode e t t') ts)
+        HFalse
+        e
+        l
+        (HCons (HLeaf e) l) where
+    hSkewExtend' _ e l = HCons (HLeaf e) l
+
 instance
     HSkewExtend'
-        HFalse e t t' ts
-        (HCons (HLeaf e) (HCons t (HCons t' ts))) where
-    hSkewExtend' _ e tt'ts = (HCons (HLeaf e) tt'ts)
+        HTrue
+        e
+        (HCons t (HCons t' l))
+        (HCons (HNode e t t') l) where
+    hSkewExtend' _ e (HCons t (HCons t' l)) =
+        (HCons (HNode e t t') l)
 \end{code}
 
 \noindent
