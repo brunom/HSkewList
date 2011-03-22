@@ -1,4 +1,7 @@
-all: paper.pdf paper.hs
+all: paper.pdf paper.o
+
+paper.o : paper.hs
+	ghc -O paper.hs
 
 paper.hs : paper.lhs
 	lhs2Tex paper.lhs -o paper.hs --newcode

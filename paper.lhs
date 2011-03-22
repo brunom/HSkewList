@@ -264,8 +264,10 @@ class HExtend e l l' | e l -> l'
 \end{code}
 
 %if style==newcode
+\begin{code}
 infixr 2 .*.
 infixr 4 .=.
+\end{code}
 %endif
 
 The functional dependency |e l -> l'| makes |HExtend| a type-level function, instead of a relation:
@@ -308,7 +310,8 @@ myR = field1 .*. field2 .*. emptyRecord
 %%   where hExtend f (Record r) = Record (HCons f r)
 %% \end{code}
 
-The class |HasField| is used to retrieve the value part corresponding to a specific label from a record:
+The class |HasField| is used to retrieve the value part
+corresponding to a specific label from a record:
 
 \begin{code}
 class HasField l r v | l r -> v where
