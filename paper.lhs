@@ -490,7 +490,7 @@ emptySkewRecord = SkewRecord HNil
 
 instance
     (HSkewExtend (LVPair l v) ts ts',
-    HTHasFieldSkew l ts HFalse) =>
+    HHasFieldSkew l ts HNothing) =>
     HExtend (LVPair l v) (SkewRecord ts) (SkewRecord ts') where
     e .*. SkewRecord ts =
         SkewRecord (hSkewExtend e ts)
@@ -527,7 +527,6 @@ instance
     HSkewExtend e l l' where
     hSkewExtend e l = hSkewExtend' (hSkewCarry l) e l
 
-
 class HSkewExtend' b e l l' | b e l -> l' where
     hSkewExtend' :: b -> e -> l -> l'
 instance
@@ -537,7 +536,6 @@ instance
         l
         (HCons (HLeaf e) l) where
     hSkewExtend' _ e l = HCons (hLeaf e) l
-
 instance
     HSkewExtend'
         HTrue
@@ -557,13 +555,15 @@ but follow only the right one at runtime.
 
 \begin{code}
 instance
-    (HHasFieldSkew l ts v) =>
+    (HHasFieldSkew l ts (HJust v)) =>
     HHasField l (SkewRecord ts) v where
     SkewRecord ts # l =
-        hSkewGet l ts
+        case hSkewGet l ts of HJust e -> e
 
 class HHasFieldSkew l ts v | l ts -> v where
     hSkewGet :: l -> ts -> v
+instance HHasFieldSkew l HNil HNothing
+instance HHasFieldSkew l HEmpty HNothing
 instance
     (HHasFieldSkew l (t, ts) v) =>
     HHasFieldSkew l (HCons t ts) v where
@@ -575,52 +575,43 @@ instance
     hSkewGet l (HNode e t t') =
         hSkewGet l (e, (t, t'))
 instance
-    HHasFieldSkew l (LVPair l v) v where
-    hSkewGet l (LVPair v) = v
+    (HEq l l' b
+    ,HMakeMaybe b v m) =>
+    HHasFieldSkew l (LVPair l' v) m where
+    hSkewGet l f = hMakeMaybe (hEq l (labelLVPair f)) (valueLVPair f)
 instance
-    (HTHasFieldSkew l e b
-    ,HHasFieldSkew' l b e e' v)
+    (HHasFieldSkew l e ve
+    ,HHasFieldSkew l e' ve'
+    ,HPlus ve ve' v)
     => HHasFieldSkew l (e, e') v where
     hSkewGet l (e, e') =
-        hSkewGet' l (hHasFieldSkew l e) e e'
+        hPlus (hSkewGet l e) (hSkewGet l e')
 
-class HTHasFieldSkew l t b | l t -> b where
-instance HTHasFieldSkew l HNil HFalse
-instance HTHasFieldSkew l HEmpty HFalse
-instance
-    (HTHasFieldSkew l (e, ts) b) =>
-    HTHasFieldSkew l (HCons e ts) b
-instance
-    (HTHasFieldSkew l (e, (t, t')) b) =>
-    HTHasFieldSkew l (HNode e t t') b
-instance
-    (HEq l l' b) =>
-    HTHasFieldSkew l (LVPair l' v) b
-instance
-    (HTHasFieldSkew l e be
-    ,HTHasFieldSkew l e' be'
-    ,HOr be be' b)
-    => HTHasFieldSkew l (e, e') b
-hHasFieldSkew :: HTHasFieldSkew l t b => l -> t -> b
-hHasFieldSkew = undefined
+class HMakeMaybe b v m | b v -> m where
+    hMakeMaybe :: b -> v -> m
+instance HMakeMaybe HFalse v HNothing where
+    hMakeMaybe b v = HNothing
+instance HMakeMaybe HTrue v (HJust v) where
+    hMakeMaybe b v = HJust v
 
-class HHasFieldSkew' l b e e' v | l b e e' -> v where
-    hSkewGet' :: l -> b -> e -> e' -> v
-instance
-    (HHasFieldSkew l e v) =>
-    HHasFieldSkew' l HTrue e e' v where
-    hSkewGet' l _ e e' = hSkewGet l e
-instance
-    (HHasFieldSkew l e' v) =>
-    HHasFieldSkew' l HFalse e e' v where
-    hSkewGet' l _ e e' = hSkewGet l e'
+data HNothing  = HNothing
+data HJust e   = HJust e
+
+class HPlus a b c | a b -> c where
+    hPlus :: a -> b -> c
+instance HPlus (HJust a) b (HJust a) where
+    hPlus a b = a
+instance HPlus HNothing (HJust b) (HJust b) where
+    hPlus a b = b
+instance HPlus HNothing HNothing HNothing where
+    hPlus a b = HNothing
 \end{code}
 
 \begin{code}
 e =
     (
     l1 .=. 1 .*.
-    l1 .=. 1 .*.
+--    l1 .=. 1 .*.
     l2 .=. 2 .*.
     emptySkewRecord)
     # l2
