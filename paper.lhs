@@ -392,7 +392,7 @@ squares =
     HNil
 sq3 = hLookupByLabel l3 squares
 \end{code}
-
+\marcos{Sacar\'ia el pragma ... y lo escribir\'ia |squares = l1 .=. 1 .*. l2 .=. 4 .*. l3 .=. 9 .*. l4 .=. 16 .*. emptyRecord|}
 %% $
 
 \begin{spec}
@@ -402,6 +402,7 @@ Paper.sq3 =
   case ds1_d15l of _ { Paper.HCons f'1_X10B ds2_X17k ->
   f'1_X10B
 \end{spec}
+\marcos{Cambiar\'ia los nombres para que quede m\'as legible el c\'odigo. Ej: |case squares of _ { HCons x1 x1s -> case x1s of ... |}
 
 %% The possibility to update an element in a record at a given label position is provided by:
 
@@ -435,6 +436,8 @@ Without help from the compiler,
 defining such type function for
 unstructured labels is beyond (our) reach.
 
+\section{Faster Extensible Records}\label{sec:hlist}
+
 The key insight is that sub-linear behavior is only needed at runtime.
 We are willing to keep the work done at compile-time superlinear
 if it helps us to speed up our programs at runtime.
@@ -446,7 +449,7 @@ that allows fast random access and depend on the compiler to
 hardcode the path to our fields.
 Following, \cite{OkaThesis} we leaned on Skew Binary Random-Access Lists.
 
-\section{Skew Binary Random-Access List}\label{sec:hlist}
+\subsection{Skew Binary Random-Access List}\label{sec:hlist}
 
 We'll describe Skew Binary Random-Access List \cite{Mye83} in a less principled
 but easier and more direct fashion
@@ -454,6 +457,9 @@ than \cite{OkaThesis}, which is founded on numerical representations.
 A skew list is a linked list spine of complete binary trees
 with elements in both
 leaves and internal nodes.
+
+
+\subsection{SkewRecord}
 
 \begin{code}
 newtype  HLeaf  e         =  HLeaf  e

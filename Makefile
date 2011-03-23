@@ -4,7 +4,7 @@ paper.o : paper.hs
 	ghc -O paper.hs
 
 paper.hs : paper.lhs
-	lhs2Tex paper.lhs -o paper.hs --newcode
+	lhs2TeX paper.lhs -o paper.hs --newcode
 
 paper.tex : paper.lhs
 	lhs2TeX paper.lhs -o paper.tex
