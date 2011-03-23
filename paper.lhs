@@ -39,7 +39,6 @@
 %endif
 
 %if style==newcode
-
 \begin{code}
 {-# LANGUAGE EmptyDataDecls #-}
 {-# LANGUAGE FlexibleContexts #-}
@@ -56,9 +55,12 @@ import Data.HList.Label4
 import Data.HList.TypeEqGeneric1
 import Data.HList.TypeCastGeneric1
 
+infixr 2 .*.
+infixr 4 .=.
+infixr 9 #
 \end{code}
-
 %endif
+
 %\setlength{\parindent}{0in}
 
 \begin{document}
@@ -263,13 +265,6 @@ class HExtend e l l' | e l -> l'
     where (.*.) :: e -> l -> l'
 \end{code}
 
-%if style==newcode
-\begin{code}
-infixr 2 .*.
-infixr 4 .=.
-\end{code}
-%endif
-
 The functional dependency |e l -> l'| makes |HExtend| a type-level function, instead of a relation:
 once |e| and |l| are fixed |l'| is uniquely determined.
 It fixes the type |l'| of a collection,
@@ -310,53 +305,53 @@ myR = field1 .*. field2 .*. emptyRecord
 %%   where hExtend f (Record r) = Record (HCons f r)
 %% \end{code}
 
-The class |HasField| is used to retrieve the value part
+The class |HHasField| is used to retrieve the value part
 corresponding to a specific label from a record:
 
 \begin{code}
-class HasField l r v | l r -> v where
-    hLookupByLabel :: l -> r -> v
+class HHasField l r v | l r -> v where
+    (#) :: r -> l -> v
 \end{code}
 
 \noindent At the type-level it is statically checked that the record |r| indeed has
 a field with label |l| associated with a value of the type |v|.
-At value-level the member |hLookupByLabel| returns the value of type |v|.
+At value-level the operator |(#)| returns the value of type |v|.
 So, the following expression returns the string |"bla"|:
 
-< hLookupByLabel label2 myR
+< myR # label2
 
-The instances for |HasField| are
+The instances for |HHasField| are
 
 \begin{code}
 instance
-    (HasFieldList l r v)
-    => HasField l (Record r) v where
-    hLookupByLabel l (Record r) =
-        hListLookupByLabel l r
+    (HHasFieldList l r v)
+    => HHasField l (Record r) v where
+    Record r # l =
+        hListGet l r
 
-class HasFieldList l r v | l r -> v where
-    hListLookupByLabel :: l -> r -> v
+class HHasFieldList l r v | l r -> v where
+    hListGet :: l -> r -> v
 
 instance
     (  HEq l l' b
-    ,  HasFieldList' b l (HCons (LVPair l' v') r) v)
-    => HasFieldList l (HCons (LVPair l' v') r) v where
-    hListLookupByLabel l r@(HCons f' _) =
-        hListLookupByLabel' (hEq l (labelLVPair f')) l r
+    ,  HHasFieldList' b l (HCons (LVPair l' v') r) v)
+    => HHasFieldList l (HCons (LVPair l' v') r) v where
+    hListGet l r@(HCons f' _) =
+        hListGet' (hEq l (labelLVPair f')) l r
 
-class HasFieldList' b l r v | b l r -> v where
-    hListLookupByLabel':: b -> l -> r -> v
+class HHasFieldList' b l r v | b l r -> v where
+    hListGet':: b -> l -> r -> v
 
 instance
-    HasFieldList' HTrue l (HCons (LVPair l v) r) v where
-    hListLookupByLabel' _ _ (HCons (LVPair v) _) =
+    HHasFieldList' HTrue l (HCons (LVPair l v) r) v where
+    hListGet' _ _ (HCons (LVPair v) _) =
         v
 
 instance
-    HasFieldList l r v =>
-    HasFieldList' HFalse l (HCons fld r) v where
-    hListLookupByLabel' _ l (HCons _ r) =
-        hListLookupByLabel l r
+    HHasFieldList l r v =>
+    HHasFieldList' HFalse l (HCons fld r) v where
+    hListGet' _ l (HCons _ r) =
+        hListGet l r
 \end{code}
 
 \noindent
@@ -364,11 +359,11 @@ While only |HCons| may have the field we are looking for,
 we need to consider two cases.
 The head of the list may be the correct field,
 or the field may be present further along the list.
-We need to assert |HEq l l' b| and delegate to another type-function (|HasFieldList'|)
+We need to assert |HEq l l' b| and delegate to another type-function (|HHasFieldList'|)
 so that the two cases are disambiguated in an instance head.
 Haskell won't disambiguate two instances based on the instance context.
 
-GHC is smart enough to elide the dictionary objects and indirect jumps for |hLookupByLabel|.
+GHC is smart enough to elide the dictionary objects and indirect jumps for |(#)|.
 The code is inlined to a case cascade, but the program must traverse the linked list.
 This is a sample program and its GHC core.
 
@@ -390,7 +385,7 @@ squares =
     HCons (l3 .=. 9)   $
     HCons (l4 .=. 16)  $
     HNil
-sq3 = hLookupByLabel l3 squares
+sq3 = squares # l3
 \end{code}
 \marcos{Sacar\'ia el pragma ... y lo escribir\'ia |squares = l1 .=. 1 .*. l2 .=. 4 .*. l3 .=. 9 .*. l4 .=. 16 .*. emptyRecord|}
 %% $
@@ -403,22 +398,6 @@ Paper.sq3 =
   f'1_X10B
 \end{spec}
 \marcos{Cambiar\'ia los nombres para que quede m\'as legible el c\'odigo. Ej: |case squares of _ { HCons x1 x1s -> case x1s of ... |}
-
-%% The possibility to update an element in a record at a given label position is provided by:
-
-%% < class HUpdateAtLabel l v r r' | l v r -> r' where
-%% <   hUpdateAtLabel :: l -> v -> r -> r'
-
-%% In order to keep our programs readable we introduce infix operators for some of the previous functions:
-
-%% \begin{code}
-%% infixr 2 .*.
-%% infixr 4 .=.
-%% infixr 9 #
-%% (.*.) ::  HExtend e l l' => e -> l -> l'
-%% (.*.) =   hExtend
-%% r  #    l  =  hLookupByLabel l r
-%% \end{code}
 
 When the number of fields increases,
 as in EDSLs that use extensible records internally \cite{FlyFirstClass},
@@ -441,7 +420,7 @@ unstructured labels is beyond (our) reach.
 The key insight is that sub-linear behavior is only needed at runtime.
 We are willing to keep the work done at compile-time superlinear
 if it helps us to speed up our programs at runtime.
-|HasField| already looks for our label at compile-time
+|HHasField| already looks for our label at compile-time
 to fail compilation if we require a field for a record
 wihout such label.
 So we just store our field unordered in a structure
@@ -462,8 +441,10 @@ leaves and internal nodes.
 \subsection{SkewRecord}
 
 \begin{code}
-newtype  HLeaf  e         =  HLeaf  e
-data     HNode  e  t  t'  =  HNode  e  t  t'
+data  HEmpty           =  HEmpty
+data  HNode  e  t  t'  =  HNode  e  t  t'
+type  HLeaf  e         =  HNode e HEmpty HEmpty
+hLeaf        e         =  HNode e HEmpty HEmpty
 \end{code}
 
 \noindent
@@ -473,9 +454,9 @@ The following declarations define a list with elements 1..5:
 
 \begin{code}
 onefive =
-    HCons (HLeaf 1) $
-    HCons (HLeaf 2) $
-    HCons (HNode 3 (HLeaf 4) (HLeaf 5)) $
+    HCons (hLeaf 1) $
+    HCons (hLeaf 2) $
+    HCons (HNode 3 (hLeaf 4) (hLeaf 5)) $
     HNil
 \end{code}
 \marcos{No me gusta eso de introducir un nuevo ejemplo para cada cosa. Yo usar\'ia |squares|, o mejor, har\'ia que |myR| de 2.2 sea m\'as grande y lo usar\'ia en lugar de |squares| y |onefive|.}
@@ -495,7 +476,7 @@ When the spine has at least two trees
 and the first two trees are of equal size,
 we remove them and insert a new |HNode| built
 of the new element and the two trees removed.
-Else, we just insert a |HLeaf| of the new element.
+Else, we just insert a |HNode| with the element and two |HLeaf|s through helper method |hLeaf|.
 
 We define a new tag |SkewRecord|
 and the corresponding |HExtend| instance
@@ -508,17 +489,18 @@ emptySkewRecord :: SkewRecord HNil
 emptySkewRecord = SkewRecord HNil
 
 instance
-    (HSkewExtend e l l') =>
-    HExtend e (SkewRecord l) (SkewRecord l') where
-    e .*. SkewRecord l =
-        SkewRecord (hSkewExtend e l)
+    (HSkewExtend (LVPair l v) ts ts',
+    HTHasFieldSkew l ts HFalse) =>
+    HExtend (LVPair l v) (SkewRecord ts) (SkewRecord ts') where
+    e .*. SkewRecord ts =
+        SkewRecord (hSkewExtend e ts)
 \end{code}
 
 |HComplete| below checks that all root to leaf paths have the same length
 and returns it.
 \begin{code}
 class HComplete t h | t -> h
-instance HComplete (HLeaf e) HZero
+instance HComplete HEmpty HZero
 instance
     (HComplete t h, HComplete t' h) =>
     HComplete (HNode e t t') (HSucc h)
@@ -546,7 +528,7 @@ instance
     hSkewExtend e l = hSkewExtend' (hSkewCarry l) e l
 
 
-class HSkewExtend' b e l l' where
+class HSkewExtend' b e l l' | b e l -> l' where
     hSkewExtend' :: b -> e -> l -> l'
 instance
     HSkewExtend'
@@ -554,7 +536,7 @@ instance
         e
         l
         (HCons (HLeaf e) l) where
-    hSkewExtend' _ e l = HCons (HLeaf e) l
+    hSkewExtend' _ e l = HCons (hLeaf e) l
 
 instance
     HSkewExtend'
@@ -567,98 +549,81 @@ instance
 \end{code}
 
 \noindent
-The |HBalanced| type-function returns the height of the given tree.
-While we are at it, we check that the tree is complete.
-The three cases for |HSkewExtend| handle
-the empty, singleton, and length 2+ lists, respectively.
-For the latter, only when the first two lists are the same size,
-as indicated by |HBalanced|,
-we insert a new |HNode|.
-In all other cases, we use |HLeaf|.
 
-The missing piece is |HasField| for |SkewRecord|.
+The missing piece is |HHasField| for |SkewRecord|.
 As already mentioned,
 we explore all paths at compile-time
 but follow only the right one at runtime.
 
 \begin{code}
 instance
-    HasFieldSkew l ts v =>
-    HasField l (SkewRecord ts) v where
-    hLookupByLabel l (SkewRecord ts) =
-        hSkewLookupByLabel l ts
+    (HHasFieldSkew l ts v) =>
+    HHasField l (SkewRecord ts) v where
+    SkewRecord ts # l =
+        hSkewGet l ts
 
-class HasFieldSkew l ts v | l ts -> v where
-    hSkewLookupByLabel :: l -> ts -> v
+class HHasFieldSkew l ts v | l ts -> v where
+    hSkewGet :: l -> ts -> v
 instance
-    (HasFieldB l t bt
-    ,HasFieldB l ts bts
-    ,HasFieldCons bt bts l t ts v) =>
-    HasFieldSkew l (HCons t ts) v where
-    hSkewLookupByLabel l (HCons t ts) =
-        hConsLookupByLabel (hasField l t) (hasField l ts) l t ts
+    (HHasFieldSkew l (t, ts) v) =>
+    HHasFieldSkew l (HCons t ts) v where
+    hSkewGet l (HCons t ts) =
+        hSkewGet l (t, ts)
 instance
-    HasFieldSkew l (HLeaf (LVPair l v)) v where
-    hSkewLookupByLabel l (HLeaf (LVPair v)) = v
+    (HHasFieldSkew l (e, (t, t')) v) =>
+    HHasFieldSkew l (HNode e t t') v where
+    hSkewGet l (HNode e t t') =
+        hSkewGet l (e, (t, t'))
 instance
-    (HEq l l' bl'
-    ,HasFieldB l t bt
-    ,HasFieldB l t' bt'
-    ,HasFieldNode bl' bt bt' l v' t t' v)
-    => HasFieldSkew l (HNode (LVPair l' v') t t') v where
-    hSkewLookupByLabel l (HNode f@(LVPair v') t t') =
-        hNodeLookupByLabel
-        (hEq l (labelLVPair f))
-        (hasField l t)
-        (hasField l t')
-        l
-        v'
-        t
-        t'
+    HHasFieldSkew l (LVPair l v) v where
+    hSkewGet l (LVPair v) = v
+instance
+    (HTHasFieldSkew l e b
+    ,HHasFieldSkew' l b e e' v)
+    => HHasFieldSkew l (e, e') v where
+    hSkewGet l (e, e') =
+        hSkewGet' l (hHasFieldSkew l e) e e'
 
-class HasFieldB l r b | l r -> b where
-instance HasFieldB l HNil HFalse
-instance (HasFieldB l t bt, HasFieldB l ts bts, HOr bt bts b)
-    => HasFieldB l (HCons t ts) b
-instance HEq l l' b => HasFieldB l (HLeaf (LVPair l' v)) b
+class HTHasFieldSkew l t b | l t -> b where
+instance HTHasFieldSkew l HNil HFalse
+instance HTHasFieldSkew l HEmpty HFalse
 instance
-    (HEq l l' bl
-    ,HasFieldB l l1 b1
-    ,HasFieldB l l2 b2
-    ,HOr bl b1 bl1
-    ,HOr bl1 b2 bl12)
-    => HasFieldB l (HNode (LVPair l' v) l1 l2) bl12
-hasField :: HasFieldB l r b => l -> r -> b
-hasField = undefined
+    (HTHasFieldSkew l (e, ts) b) =>
+    HTHasFieldSkew l (HCons e ts) b
+instance
+    (HTHasFieldSkew l (e, (t, t')) b) =>
+    HTHasFieldSkew l (HNode e t t') b
+instance
+    (HEq l l' b) =>
+    HTHasFieldSkew l (LVPair l' v) b
+instance
+    (HTHasFieldSkew l e be
+    ,HTHasFieldSkew l e' be'
+    ,HOr be be' b)
+    => HTHasFieldSkew l (e, e') b
+hHasFieldSkew :: HTHasFieldSkew l t b => l -> t -> b
+hHasFieldSkew = undefined
 
+class HHasFieldSkew' l b e e' v | l b e e' -> v where
+    hSkewGet' :: l -> b -> e -> e' -> v
+instance
+    (HHasFieldSkew l e v) =>
+    HHasFieldSkew' l HTrue e e' v where
+    hSkewGet' l _ e e' = hSkewGet l e
+instance
+    (HHasFieldSkew l e' v) =>
+    HHasFieldSkew' l HFalse e e' v where
+    hSkewGet' l _ e e' = hSkewGet l e'
+\end{code}
 
-class HasFieldCons bt bts l t ts v where
-    hConsLookupByLabel :: bt -> bts -> l -> t -> ts -> v
-instance
-    HasFieldSkew l t v =>
-    HasFieldCons HTrue bts l t ts v where
-    hConsLookupByLabel _ _ l t ts = hSkewLookupByLabel l t
-instance
-    HasFieldSkew l ts v =>
-    HasFieldCons HFalse HTrue l t ts v where
-    hConsLookupByLabel _ _ l t ts =
-        hSkewLookupByLabel l ts
-
-class HasFieldNode be bt bt' l e t t' v where
-    hNodeLookupByLabel :: be -> bt -> bt' -> l -> e -> t -> t' -> v
-instance
-    HasFieldNode HTrue bt bt' l (LVPair l v) t t' v where
-    hNodeLookupByLabel _ _ _ l e t t' = valueLVPair e
-instance
-    HasFieldSkew l t v =>
-    HasFieldNode HFalse HTrue bt' l e t t' v where
-    hNodeLookupByLabel _ _ _ l e t t' =
-        hSkewLookupByLabel l t
-instance
-    HasFieldSkew l t' v =>
-    HasFieldNode HFalse HFalse HTrue l e t t' v where
-    hNodeLookupByLabel _ _ _ l e t t' =
-        hSkewLookupByLabel l t'
+\begin{code}
+e =
+    (
+    l1 .=. 1 .*.
+    l1 .=. 1 .*.
+    l2 .=. 2 .*.
+    emptySkewRecord)
+    # l2
 \end{code}
 
 \section{Efficiency}
