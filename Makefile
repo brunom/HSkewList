@@ -1,7 +1,7 @@
-all: paper.pdf paper.o
+all: paper.pdf paper.exe
 
-paper.o : paper.hs
-	ghc -O paper.hs
+paper.exe : paper.hs
+	time ghc -O --make paper.hs -o paper.exe 2>&1
 
 paper.hs : paper.lhs
 	lhs2TeX paper.lhs -o paper.hs --newcode
