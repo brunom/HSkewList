@@ -478,7 +478,7 @@ onefive =
     HCons (HNode 3 (HLeaf 4) (HLeaf 5)) $
     HNil
 \end{code}
-
+\marcos{No me gusta eso de introducir un nuevo ejemplo para cada cosa. Yo usar\'ia |squares|, o mejor, har\'ia que |myR| de 2.2 sea m\'as grande y lo usar\'ia en lugar de |squares| y |onefive|.}
 %% $ fix emacs color highlighting
 
 The invariant of skew lists is that the height of trees
@@ -501,6 +501,7 @@ We define a new tag |SkewRecord|
 and the corresponding |HExtend| instance
 to be able to use |(.*.)|.
 |HSkewRecord| does the actual work.
+\marcos{Para seguir el estilo de HList tendr\'iamos que tener un |HSkew| que sea el |SkewRecord| descripto ahora y un |HSkewRecord| con un smart constructor |mkHSkewRecord| que imponga la constraint de que el HSkew sea un ``LabelSet"}
 \begin{code}
 newtype SkewRecord r = SkewRecord r
 emptySkewRecord :: SkewRecord HNil
@@ -659,6 +660,10 @@ instance
     hNodeLookupByLabel _ _ _ l e t t' =
         hSkewLookupByLabel l t'
 \end{code}
+
+\section{Efficiency}
+
+\todo{incluir gr\'aficas}
 
 \bibliographystyle{plainnat}
 
