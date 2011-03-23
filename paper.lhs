@@ -456,8 +456,11 @@ with elements in both
 leaves and internal nodes.
 
 \begin{code}
-newtype  HLeaf  e         =  HLeaf  e
-data     HNode  e  t  t'  =  HNode  e  t  t'
+data  HEmpty           =  HEmpty
+data  HNode  e  t  t'  =  HNode  e  t  t'
+type  HNode  e  t  t'  =  HCons e (HCons t t')
+type  HLeaf  e         =  HNode e HEmpty HEmpty
+hLeaf        e         =  HNode e HEmpty HEmpty
 \end{code}
 
 \noindent
@@ -467,9 +470,9 @@ The following declarations define a list with elements 1..5:
 
 \begin{code}
 onefive =
-    HCons (HLeaf 1) $
-    HCons (HLeaf 2) $
-    HCons (HNode 3 (HLeaf 4) (HLeaf 5)) $
+    HCons (hLeaf 1) $
+    HCons (hLeaf 2) $
+    HCons (HNode 3 (hLeaf 4) (hLeaf 5)) $
     HNil
 \end{code}
 
@@ -489,7 +492,7 @@ When the spine has at least two trees
 and the first two trees are of equal size,
 we remove them and insert a new |HNode| built
 of the new element and the two trees removed.
-Else, we just insert a |HLeaf| of the new element.
+Else, we just insert a |HNode| with the element and two |HLeaf|s through helper method |hLeaf|.
 
 We define a new tag |SkewRecord|
 and the corresponding |HExtend| instance
@@ -511,7 +514,7 @@ instance
 and returns it.
 \begin{code}
 class HComplete t h | t -> h
-instance HComplete (HLeaf e) HZero
+instance HComplete HEmpty HZero
 instance
     (HComplete t h, HComplete t' h) =>
     HComplete (HNode e t t') (HSucc h)
@@ -547,7 +550,7 @@ instance
         e
         l
         (HCons (HLeaf e) l) where
-    hSkewExtend' _ e l = HCons (HLeaf e) l
+    hSkewExtend' _ e l = HCons (hLeaf e) l
 
 instance
     HSkewExtend'
@@ -560,14 +563,6 @@ instance
 \end{code}
 
 \noindent
-The |HBalanced| type-function returns the height of the given tree.
-While we are at it, we check that the tree is complete.
-The three cases for |HSkewExtend| handle
-the empty, singleton, and length 2+ lists, respectively.
-For the latter, only when the first two lists are the same size,
-as indicated by |HBalanced|,
-we insert a new |HNode|.
-In all other cases, we use |HLeaf|.
 
 The missing piece is |HasField| for |SkewRecord|.
 As already mentioned,
@@ -591,9 +586,6 @@ instance
     hSkewLookupByLabel l (HCons t ts) =
         hConsLookupByLabel (hasField l t) (hasField l ts) l t ts
 instance
-    HasFieldSkew l (HLeaf (LVPair l v)) v where
-    hSkewLookupByLabel l (HLeaf (LVPair v)) = v
-instance
     (HEq l l' bl'
     ,HasFieldB l t bt
     ,HasFieldB l t' bt'
@@ -611,9 +603,9 @@ instance
 
 class HasFieldB l r b | l r -> b where
 instance HasFieldB l HNil HFalse
+instance HasFieldB l HEmpty HFalse
 instance (HasFieldB l t bt, HasFieldB l ts bts, HOr bt bts b)
     => HasFieldB l (HCons t ts) b
-instance HEq l l' b => HasFieldB l (HLeaf (LVPair l' v)) b
 instance
     (HEq l l' bl
     ,HasFieldB l l1 b1
