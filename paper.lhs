@@ -225,31 +225,29 @@ instance HPlus HNothing HNothing HNothing where
 
 \subsection{Heterogeneous Lists}
 
-Heterogeneous lists are represented with the data types |HNil| and |HCons|,
-which model the structure of a normal list both at the value and type level:
+Heterogeneous lists can be represented with the data types |HNil| and |HCons|,
+which model the structure of lists both at the value and type level:
 
 \begin{code}
 data HNil       = HNil
 data HCons e l  = HCons e l
 \end{code}
 
-The sequence |HCons True (HCons "bla" HNil)| is a correct heterogeneous list
-with type |HCons Bool (HCons String HNil)|.
-%% Since we want to prevent that an expression |HCons True False| represents a correct heterogeneous list
-%% (the second |HCons| argument is not a type-level list)
-%% we introduce the classes |HList| and its instances,
-%% and express express this constraint by adding a context condition to the |HCons ...| instance:
+For example, the value |HCons True (HCons (HJust 'a') HNil)| is a heterogeneous list of type |HCons Bool (HCons (HJust Char) HNil)|.
 
-%% \begin{code}
-%% class     HList l
-%% instance  HList HNil
-%% instance  HList l => HList (HCons e l)
-%% \end{code}
+To prevent the formation of incorrect heterogeneous lists, such as |HCons True False|, 
+it is possible to introduce a class |HList| whose instances specify the type of 
+well-formed heterogeneous lists. 
 
-%% The main reason for introducing the class |HExtend| is to make it possible
-%% to encode constraints on the things which can be |HCons|-ed;
-%% here we have expressed that the second parameter should be a list again.
-%% In the next subsection we will see how to make use of this facility.
+\begin{spec}
+class     HList l
+instance  HList HNil
+instance  HList l => HList (HCons e l)
+\end{spec}
+
+For space reasons, we we will avoid the inclusion of this well-formedness condition for 
+heterogeneous lists as well as for other type-level types, like naturals or booleans,
+in order to make codes shorter. 
 
 \subsection{Extensible Records}
 
