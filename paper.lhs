@@ -425,10 +425,10 @@ data L1; l1 = undefined :: Proxy L1
 data L2; l2 = undefined :: Proxy L2
 data L3; l3 = undefined :: Proxy L3
 data L4; l4 = undefined :: Proxy L4
+{-# NOINLINE squares #-}
 \end{code}
 %endif
 
-%{-# NOINLINE squares #-}
 \begin{code}
 squares =
     l1  .=. 1   .*.
@@ -624,27 +624,6 @@ As already mentioned,
 we explore all paths at compile-time
 but follow only the right one at runtime.
 
-\begin{code}
-data HNothing  = HNothing
-data HJust e   = HJust e
-
-class HMakeMaybe b v m | b v -> m where
-    hMakeMaybe :: b -> v -> m
-instance HMakeMaybe HFalse v HNothing where
-    hMakeMaybe b v = HNothing
-instance HMakeMaybe HTrue v (HJust v) where
-    hMakeMaybe b v = HJust v
-
-class HPlus a b c | a b -> c where
-    hPlus :: a -> b -> c
-instance HPlus (HJust a) b (HJust a) where
-    hPlus a b = a
-instance HPlus HNothing (HJust b) (HJust b) where
-    hPlus a b = b
-instance HPlus HNothing HNothing HNothing where
-    hPlus a b = HNothing
-\end{code}
-
 Mirroring the definitions for linked list records,
 we need a |HHasField| instance for |SkewRecord|
 and an auxiliary type class |HHasFieldSkew|.
@@ -653,14 +632,13 @@ is now much more involved.
 The cases that both the test function and the work function must consider
 are more numerous and involved.
 Thus, we merge both functions.
-|HHasFieldSkew| 
+|HHasFieldSkew| returns a type level and value level Maybe,
+that is,
+|HNothing| when no field with the label is found,
+and |HJust| of the field's type/value otherwise.
+For branching constructors |HCons| and |HNode|,
+|HPlus| chooses the correct path for us.
 \begin{code}
-instance
-    (HHasFieldSkew l ts (HJust v)) =>
-    HHasField l (SkewRecord ts) v where
-    SkewRecord ts # l =
-        case hSkewGet l ts of HJust e -> e
-
 class HHasFieldSkew l ts v | l ts -> v where
     hSkewGet :: l -> ts -> v
 instance HHasFieldSkew l HNil HNothing where
@@ -690,9 +668,69 @@ instance
     hSkewGet l f = hMakeMaybe (hEq l (labelLVPair f)) (valueLVPair f)
 \end{code}
 
+Finally, |HHasField| requires
+top level |HHasFieldSkew| to return |HJust|,
+so compilation fails when requiring a non existent field,
+At runtime, |(#)| unwraps the input |SkewRecord|
+and the intermediate |HJust| from |HHasFieldSkew|.
+\begin{code}
+instance
+    (HHasFieldSkew l ts (HJust v)) =>
+    HHasField l (SkewRecord ts) v where
+    SkewRecord ts # l =
+        case hSkewGet l ts of HJust e -> e
+\end{code}
+
 \section{Efficiency}
 
-\todo{incluir gr\'aficas}
+Let's up the ante a little on our squares sample
+%if style==newcode
+\begin{code}
+data L5; l5 = undefined :: Proxy L5
+data L6; l6 = undefined :: Proxy L6
+data L7; l7 = undefined :: Proxy L7
+data L8; l8 = undefined :: Proxy L8
+data L9; l9 = undefined :: Proxy L9
+data L0; l0 = undefined :: Proxy L0
+{-# NOINLINE skewSquares #-}
+\end{code}
+%endif
+
+\begin{code}
+skewSquares =
+    l0  .=. 0   .*.
+    l1  .=. 1   .*.
+    l2  .=. 4   .*.
+    l3  .=. 9   .*.
+    l4  .=. 16  .*.
+    l5  .=. 25  .*.
+    l6  .=. 36  .*.
+    l7  .=. 49  .*.
+    l8  .=. 64  .*.
+    l9  .=. 81  .*.
+    emptySkewRecord
+sq7 = skewSquares # l7
+\end{code}
+
+\noindent
+Because we used |emptySkewRecord|,
+the compiler builds a skew list,
+and getting to |l7| only traverses a fraction of the elements.
+Here's the core:
+\begin{spec}
+sq7 =
+  case skewSquares  of HCons  _   l1      ->
+  case l1           of HCons  t1  _       ->
+  case t1           of HNode  _   _   t2  ->
+  case t2           of HNode  e   _   _   ->
+  e
+\end{spec}
+
+As records have more and more fields, the difference is more pronounced.
+We measured accessing the last of an increasing number of fields.
+The program constructed the list once
+and run a 100.000.000 iteration |(#)| loop.
+Our laptop is a Celeron M 1.4 Ghz single core with 736 MB of RAM.
 
 \begin{tikzpicture}[x=0.04cm,y=0.16cm]
 
@@ -706,7 +744,7 @@ instance
   (\xmax,\ymax);
 
   % axes
-  \draw[->] (\xmin,\ymin) -- (\xmax,\ymin) node[right] {list length};
+  \draw[->] (\xmin,\ymin) -- (\xmax,\ymin) node[right] {field count};
   \draw[->] (\xmin,\ymin) -- (\xmin,\ymax) node[above] {time (s)};
 
   % xticks and yticks
@@ -745,6 +783,19 @@ instance
   \node[right,red] at (150, 3.7) {SkewRecord};
 \end{tikzpicture}
 
+\noindent
+Note how the |SkewRecord| version barely increases the run time at a logarithm rate.
+Actually, sometimes larger records run faster.
+For example, a 31 size skew list contains a single tree,
+so elements are at most 5 hops away.
+But a 28 size skew lists contains trees sized
+1, 1, 3, 7 and 15,
+and getting to the last takes 8 hops.
+
+The dark side is that compile time explodes for |SkewRecord|,
+so rapid prototyping may be better served by using plain |Record|
+for debug runs:
+
 \begin{tikzpicture}[x=0.04cm,y=0.04cm]
 
   \def\xmin{0}
@@ -757,7 +808,7 @@ instance
   (\xmax,\ymax);
 
   % axes
-  \draw[->] (\xmin,\ymin) -- (\xmax,\ymin) node[right] {list length};
+  \draw[->] (\xmin,\ymin) -- (\xmax,\ymin) node[right] {field count};
   \draw[->] (\xmin,\ymin) -- (\xmin,\ymax) node[above] {time (s)};
 
   % xticks and yticks
