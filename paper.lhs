@@ -123,6 +123,10 @@ and implements a look-up operation that runs in logarithmic-time.
 \section{Introduction} \label{sec:intro}
 
 
+\section{The Idea} \label{sec:intro}
+
+.. we have observed that when, for example, looking-up an element into a HList ...
+
 \begin{figure}[htp]
 \begin{center}
 \includegraphics[scale=0.5]{search-hlist.pdf}
@@ -262,10 +266,10 @@ resulting from extending a collection of type |l| with an element of type |e|.
 The member |hExtend| performs the same computation at the level of values.
 
 We remove |l' -> e l|, an additional dependency present in the original HList formulation.
-The compiler refuses our instances implementing Skew lists because it can't prove that the instances satisfy the dependency.
+The compiler refuses our instances implementing Skew lists because it cannot prove that the instances satisfy the dependency. \marcos{no queda muy bien esa frase}
 
 
-\subsection{Extensible Records}
+\subsection{Extensible Records}\label{sec:extensiblerecords}
 
 Records are mappings from labels to values.
 They are modeled by an |HList| containing a heterogeneous list of fields.
@@ -309,7 +313,7 @@ labelLVPair = undefined
 %data Proxy e ; proxy = undefined :: Proxy e
 %\end{spec}
 
-To mix and match both kinds of records we introduce a multi-parameter class |HExtend|.
+The instance of |HExtend| for records extends the list:
 
 
 \begin{code}
@@ -317,16 +321,27 @@ instance HExtend e (Record l) (Record (HCons e l))
     where e .*. Record l = Record (HCons e l)
 \end{code}
 
-\noindent Thus, the following declarations define a record (|myR|) with two elements, labelled by |Label1| and |Label2|:
+\noindent Thus, the following declarations define a record (|myR|) with seven elements, 
+labeled by the types |L1|, |L2|, |L3|, |L4|, |L5|, |L6| and |L7|:
 
 \begin{code}
-data Label1; label1 = proxy :: Proxy Label1
-data Label2; label2 = proxy :: Proxy Label2
+data L1; l1 = proxy :: Proxy L1
+data L2; l2 = proxy :: Proxy L2
+data L3; l3 = proxy :: Proxy L3
+data L4; l4 = proxy :: Proxy L4
+data L5; l5 = proxy :: Proxy L5
+data L6; l6 = proxy :: Proxy L6
+data L7; l7 = proxy :: Proxy L7
 
-field1  = label1  .=.  True
-field2  = label2  .=.  "bla"
 
-myR = field1 .*. field2 .*. emptyRecord
+myR =  l1  .=.  True     .*. 
+       l2  .=.  9        .*. 
+       l3  .=.  "bla"    .*. 
+       l4  .=.  'c'      .*. 
+       l5  .=.  Nothing  .*. 
+       l6  .=.  [4,5]    .*.
+       l7  .=.  "last"   .*. 
+       emptyRecord
 \end{code}
 
 %% $
@@ -354,12 +369,15 @@ class HHasField l r v | l r -> v where
 \noindent At the type-level it is statically checked that the record |r| indeed has
 a field with label |l| associated with a value of the type |v|.
 At value-level the operator |(#)| returns the value of type |v|.
-So, the following expression returns the string |"bla"|:
+For example, the following expression returns the string |"bla"|:
 
-< myR # label2
+\begin{code}
+bla = myR # l3
+\end{code}
+
 
 The |HHasField| instance for |Record| just unpacks the list
-and delegate the job to |HHasFieldList|.
+and delegates the job to |HHasFieldList|.
 We use a different class to avoid a clash with
 the |HHasField| instance for |SkewRecord| below,
 which also uses |HCons| and |HNil| internally.
@@ -417,33 +435,14 @@ devoid of logic and conditions.
 For this reason,
 GHC is smart enough to elide the dictionary objects and indirect jumps for |(#)|.
 The code is inlined to a case cascade, but the program must traverse the linked list.
-This is a sample program and its GHC core.
+For example, this is the GHC core of the example:
 
-%if style==newcode
-\begin{code}
-data L1; l1 = undefined :: Proxy L1
-data L2; l2 = undefined :: Proxy L2
-data L3; l3 = undefined :: Proxy L3
-data L4; l4 = undefined :: Proxy L4
-{-# NOINLINE squares #-}
-\end{code}
-%endif
-
-\begin{code}
-squares =
-    l1  .=. 1   .*.
-    l2  .=. 4   .*.
-    l3  .=. 9   .*.
-    l4  .=. 16  .*.
-    emptyRecord
-sq3 = squares # l3
-\end{code}
 
 \begin{spec}
-sq3 =
-  case squares  of HCons  _  l1  ->
-  case l1       of HCons  _  l2  ->
-  case l2       of HCons  e  _   ->
+bla =
+  case myR  of HCons  _  rs1  ->
+  case rs1  of HCons  _  rs2  ->
+  case rs2  of HCons  e  _    ->
   e
 \end{spec}
 
@@ -483,6 +482,29 @@ but easier and more direct fashion
 than \cite{OkaThesis}, which is founded on numerical representations.
 A skew list is a linked list spine of complete binary trees.
 
+The invariant of skew lists is that the height of trees
+get strictly larger along the linked list,
+except that the first two trees may be of equal size.
+Because of the size restriction,
+the spine is bounded by the logarithm of the element count,
+as is each tree.
+Hence, we can get to any element in logarithm effort.
+
+Insertion maintaining the invariant is constant time
+and considers two cases.
+When the spine has at least two trees
+and the first two trees are of equal size (\emph{case 1}),
+we remove them and insert a new node built
+of the new element and the two trees removed.
+Else (\emph{case 2}), we just insert a new leaf.
+In Figure~\ref{fig:insert} we show a graphic representation of
+the construction of a skew list with the elements of |myR| from section \ref{sec:extensiblerecords}.
+Nodes connected by arrows represent linked-lists and nodes connected by lines represent trees.
+The first two steps (adding elements with label |l6| and |l5|) are in case 2, 
+thus two leaves are inserted into the spine. 
+On the other hand, the third step is in case 1, so a node has to be made with the new element and the 
+two previous sub-trees.
+
 
 \begin{figure}[htp]
 \begin{center}
@@ -493,6 +515,9 @@ A skew list is a linked list spine of complete binary trees.
 
 
 \subsection{SkewRecord}
+
+In this subsection we present our implementation of extensible records
+using skew lists. First, we introduce some types to model the structure:
 
 \begin{code}
 data  HEmpty           =  HEmpty
@@ -506,41 +531,25 @@ The element precedes the subtrees in |HNode|
 so all elements in expressions read in order left to right.
 The common leaf case warrants helper type |HLeaf|
 and smart constructor |hLeaf|.
-The following declarations define a list with elements 1..5:
+The following declarations define a list with the elements of the fourth step of Figure~\ref{fig:insert} :
 
 \begin{code}
-onefive =
-    HCons (hLeaf 1) $
-    HCons (hLeaf 2) $
-    HCons (HNode 3 (hLeaf 4) (hLeaf 5)) $
+four =
+    HCons  (hLeaf  (l4  .=.  'c')) $
+    HCons  (HNode  (l5  .=.  Nothing) 
+                   (hLeaf (l6  .=.  [4,5])) 
+                   (hLeaf (l7  .=.  "last"))) $
     HNil
 \end{code}
-\marcos{No me gusta eso de introducir un nuevo ejemplo para cada cosa. Yo usar\'ia |squares|, o mejor, har\'ia que |myR| de 2.2 sea m\'as grande y lo usar\'ia en lugar de |squares| y |onefive|.}
-\bruno{La gracia de este ejemplo es mostrar la estructura real de una skew list.  Usar .*. no lo muestra.  Igual este ejemplo vuela y lo sustituye una figura, no?}
 
 %% $ fix emacs color highlighting
 
-The invariant of skew lists is that the height of trees
-get strictly larger along the linked list,
-except that the first two trees may be of equal size.
-Because of the size restriction,
-the spine is bounded by the logarithm of the element count,
-as is each tree.
-Hence, we can get to any element in logarithm effort.
-
-Insertion maintaining the invariant is constant time
-and considers two cases.
-When the spine has at least two trees
-and the first two trees are of equal size,
-we remove them and insert a new |HNode| built
-of the new element and the two trees removed.
-Else, we just insert a new |HLeaf|.
 
 We define a new tag |SkewRecord|
 and the corresponding |HExtend| instance
 to be able to use |(.*.)|.
 |HSkewRecord| does the actual work.
-\marcos{Para seguir el estilo de HList tendr\'iamos que tener un |HSkew| que sea el |SkewRecord| descripto ahora y un |HSkewRecord| con un smart constructor |mkHSkewRecord| que imponga la constraint de que el HSkew sea un ``LabelSet"}
+
 \begin{code}
 newtype SkewRecord r = SkewRecord r
 emptySkewRecord :: SkewRecord HNil
@@ -683,33 +692,23 @@ instance
 
 \section{Efficiency}
 
-Let's up the ante a little on our squares sample
+Let's up the ante a little on our squares sample\todo{rewrite}
+
 %if style==newcode
 \begin{code}
-data L5; l5 = undefined :: Proxy L5
-data L6; l6 = undefined :: Proxy L6
-data L7; l7 = undefined :: Proxy L7
-data L8; l8 = undefined :: Proxy L8
-data L9; l9 = undefined :: Proxy L9
-data L0; l0 = undefined :: Proxy L0
-{-# NOINLINE skewSquares #-}
+myR' =  l1  .=.  True     .*. 
+        l2  .=.  9        .*. 
+        l3  .=.  "bla"    .*. 
+        l4  .=.  'c'      .*. 
+        l5  .=.  Nothing  .*. 
+        l6  .=.  [4,5]    .*.
+        l7  .=.  "last"   .*. 
+        emptySkewRecord
 \end{code}
 %endif
 
 \begin{code}
-skewSquares =
-    l0  .=. 0   .*.
-    l1  .=. 1   .*.
-    l2  .=. 4   .*.
-    l3  .=. 9   .*.
-    l4  .=. 16  .*.
-    l5  .=. 25  .*.
-    l6  .=. 36  .*.
-    l7  .=. 49  .*.
-    l8  .=. 64  .*.
-    l9  .=. 81  .*.
-    emptySkewRecord
-sq7 = skewSquares # l7
+last = myR' # l7
 \end{code}
 
 \noindent
@@ -845,6 +844,10 @@ for debug runs:
   };
   \node[right,red] at (150,110) {SkewRecord};
 \end{tikzpicture}
+
+
+\section{Conclusions and Future Work}
+
 
 \bibliographystyle{plainnat}
 
