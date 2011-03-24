@@ -122,6 +122,18 @@ and implements a look-up operation that runs in logarithmic-time.
 
 \section{Introduction} \label{sec:intro}
 
+Although there have been many different proposals for Extensible Records in Haskell 
+\cite{Gaster96apolymorphic, Jones99lightweightextensible, LabeledFunctions, Leijen:fclabels, Leijen:scopedlabels},
+it seems that finding one that fulfills the Haskell community needs is still an open problem.
+The library for strongly typed heterogeneous collections HList \cite{KLS04}
+provides an implementation of extensible records ... 
+a drawback of this implementation is that looking-up, the (usually) most used operation on records,
+is linear time.
+We propose an alternative implementation for extensible records, using the same techniques than HList,
+with a look-up operation that runs in logarithmic-time.  
+another contribution of this pearl is the trick we use ... sort of partial evaluation ... 
+
+
 
 \section{The Idea} \label{sec:intro}
 
@@ -144,7 +156,7 @@ and implements a look-up operation that runs in logarithmic-time.
 
 \section{HList}\label{sec:hlist}
 
-HList  \cite{KLS04} is a Haskell library that implements typeful heterogeneous collections, 
+HList is a Haskell library that implements typeful heterogeneous collections, 
 such as heterogeneous lists or records, using extensions of Haskell for multi-parameter 
 classes \cite{PJM97} and functional dependencies \cite{Jon00}.
 HList strongly relies on \emph{type-level programming} techniques by means of which
