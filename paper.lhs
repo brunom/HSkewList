@@ -867,7 +867,14 @@ for debug runs:
 
 \section{Conclusions and Future Work}
 
+Using type-level programming techniques we have developed 
+an implementation of extensible records for Haskell that at run-time 
+is logarithmic-time at searching and removing elements and constant-time at
+inserting elements.
 
+Much of the effort is done at compile time. 
+Interesting future work is to find a way to reduce compilation time.
+ 
 \bibliographystyle{plainnat}
 
 \begin{flushleft}
