@@ -13,8 +13,7 @@ upperbound=4
 LTX_OPTS=-halt-on-error
 
 paper.pdf : paper.tex  biblio.bib
-	latex $(LTX_OPTS) paper.tex
-	latex $(LTX_OPTS) paper.tex
+	pdflatex $(LTX_OPTS) paper.tex
 	bibtex paper
 	pdflatex $(LTX_OPTS) paper.tex
 

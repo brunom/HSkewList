@@ -1,6 +1,8 @@
 \documentclass[natbib,preprint]{sigplanconf}
 %\usepackage{pdfsync}
 \usepackage{color}
+\usepackage{graphicx}
+
 %\usepackage{amsmath}
 \usepackage{tikz}
 %\usepackage{pgflibraryarrows}
@@ -120,85 +122,21 @@ and implements a look-up operation that runs in logarithmic-time.
 
 \section{Introduction} \label{sec:intro}
 
-\begin{tikzpicture}[x=0.04cm,y=0.04cm]
 
-  \def\xmin{0}
-  \def\xmax{150}
-  \def\ymin{0}
-  \def\ymax{110}
+\begin{figure}[htp]
+\begin{center}
+\includegraphics[scale=0.5]{search-hlist.pdf}
+\end{center}
+\caption{Search |l5| in HList} \label{fig:search-hlist}
+\end{figure}
 
-  % grid
-  \draw[style=help lines, ystep=10, xstep=10] (\xmin,\ymin) grid
-  (\xmax,\ymax);
+\begin{figure}[htp]
+\begin{center}
+\includegraphics[scale=0.5]{search-skew.pdf}
+\end{center}
+\caption{Search |l5| in Skew} \label{fig:search-skew}
+\end{figure}
 
-  % axes
-  \draw[->] (\xmin,\ymin) -- (\xmax,\ymin) node[right] {list length};
-  \draw[->] (\xmin,\ymin) -- (\xmin,\ymax) node[above] {time (s)};
-
-  % xticks and yticks
-  \foreach \x in {10,30,...,\xmax}
-  \node at (\x, \ymin) [below] {\x};
-  \foreach \y in {10,30,...,\ymax}
-  \node at (\xmin,\y) [left] {\y};
-
-  \draw[black] plot coordinates {
-    (0,  2.3)
-    (10, 2.5)
-    (20, 2.8)
-    (30, 3.2)
-    (40, 3.7)
-    (50, 4.3)
-    (60, 5.1)
-    (70, 6.1)
-    (100, 11)
-    (150, 24)
-  };
-
-  \draw[blue] plot coordinates {
-    (0,  1.2)
-    (10, 3.7)
-    (20, 5.8)
-    (30, 8.0)
-    (40,  11)
-    (50,  13)
-    (60,  15)
-    (70,  17)
-    (100, 24)
-    (150, 35)
-  };
-
-  \draw[red] plot coordinates {
-    (0,  2.5)
-    (10, 2.7)
-    (20, 3.3)
-    (30, 4.5)
-    (40, 6.3)
-    (50, 8.7)
-    (60,  12)
-    (70,  16)
-    (100, 37)
-    (150,110)
-  };
-
-  \draw[orange] plot coordinates {
-    (0,  1.6)
-    (10, 2.5)
-    (20, 2.7)
-    (30, 2.6)
-    (40, 2.9)
-    (50, 3.4)
-    (60, 2.9)
-    (70, 3.3)
-    (100,3.2)
-    (150,3.7)
-  };
-
-  % plot the data from the file data.dat
-  % smooth the curve and mark the data point with a dot
-  %\draw[color=blue] plot[smooth,mark=*,mark size=1pt] file {data.dat}
-  % node [right] {data};
-
-\end{tikzpicture}
 
 \section{HList}\label{sec:hlist}
 
@@ -537,6 +475,14 @@ than \cite{OkaThesis}, which is founded on numerical representations.
 A skew list is a linked list spine of complete binary trees.
 
 
+\begin{figure}[htp]
+\begin{center}
+\includegraphics[scale=0.5]{insert.pdf}
+\end{center}
+\caption{Insertion in a Skew} \label{fig:insert}
+\end{figure}
+
+
 \subsection{SkewRecord}
 
 \begin{code}
@@ -738,6 +684,87 @@ instance
 \section{Efficiency}
 
 \todo{incluir gr\'aficas}
+
+\begin{tikzpicture}[x=0.04cm,y=0.04cm]
+
+  \def\xmin{0}
+  \def\xmax{150}
+  \def\ymin{0}
+  \def\ymax{110}
+
+  % grid
+  \draw[style=help lines, ystep=10, xstep=10] (\xmin,\ymin) grid
+  (\xmax,\ymax);
+
+  % axes
+  \draw[->] (\xmin,\ymin) -- (\xmax,\ymin) node[right] {list length};
+  \draw[->] (\xmin,\ymin) -- (\xmin,\ymax) node[above] {time (s)};
+
+  % xticks and yticks
+  \foreach \x in {10,30,...,\xmax}
+  \node at (\x, \ymin) [below] {\x};
+  \foreach \y in {10,30,...,\ymax}
+  \node at (\xmin,\y) [left] {\y};
+
+  \draw[black] plot coordinates {
+    (0,  2.3)
+    (10, 2.5)
+    (20, 2.8)
+    (30, 3.2)
+    (40, 3.7)
+    (50, 4.3)
+    (60, 5.1)
+    (70, 6.1)
+    (100, 11)
+    (150, 24)
+  };
+
+  \draw[blue] plot coordinates {
+    (0,  1.2)
+    (10, 3.7)
+    (20, 5.8)
+    (30, 8.0)
+    (40,  11)
+    (50,  13)
+    (60,  15)
+    (70,  17)
+    (100, 24)
+    (150, 35)
+  };
+
+  \draw[red] plot coordinates {
+    (0,  2.5)
+    (10, 2.7)
+    (20, 3.3)
+    (30, 4.5)
+    (40, 6.3)
+    (50, 8.7)
+    (60,  12)
+    (70,  16)
+    (100, 37)
+    (150,110)
+  };
+
+  \draw[orange] plot coordinates {
+    (0,  1.6)
+    (10, 2.5)
+    (20, 2.7)
+    (30, 2.6)
+    (40, 2.9)
+    (50, 3.4)
+    (60, 2.9)
+    (70, 3.3)
+    (100,3.2)
+    (150,3.7)
+  };
+
+  % plot the data from the file data.dat
+  % smooth the curve and mark the data point with a dot
+  %\draw[color=blue] plot[smooth,mark=*,mark size=1pt] file {data.dat}
+  % node [right] {data};
+
+\end{tikzpicture}
+
 
 \bibliographystyle{plainnat}
 

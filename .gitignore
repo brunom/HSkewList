@@ -7,7 +7,7 @@
 *.blg
 *.dvi
 *.log
-*.pdf
+paper.pdf
 *.ptb
 *.tex
 paper.hs
