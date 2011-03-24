@@ -233,7 +233,7 @@ data HNil       = HNil
 data HCons e l  = HCons e l
 \end{code}
 
-For example, the value |HCons True (HCons (HJust 'a') HNil)| is a heterogeneous list of type |HCons Bool (HCons (HJust Char) HNil)|.
+For example, the value |HCons True (HCons 'a' HNil)| is a heterogeneous list of type |HCons Bool (HCons Char HNil)|.
 
 To prevent the formation of incorrect heterogeneous lists, such as |HCons True False|, 
 it is possible to introduce a class |HList| whose instances specify the type of 
@@ -247,25 +247,35 @@ instance  HList l => HList (HCons e l)
 
 For space reasons, we we will avoid the inclusion of this well-formedness condition for 
 heterogeneous lists as well as for other type-level types, like naturals or booleans,
-in order to make codes shorter. 
+in order to keep codes shorter. 
+
+The following class describes the extension of heterogeneous collections. 
+
+\begin{code}
+class HExtend e l l' | e l -> l'
+    where (.*.) :: e -> l -> l'
+\end{code}
+
+The functional dependency |e l -> l'| makes |HExtend| a type-level function.
+It fixes the type |l'| of a collection,
+resulting from extending a collection of type |l| with an element of type |e|.
+The member |hExtend| performs the same computation at the level of values.
+
+We remove |l' -> e l|, an additional dependency present in the original HList formulation.
+The compiler refuses our instances implementing Skew lists because it can't prove that the instances satisfy the dependency.
+
 
 \subsection{Extensible Records}
 
-%% In our code we will make heavy use of non-homogeneous collections:
-%% grammars are a collection of productions,
-%% and nodes have a collection of attributes and a collection of children nodes.
-%% Such collections, which can be extended and shrunk,
-Records
-map typed labels to values
-and are modeled by an |HList| containing a heterogeneous list of fields,
-marked with the data type |Record|.
-We will refer to them as records from now on:
+Records are mappings from labels to values.
+They are modeled by an |HList| containing a heterogeneous list of fields.
 
 \begin{code}
 newtype Record r = Record r
 \end{code}
 
-\noindent An empty record is a |Record| containing an empty heterogeneous list:
+\noindent 
+An empty record is a |Record| containing an empty heterogeneous list:
 
 \begin{code}
 emptyRecord :: Record HNil
@@ -273,7 +283,7 @@ emptyRecord = Record HNil
 \end{code}
 
 \noindent
-A field with label |l| (a phantom type \cite{Hin03}) and value of type |v| is represented by the type:
+A field with label |l| and value of type |v| is represented by the type:
 
 \begin{code}
 newtype LVPair l v  =   LVPair { valueLVPair :: v }
@@ -281,38 +291,26 @@ newtype LVPair l v  =   LVPair { valueLVPair :: v }
 _  .=.  v           =   LVPair v
 \end{code}
 
-\noindent Labels are now almost first-class objects, and can be used as type-level values.
-We can retrieve the label value using the function |labelLVPair|, which exposes the phantom type parameter:
+\noindent 
+Notice that the label is a phantom type \cite{Hin03}. 
+We can retrieve the label value by using the function |labelLVPair|, which exposes 
+the phantom type parameter:
 
 \begin{code}
 labelLVPair :: LVPair l v -> l
 labelLVPair = undefined
 \end{code}
 
-\noindent Since we need to represent many labels, we introduce a polymorphic type |Proxy| to represent them;
-by choosing a different phantom type for each label to be represented we can distinguish them:
+%\noindent 
+%Since we need to represent many labels, we introduce a polymorphic type |Proxy| to represent them;
+%by choosing a different phantom type for each label to be represented we can distinguish them:
+%
+%\begin{spec}
+%data Proxy e ; proxy = undefined :: Proxy e
+%\end{spec}
 
-\begin{spec}
-data Proxy e ; proxy = undefined :: Proxy e
-\end{spec}
+To mix and match both kinds of records we introduce a multi-parameter class |HExtend|.
 
-
-
-To mix and match both kinds of records we introduce a multi-parameter class |HExtend|.
-
-\begin{code}
-class HExtend e l l' | e l -> l'
-    where (.*.) :: e -> l -> l'
-\end{code}
-
-The functional dependency |e l -> l'| makes |HExtend| a type-level function, instead of a relation:
-once |e| and |l| are fixed |l'| is uniquely determined.
-It fixes the type |l'| of a collection,
-resulting from extending a collection of type |l| with an element of type |e|.
-The member |hExtend| performs the same computation at the level of values.
-
-We remove |l' -> e l|, an additional dependency present in the original HList formulation.
-The compiler refuses our instances implementing Skew lists because it can't prove that the instances satisfy the dependency.
 
 \begin{code}
 instance HExtend e (Record l) (Record (HCons e l))
