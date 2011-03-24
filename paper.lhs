@@ -135,9 +135,23 @@ another contribution of this pearl is the trick we use ... sort of partial evalu
 
 
 
-\section{The Idea} \label{sec:idea}
 
-The key idea is very simple .. we have observed that when, for example, looking-up an element into a HList ...
+We have observed that, when looking-up an element into a HList,
+the element is searched at compile-time in order to raise an error if the element does not belong to the list.
+This search generates the path the program follows at run-time, to obtain the element.
+In Figure~\ref{fig:search-hlist} we represent this with a dashed arrow for the compile-time search, 
+and a continued arrow for the generated path. 
+Since the structure is linear, the search and the path have the same length.
+
+Thus, the key idea is very simple; we propose to use a balanced tree instead of a list (Figure~\ref{fig:search-skew}), 
+in order to be able to use the information given by the compile-time search to make shorter paths.
+
+In the rest of this paper we show the type-level techniques used by HList to implement extensible records (Section~\ref{sec:hlist})
+and how we use these techniques to provide an implementation which is faster at run-time (Section~\ref{sec:faster}). 
+In Section~\ref{sec:efficiency} we show some results about the efficiency of our approach compared to HList,
+whereas in Section~\ref{sec:conclusions} we present some conclusions and future work.
+
+
 
 \begin{figure}[htp]
 \begin{center}
@@ -474,7 +488,7 @@ Without help from the compiler,
 defining such type function for
 unstructured labels is beyond (our) reach.
 
-\section{Faster Extensible Records}\label{sec:hlist}
+\section{Faster Extensible Records}\label{sec:faster}
 
 The key insight is that sub-linear behavior is only needed at runtime.
 We are willing to keep the work done at compile-time superlinear
@@ -487,7 +501,7 @@ that allows fast random access and depend on the compiler to
 hardcode the path to our fields.
 Following \cite{OkaThesis} we leaned on Skew Binary Random-Access Lists.
 
-\subsection{Skew Binary Random-Access List}\label{sec:hlist}
+\subsection{Skew Binary Random-Access List}\label{sec:skew}
 
 We'll describe Skew Binary Random-Access List \cite{Mye83} in a less principled
 but easier and more direct fashion
@@ -702,7 +716,7 @@ instance
         case hSkewGet l ts of HJust e -> e
 \end{code}
 
-\section{Efficiency}
+\section{Efficiency}\label{sec:efficiency}
 
 
 
@@ -713,7 +727,7 @@ Let us see what happens in the worst-case scenario for both representations,
 i.e. looking-up the last element of the list.
 
 In the example, when using HList (|myR|) we know that the core code results in a |case| cascade with deep 7.
-This is the case of Figure~\ref{fig:search-hlist} of section~\ref{sec:idea}.
+This is the case of Figure~\ref{fig:search-hlist} of section~\ref{sec:intro}.
 
 
 On the other hand, if we have the same record expressed as a skew list:
@@ -865,7 +879,7 @@ for debug runs:
 \end{tikzpicture}
 
 
-\section{Conclusions and Future Work}
+\section{Conclusions and Future Work}\label{sec:conclusions}
 
 Using type-level programming techniques we have developed 
 an implementation of extensible records for Haskell that at run-time 
