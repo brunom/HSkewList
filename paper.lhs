@@ -135,9 +135,9 @@ another contribution of this pearl is the trick we use ... sort of partial evalu
 
 
 
-\section{The Idea} \label{sec:intro}
+\section{The Idea} \label{sec:idea}
 
-.. we have observed that when, for example, looking-up an element into a HList ...
+The key idea is very simple .. we have observed that when, for example, looking-up an element into a HList ...
 
 \begin{figure}[htp]
 \begin{center}
@@ -704,9 +704,18 @@ instance
 
 \section{Efficiency}
 
-Let's up the ante a little on our squares sample\todo{rewrite}
 
-%if style==newcode
+
+
+
+\todo{revisar}
+Let us see what happens in the worst-case scenario, i.e. looking up the last element of the list.
+
+When using HList (|myR|), we know that the core code results in a |case| cascade with deep 7.
+This is the case of Figure~\ref{fig:search-hlist} of section~\ref{sec:idea}.
+
+
+On the other hand, if we have the same record expressed as a skew list:
 \begin{code}
 myR' =  l1  .=.  True     .*. 
         l2  .=.  9        .*. 
@@ -716,24 +725,18 @@ myR' =  l1  .=.  True     .*.
         l6  .=.  [4,5]    .*.
         l7  .=.  "last"   .*. 
         emptySkewRecord
-\end{code}
-%endif
 
-\begin{code}
 last = myR' # l7
 \end{code}
-
-\noindent
-Because we used |emptySkewRecord|,
-the compiler builds a skew list,
-and getting to |l7| only traverses a fraction of the elements.
-Here's the core:
+getting to |l7| only traverses a fraction of the elements,
+as we have seen in Figure~\ref{fig:search-skew}.
+Here's the core code:
 \begin{spec}
-sq7 =
-  case skewSquares  of HCons  _   l1      ->
-  case l1           of HCons  t1  _       ->
-  case t1           of HNode  _   _   t2  ->
-  case t2           of HNode  e   _   _   ->
+last =
+  case myR'   of HCons  t1   _        ->
+  case t1     of HNode  _   _   t12   ->
+  case t12    of HNode  _   _   t121  ->
+  case t121   of HNode  e   _   _     ->
   e
 \end{spec}
 
