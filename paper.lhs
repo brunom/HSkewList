@@ -698,7 +698,7 @@ instance
 
 \todo{incluir gr\'aficas}
 
-\begin{tikzpicture}[x=0.04cm,y=0.15cm]
+\begin{tikzpicture}[x=0.04cm,y=0.16cm]
 
   \def\xmin{0}
   \def\xmax{150}
@@ -706,7 +706,7 @@ instance
   \def\ymax{35}
 
   % grid
-  \draw[style=help lines, ystep=4, xstep=10] (\xmin,\ymin) grid
+  \draw[style=help lines, ystep=2.5, xstep=10] (\xmin,\ymin) grid
   (\xmax,\ymax);
 
   % axes
@@ -714,9 +714,9 @@ instance
   \draw[->] (\xmin,\ymin) -- (\xmin,\ymax) node[above] {time (s)};
 
   % xticks and yticks
-  \foreach \x in {10,30,...,\xmax}
+  \foreach \x in {20,40,...,\xmax}
   \node at (\x, \ymin) [below] {\x};
-  \foreach \y in {4,8,...,\ymax}
+  \foreach \y in {5,10,...,\ymax}
   \node at (\xmin,\y) [left] {\y};
 
   \draw[blue] plot coordinates {
@@ -765,9 +765,9 @@ instance
   \draw[->] (\xmin,\ymin) -- (\xmin,\ymax) node[above] {time (s)};
 
   % xticks and yticks
-  \foreach \x in {10,30,...,\xmax}
+  \foreach \x in {20,40,...,\xmax}
   \node at (\x, \ymin) [below] {\x};
-  \foreach \y in {10,30,...,\ymax}
+  \foreach \y in {20,40,...,\ymax}
   \node at (\xmin,\y) [left] {\y};
 
   \draw[blue] plot coordinates {
