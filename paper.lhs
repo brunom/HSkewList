@@ -879,7 +879,8 @@ inserting elements.
 
 Much of the effort is done at compile time. 
 Interesting future work is to find a way to reduce compilation time.
- 
+Experiments demonstrate that GHC memoizes class instances,
+but some particularity of our instances confuse the mechanism.
 \bibliographystyle{plainnat}
 
 \begin{flushleft}
