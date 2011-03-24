@@ -411,7 +411,11 @@ So, the following expression returns the string |"bla"|:
 
 < myR # label2
 
-The instances for |HHasField| are
+The |HHasField| instance for |Record| just unpacks the list
+and delegate the job to |HHasFieldList|.
+We use a different class to avoid a clash with
+the |HHasField| instance for |SkewRecord| below,
+which also uses |HCons| and |HNil| internally.
 
 \begin{code}
 instance
@@ -453,7 +457,17 @@ or the field may be present further along the list.
 We need to assert |HEq l l' b| and delegate to another type-function (|HHasFieldList'|)
 so that the two cases are disambiguated in an instance head.
 Haskell won't disambiguate two instances based on the instance context.
+|HEq l l' b| reifies which case it is into |b|, which we then feed to |HHasFieldList'|.
+This pervasive HList trick limits the most dangerous type class extensions
+to the implementation of |HEq|.
+The two |HHasFieldList'| instances differ in the first type-bool argument.
+|HTrue| signals that the label from the field in the list head
+is the right one, so we just return the value of the field.
+Otherwise, in the |HFalse| case, we recursively call |HHasFieldList|.
 
+At the value level, the functions |hListGet| and |hListGet'| are trivial,
+devoid of logic and conditions.
+For this reason,
 GHC is smart enough to elide the dictionary objects and indirect jumps for |(#)|.
 The code is inlined to a case cascade, but the program must traverse the linked list.
 This is a sample program and its GHC core.
@@ -467,28 +481,24 @@ data L4; l4 = undefined :: Proxy L4
 \end{code}
 %endif
 
+%{-# NOINLINE squares #-}
 \begin{code}
-{-# NOINLINE squares #-}
 squares =
-    Record             $
-    HCons (l1 .=. 1)   $
-    HCons (l2 .=. 4)   $
-    HCons (l3 .=. 9)   $
-    HCons (l4 .=. 16)  $
-    HNil
+    l1  .=. 1   .*.
+    l2  .=. 4   .*.
+    l3  .=. 9   .*.
+    l4  .=. 16  .*.
+    emptyRecord
 sq3 = squares # l3
 \end{code}
-\marcos{Sacar\'ia el pragma ... y lo escribir\'ia |squares = l1 .=. 1 .*. l2 .=. 4 .*. l3 .=. 9 .*. l4 .=. 16 .*. emptyRecord|}
-%% $
 
 \begin{spec}
-Paper.sq3 =
-  case Paper.squares of _ { Paper.HCons ds_d15d r_aYq ->
-  case r_aYq of _ { Paper.HCons f'_aYD ds1_d15l ->
-  case ds1_d15l of _ { Paper.HCons f'1_X10B ds2_X17k ->
-  f'1_X10B
+sq3 =
+  case squares  of HCons  _  l1  ->
+  case l1       of HCons  _  l2  ->
+  case l2       of HCons  e  _   ->
+  e
 \end{spec}
-\marcos{Cambiar\'ia los nombres para que quede m\'as legible el c\'odigo. Ej: |case squares of _ { HCons x1 x1s -> case x1s of ... |}
 
 When the number of fields increases,
 as in EDSLs that use extensible records internally \cite{FlyFirstClass},
@@ -524,9 +534,7 @@ Following, \cite{OkaThesis} we leaned on Skew Binary Random-Access Lists.
 We'll describe Skew Binary Random-Access List \cite{Mye83} in a less principled
 but easier and more direct fashion
 than \cite{OkaThesis}, which is founded on numerical representations.
-A skew list is a linked list spine of complete binary trees
-with elements in both
-leaves and internal nodes.
+A skew list is a linked list spine of complete binary trees.
 
 
 \subsection{SkewRecord}
@@ -541,6 +549,8 @@ hLeaf        e         =  HNode e HEmpty HEmpty
 \noindent
 The element precedes the subtrees in |HNode|
 so all elements in expressions read in order left to right.
+The common leaf case warrants helper type |HLeaf|
+and smart constructor |hLeaf|.
 The following declarations define a list with elements 1..5:
 
 \begin{code}
@@ -551,6 +561,8 @@ onefive =
     HNil
 \end{code}
 \marcos{No me gusta eso de introducir un nuevo ejemplo para cada cosa. Yo usar\'ia |squares|, o mejor, har\'ia que |myR| de 2.2 sea m\'as grande y lo usar\'ia en lugar de |squares| y |onefive|.}
+\bruno{La gracia de este ejemplo es mostrar la estructura real de una skew list.  Usar .*. no lo muestra.  Igual este ejemplo vuela y lo sustituye una figura, no?}
+
 %% $ fix emacs color highlighting
 
 The invariant of skew lists is that the height of trees
@@ -567,7 +579,7 @@ When the spine has at least two trees
 and the first two trees are of equal size,
 we remove them and insert a new |HNode| built
 of the new element and the two trees removed.
-Else, we just insert a |HNode| with the element and two |HLeaf|s through helper method |hLeaf|.
+Else, we just insert a new |HLeaf|.
 
 We define a new tag |SkewRecord|
 and the corresponding |HExtend| instance
@@ -597,7 +609,13 @@ instance
     HComplete (HNode e t t') (HSucc h)
 \end{code}
 
-|HSkewCarry|, named as
+|HSkewCarry| finds out if we need take two existing trees
+and put them below a new |HNode|,
+or just insert a new |HLeaf|.
+The name evokes the carry possible when adding two numbers.
+If each top level tree is a digit,
+building a new, taller, is a form of carry,
+so |HSkewCarry| return |HTrue|.
 \begin{code}
 class HSkewCarry l b | l -> b
 instance HSkewCarry HNil HFalse
@@ -609,7 +627,16 @@ instance
     => HSkewCarry (HCons t (HCons t' ts)) b
 hSkewCarry :: HSkewCarry l b => l -> b
 hSkewCarry = undefined
+\end{code}
 
+|HSkewExtend| looks like |HHasFieldList| earlier.
+In this case, |HSkewCarry| is responsible for discriminating
+the current case.
+Because pattern matching in type classes is more limited than
+runtime value pattern matching
+and as-patterns are missing,
+a smart test type-function saves on repetition.
+\begin{code}
 class HSkewExtend e l l' | e l -> l'
     where hSkewExtend :: e -> l -> l'
 instance
@@ -637,8 +664,6 @@ instance
         (HCons (HNode e t t') l)
 \end{code}
 
-\noindent
-
 The missing piece is |HHasField| for |SkewRecord|.
 As already mentioned,
 we explore all paths at compile-time
@@ -663,7 +688,18 @@ instance HPlus HNothing (HJust b) (HJust b) where
     hPlus a b = b
 instance HPlus HNothing HNothing HNothing where
     hPlus a b = HNothing
+\end{code}
 
+Mirroring the definitions for linked list records,
+we need a |HHasField| instance for |SkewRecord|
+and an auxiliary type class |HHasFieldSkew|.
+However, deciding on the path to the desired field
+is now much more involved.
+The cases that both the test function and the work function must consider
+are more numerous and involved.
+Thus, we merge both functions.
+|HHasFieldSkew| 
+\begin{code}
 instance
     (HHasFieldSkew l ts (HJust v)) =>
     HHasField l (SkewRecord ts) v where
