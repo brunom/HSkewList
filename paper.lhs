@@ -140,78 +140,91 @@ and implements a look-up operation that runs in logarithmic-time.
 
 \section{HList}\label{sec:hlist}
 
-The library HList  \cite{KLS04} implements typeful heterogeneous collections (lists, records, ...),
-using techniques for dependently typed programming in Haskell \cite{Hall01,McB02}
-which in turn use Haskell 98 extensions for multi-parameter classes \cite{PJM97} and functional dependencies \cite{Jon00}.
-\emph{Type-level programming} uses types to represent type-level values, and classes to represent type-level types and functions.
+HList  \cite{KLS04} is a Haskell library that implements typeful heterogeneous collections, 
+such as heterogeneous lists or records, using extensions of Haskell for multi-parameter 
+classes \cite{PJM97} and functional dependencies \cite{Jon00}.
+HList strongly relies on \emph{type-level programming} techniques by means of which
+types are used to represent type-level values, and classes are used to represent 
+type-level types and functions.
 
-In order to be self-contained we start out with a small introduction.
-To represent Boolean values at the type level we define a new type for each of the Boolean values.
-%% The class |HBool| represents the type-level type of Booleans.
-%% We may read the instance definitions as ``the type-level values |HTrue| and |HFalse| have the type-level type |HBool|'':
-%% class  HBool x
+We illustrate the use of type-level programming by means of two simple examples that
+will be used later in the paper. We start with a type-level representation of booleans values. 
+Since we are only interested in type-level computations, we define empty 
+types |HTrue| and |HFalse| corresponding to each boolean value.
+
 \begin{spec}
 data   HTrue   ; hTrue   = undefined :: HTrue
 data   HFalse  ; hFalse  = undefined :: HFalse
 \end{spec}
 
-%% instance HBool HTrue
-%% instance HBool HFalse
+The inhabitants |hTrue| and |hFalse| of those types are defined for the only purpose 
+to be used in value-level expressions to construct type-level values by 
+referring to the types of such expressions.
 
-Since we are only interested in type-level computation,
-we defined |HTrue| and |HFalse| as empty types.
-By defining an inhabitant for each value we can,
-by writing expressions at the value level,
-construct values at the type-level
-by referring to the types of such expressions.
-
-Multi-parameter classes can be used to describe type-level \emph{relations},
-whereas functional dependencies restrict such relations to functions.
-As an example we define the class |HOr| for type-level disjunction:
-
-%% class (HBool t, HBool t', HBool t'')
-%%     => HOr t t' t'' | t t' -> t''
-
+Type-level functions can be described using multi-parameter classes with functional dependencies. 
+For example, we can encode type-level negation by defining the following class:
 \begin{spec}
-class HOr t t' t'' | t t' -> t''
-hOr :: HOr t t' t'' => t -> t' -> t''
-hOr = undefined
+class HNot t t' | t -> t' where
+  hNot :: t -> t' 
 \end{spec}
 
 \noindent
-The functional dependency |t t' -> t''| expresses that the parameters |t| and |t'|
-uniquely determine the parameter |t''|.
-This implies that once |t| and |t'| are instantiated,
-the instance of |t''| must be uniquely inferable by the type-system,
-and that thus we are defining a type-level function from |t| and |t'| to |t''|.
-The type-level function itself is defined by the following non-overlapping instance declarations:
+The functional dependency |t -> t'| expresses that the parameter |t|
+uniquely determines the parameter |t'|. 
+Therefore, once |t| is instantiated,
+the instance of |t'| must be uniquely inferable by the type-system.
+In other words, the relation between |t| and |t'| is actually a function.
+Whereas the class definition describes the type signature of the type-level function, 
+the function itself is defined by the following instance declarations:
 
 \begin{spec}
-instance HOr  HFalse  HFalse  HFalse
-instance HOr  HTrue   HFalse  HTrue
-instance HOr  HFalse  HTrue   HTrue
-instance HOr  HTrue   HTrue   HTrue
+instance HNot  HFalse  HTrue   where hNot _ = hTrue
+instance HNot  HTrue   HFalse  where hNot _ = hFalse
 \end{spec}
 
-\noindent If we write |(hOr hTrue hFalse)|,
-we know that |t| and |t'| are |HTrue| and |HFalse|, respectively.
-So, the second instance is chosen to select |hOr| from and thus |t''| is inferred to be |HTrue|.
+\noindent 
+If we write the expression |(hNot hFalse)|, then we know that |t| is |HFalse|. 
+So, the first instance of |hNot| is selected and thus |t'| is inferred to be |HTrue|.
+Observe that the computation is completely at the type-level; 
+no interesting value-level computation takes place.
 
-%% Despite the fact that is looks like a computation at the value level,
-%% its actual purpose is to express a computation at the type-level;
-%% no interesting value level computation is taking place at all.
+Another example is the type-level representation of the maybe type. 
+In this case we are interesting in manipulating a value-level value associated with each type constructor.
 
-%% If we had defined |HTrue| and |HFalse| in the following way:
+\begin{code}
+data HNothing  = HNothing
+data HJust e   = HJust e
+\end{code}
 
-%% < data HTrue   = HTrue   ; hTrue  = HTrue   :: Htrue
-%% < data HFalse  = HFalse  ; hFalse = HFalse  :: HFalse
+We aim to construct a type-level value of the maybe type from a boolean. For this purpose
+we define the following multi-parameter class. The parameter |v| specifies the type 
+of the values to be contained by a |HJust|.
 
-%% \noindent then the same computation would also be performed at the value level,
-%% resulting in the value  |HTrue| of type |HTrue|.
+\begin{code}
+class HMakeMaybe b v m | b v -> m where
+    hMakeMaybe :: b -> v -> m
+instance HMakeMaybe HFalse v HNothing where
+    hMakeMaybe b v = HNothing
+instance HMakeMaybe HTrue v (HJust v) where
+    hMakeMaybe b v = HJust v
+\end{code}
 
+Another operation that will be of interest on this type is the one that combines 
+two values of type maybe. 
 
+\begin{code}
+class HPlus a b c | a b -> c where
+    hPlus :: a -> b -> c
+instance HPlus (HJust a) b (HJust a) where
+    hPlus a b = a
+instance HPlus HNothing (HJust b) (HJust b) where
+    hPlus a b = b
+instance HPlus HNothing HNothing HNothing where
+    hPlus a b = HNothing
+\end{code}
 
 \subsection{Heterogeneous Lists}
+
 Heterogeneous lists are represented with the data types |HNil| and |HCons|,
 which model the structure of a normal list both at the value and type level:
 
