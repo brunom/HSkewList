@@ -116,8 +116,8 @@ and implements a look-up operation that runs in logarithmic-time.
 %\category{D.1.1}{Programming techniques}{Applicative (Functional) Programming}
 %\terms Design, Languages, Performance, Standardization
 
-%\keywords
-%Attribute Grammars, Class system, Lazy evaluation, Type-level programming, Haskell, HList
+\keywords
+ Haskell, HList, Extensible Records, Class system, Functional Dependencies, Type-level programming, Balanced Trees 
 
 
 \section{Introduction} \label{sec:intro}
