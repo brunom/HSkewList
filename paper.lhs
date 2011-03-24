@@ -282,20 +282,21 @@ in order to keep codes shorter.
 The following class describes the extension of heterogeneous collections. 
 
 \begin{code}
-class HExtend e l l' | e l -> l'
+class HExtend e l l' | e l -> l', l' -> e l
     where (.*.) :: e -> l -> l'
 \end{code}
 
 The functional dependency |e l -> l'| makes |HExtend| a type-level function.
-It fixes the type |l'| of a collection,
-resulting from extending a collection of type |l| with an element of type |e|.
-The member |hExtend| performs the same computation at the level of values.
+It specifies the extension of a collection of type |l| with an element of type |e|,
+resulting a collection of type |l'|.
+Function |(.*.)| performs the same computation at the level of values.
 
-We remove |l' -> e l|, an additional dependency present in the original HList formulation.
-The compiler refuses our instances implementing Skew lists because it cannot prove that the instances satisfy the dependency. \marcos{no queda muy bien esa frase}
+%We removed |l' -> e l|, an additional dependency present in the original HList formulation.
+%The compiler refuses our instances implementing Skew lists because it cannot prove that the instances satisfy the %dependency. \marcos{no queda muy bien esa frase}
 
 
-\subsection{Extensible Records}\label{sec:extensiblerecords}
+\subsection{Extensible Records}
+\label{sec:extensiblerecords}
 
 Records are mappings from labels to values.
 They are modeled by an |HList| containing a heterogeneous list of fields.
@@ -339,27 +340,18 @@ labelLVPair = undefined
 %data Proxy e ; proxy = undefined :: Proxy e
 %\end{spec}
 
-The instance of |HExtend| for records extends the list:
 
+The instance of |HExtend| for records extends the list with a new field:
 
 \begin{code}
 instance HExtend e (Record l) (Record (HCons e l))
     where e .*. Record l = Record (HCons e l)
 \end{code}
 
-\noindent Thus, the following declarations define a record (|myR|) with seven elements, 
-labeled by the types |L1|, |L2|, |L3|, |L4|, |L5|, |L6| and |L7|:
+\noindent 
+Thus, the following defines a record (|myR|) with seven fields:
 
 \begin{code}
-data L1; l1 = proxy :: Proxy L1
-data L2; l2 = proxy :: Proxy L2
-data L3; l3 = proxy :: Proxy L3
-data L4; l4 = proxy :: Proxy L4
-data L5; l5 = proxy :: Proxy L5
-data L6; l6 = proxy :: Proxy L6
-data L7; l7 = proxy :: Proxy L7
-
-
 myR =  l1  .=.  True     .*. 
        l2  .=.  9        .*. 
        l3  .=.  "bla"    .*. 
@@ -384,15 +376,16 @@ myR =  l1  .=.  True     .*.
 %%   where hExtend f (Record r) = Record (HCons f r)
 %% \end{code}
 
-The class |HHasField| is used to retrieve the value part
-corresponding to a specific label from a record:
+The class |HHasField| is used to retrieve from a record the value part
+corresponding to a specific label:
 
 \begin{code}
 class HHasField l r v | l r -> v where
     (#) :: r -> l -> v
 \end{code}
 
-\noindent At the type-level it is statically checked that the record |r| indeed has
+\noindent 
+At the type-level it is statically checked that the record |r| indeed has
 a field with label |l| associated with a value of the type |v|.
 At value-level the operator |(#)| returns the value of type |v|.
 For example, the following expression returns the string |"bla"|:
@@ -405,15 +398,14 @@ bla = myR # l3
 The |HHasField| instance for |Record| just unpacks the list
 and delegates the job to |HHasFieldList|.
 We use a different class to avoid a clash with
-the |HHasField| instance for |SkewRecord| below,
+the |HHasField| instance for |SkewRecord| to be shown later,
 which also uses |HCons| and |HNil| internally.
 
 \begin{code}
 instance
     (HHasFieldList l r v)
     => HHasField l (Record r) v where
-    Record r # l =
-        hListGet l r
+    Record r # l = hListGet l r
 
 class HHasFieldList l r v | l r -> v where
     hListGet :: l -> r -> v
@@ -421,7 +413,8 @@ class HHasFieldList l r v | l r -> v where
 instance
     (  HEq l l' b
     ,  HHasFieldList' b l (HCons (LVPair l' v') r) v)
-    => HHasFieldList l (HCons (LVPair l' v') r) v where
+    => HHasFieldList l (HCons (LVPair l' v') r) v 
+where
     hListGet l r@(HCons f' _) =
         hListGet' (hEq l (labelLVPair f')) l r
 
@@ -429,15 +422,14 @@ class HHasFieldList' b l r v | b l r -> v where
     hListGet':: b -> l -> r -> v
 
 instance
-    HHasFieldList' HTrue l (HCons (LVPair l v) r) v where
-    hListGet' _ _ (HCons (LVPair v) _) =
-        v
+    HHasFieldList' HTrue l (HCons (LVPair l v) r) v 
+where
+    hListGet' _ _ (HCons (LVPair v) _) = v
 
 instance
     HHasFieldList l r v =>
     HHasFieldList' HFalse l (HCons fld r) v where
-    hListGet' _ l (HCons _ r) =
-        hListGet l r
+    hListGet' _ l (HCons _ r) = hListGet l r
 \end{code}
 
 \noindent
@@ -447,7 +439,7 @@ The head of the list may be the correct field,
 or the field may be present further along the list.
 We need to assert |HEq l l' b| and delegate to another type-function (|HHasFieldList'|)
 so that the two cases are disambiguated in an instance head.
-Haskell won't disambiguate two instances based on the instance context.
+Haskell does not disambiguate two instances based on the instance context.
 |HEq l l' b| reifies which case it is into |b|, which we then feed to |HHasFieldList'|.
 This pervasive HList trick limits the most dangerous type class extensions
 to the implementation of |HEq|.
@@ -463,13 +455,12 @@ GHC is smart enough to elide the dictionary objects and indirect jumps for |(#)|
 The code is inlined to a case cascade, but the program must traverse the linked list.
 For example, this is the GHC core of the example:
 
-
 \begin{spec}
 bla =
-  case myR  of HCons  _  rs1  ->
-  case rs1  of HCons  _  rs2  ->
-  case rs2  of HCons  e  _    ->
-  e
+  case myR  of 
+    HCons  _  rs1  ->  case rs1  of 
+                         HCons  _  rs2  ->  case rs2  of 
+                                              HCons  e  _    -> e
 \end{spec}
 
 When the number of fields increases,
@@ -478,7 +469,7 @@ we just bump GHC's context reduction stack and the program compiles.
 At runtime, however, we may hurt from the linear time lookup algorithm.
 The natural replacement when lookup in a linked list is slow
 is usually a search tree.
-We would need to define a |HOrd| type-function
+In that case we would need to define a |HOrd| type-function
 analogue to HList's magic |HEq|
 and port some staple balanced tree to compile-time,
 tricky rotations and all.
