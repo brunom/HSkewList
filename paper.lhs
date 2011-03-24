@@ -709,9 +709,10 @@ instance
 
 
 \todo{revisar}
-Let us see what happens in the worst-case scenario, i.e. looking up the last element of the list.
+Let us see what happens in the worst-case scenario for both representations, 
+i.e. looking-up the last element of the list.
 
-When using HList (|myR|), we know that the core code results in a |case| cascade with deep 7.
+In the example, when using HList (|myR|) we know that the core code results in a |case| cascade with deep 7.
 This is the case of Figure~\ref{fig:search-hlist} of section~\ref{sec:idea}.
 
 
@@ -728,9 +729,8 @@ myR' =  l1  .=.  True     .*.
 
 last = myR' # l7
 \end{code}
-getting to |l7| only traverses a fraction of the elements,
-as we have seen in Figure~\ref{fig:search-skew}.
-Here's the core code:
+the resulting core code is:
+
 \begin{spec}
 last =
   case myR'   of HCons  t1   _        ->
@@ -739,6 +739,10 @@ last =
   case t121   of HNode  e   _   _     ->
   e
 \end{spec}
+Thus, getting to |l7| only traverses a fraction of the elements,
+as we have seen in Figure~\ref{fig:search-skew}.
+
+
 
 As records have more and more fields, the difference is more pronounced.
 We measured accessing the last of an increasing number of fields.
