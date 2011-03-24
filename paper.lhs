@@ -14,9 +14,9 @@
 \newcommand{\bruno}[1]{\textcolor{red}{\textbf{Bruno:}#1}}
 \newcommand{\alberto}[1]{\textcolor{red}{\textbf{Alerto:}#1}}
 \newcommand{\marcos}[1]{\textcolor{red}{\textbf{Marcos:}#1}}
-%% \renewcommand{\bruno}[1]{}
-%% \renewcommand{\alberto}[1]{}
-%% \renewcommand{\marcos}[1]{}
+\renewcommand{\bruno}[1]{}
+\renewcommand{\alberto}[1]{}
+\renewcommand{\marcos}[1]{}
 %let paper = True
 
 %include lhs2TeX.fmt
@@ -119,53 +119,105 @@ and implements a look-up operation that runs in logarithmic-time.
 \keywords
  Haskell, HList, Extensible Records, Class system, Functional Dependencies, Type-level programming, Balanced Trees 
 
-
 \section{Introduction} \label{sec:intro}
 
-Although there have been many different proposals for Extensible Records in Haskell 
-\cite{Gaster96apolymorphic, Jones99lightweightextensible, LabeledFunctions, Leijen:fclabels, Leijen:scopedlabels},
-it seems that finding one that fulfills the Haskell community needs is still an open problem.
+
+
+Although there have been many different proposals for Extensible
+Records in Haskell
+
+\cite{Gaster96apolymorphic, Jones99lightweightextensible,
+LabeledFunctions, Leijen:fclabels, Leijen:scopedlabels},
+
+it seems that finding one that fulfills the Haskell community needs is
+still an open problem.
+
 The library for strongly typed heterogeneous collections HList \cite{KLS04}
-provides an implementation of extensible records ... 
-a drawback of this implementation is that looking-up, the (usually) most used operation on records,
+
+provides an implementation of extensible records.
+
+A drawback of this implementation is that looking-up, the (usually)
+most used operation on records,
+
 is linear time.
-We propose an alternative implementation for extensible records, using the same techniques than HList,
-with a look-up operation that runs in logarithmic-time.  
-another contribution of this pearl is the trick we use ... sort of partial evaluation ... 
+
+We propose an alternative implementation for extensible records, using
+the same techniques than HList,
+
+with a look-up operation that runs in logarithmic-time.
 
 
-
-
+Another contribution of this pearl is the trick we use to reduce the
+run-time work.
 We have observed that, when looking-up an element into a HList,
-the element is searched at compile-time in order to raise an error if the element does not belong to the list.
-This search generates the path the program follows at run-time, to obtain the element.
-In Figure~\ref{fig:search-hlist} we represent this with a dashed arrow for the compile-time search, 
-and a continued arrow for the generated path. 
+
+the element is searched at compile-time in order to raise an error if
+the element does not belong to the list.
+
+This search generates the path the program follows at run-time, to
+obtain the element.
+
+In Figure~\ref{fig:search-hlist} we represent this with a dashed arrow
+for the compile-time search,
+
+and a continued arrow for the generated path.
+
 Since the structure is linear, the search and the path have the same length.
 
-Thus, the key idea is very simple; we propose to use a balanced tree instead of a list (Figure~\ref{fig:search-skew}), 
-in order to be able to use the information given by the compile-time search to make shorter paths.
 
-In the rest of this paper we show the type-level techniques used by HList to implement extensible records (Section~\ref{sec:hlist})
-and how we use these techniques to provide an implementation which is faster at run-time (Section~\ref{sec:faster}). 
-In Section~\ref{sec:efficiency} we show some results about the efficiency of our approach compared to HList,
-whereas in Section~\ref{sec:conclusions} we present some conclusions and future work.
+
+Thus, the key idea is very simple; we propose to use a balanced tree
+instead of a list (Figure~\ref{fig:search-skew}),
+
+in order to be able to use the information given by the compile-time
+search to make shorter paths.
+
+
+
+In the rest of this paper we show the type-level techniques used by
+HList to implement extensible records (Section~\ref{sec:hlist})
+
+and how we use these techniques to provide an implementation which is
+faster at run-time (Section~\ref{sec:faster}).
+
+In Section~\ref{sec:efficiency} we show some results about the
+efficiency of our approach compared to HList,
+
+whereas in Section~\ref{sec:conclusions} we present some conclusions
+and future work.
+
+
+
+
 
 
 
 \begin{figure}[htp]
+
 \begin{center}
+
 \includegraphics[scale=0.5]{search-hlist.pdf}
+
 \end{center}
+
 \caption{Search |l7| in HList} \label{fig:search-hlist}
+
 \end{figure}
 
+
+
 \begin{figure}[htp]
+
 \begin{center}
+
 \includegraphics[scale=0.5]{search-skew.pdf}
+
 \end{center}
+
 \caption{Search |l7| in Skew} \label{fig:search-skew}
+
 \end{figure}
+
 
 
 \section{HList}\label{sec:hlist}
@@ -575,7 +627,10 @@ emptySkewRecord = SkewRecord HNil
 instance
     (HSkewExtend (LVPair l v) ts ts',
     HHasFieldSkew l ts HNothing) =>
-    HExtend (LVPair l v) (SkewRecord ts) (SkewRecord ts') where
+    HExtend
+        (LVPair l v)
+        (SkewRecord ts)
+        (SkewRecord ts') where
     e .*. SkewRecord ts =
         SkewRecord (hSkewExtend e ts)
 \end{code}
@@ -713,11 +768,10 @@ instance
 
 
 
-\todo{revisar}
 Let us see what happens in the worst-case scenario for both representations, 
 i.e. looking-up the last element of the list.
 
-In the example, when using HList (|myR|) we know that the core code results in a |case| cascade with deep 7.
+In the example, when using HList (|myR|) we know that the core code results in a |case| cascade with depth 7.
 This is the case of Figure~\ref{fig:search-hlist} of section~\ref{sec:intro}.
 
 
@@ -750,9 +804,9 @@ as we have seen in Figure~\ref{fig:search-skew}.
 
 
 As records have more and more fields, the difference is more pronounced.
-We measured accessing the last of an increasing number of fields.
-The program constructed the list once
-and run a 100.000.000 iteration |(#)| loop.
+We time accessing the last of an increasing number of fields.
+The program constructs the list once
+and runs a 100.000.000 iteration |(#)| loop.
 Our laptop is a Celeron M 1.4 Ghz single core with 736 MB of RAM.
 
 \begin{tikzpicture}[x=0.04cm,y=0.16cm]
