@@ -127,14 +127,14 @@ and implements a look-up operation that runs in logarithmic-time.
 \begin{center}
 \includegraphics[scale=0.5]{search-hlist.pdf}
 \end{center}
-\caption{Search |l5| in HList} \label{fig:search-hlist}
+\caption{Search |l7| in HList} \label{fig:search-hlist}
 \end{figure}
 
 \begin{figure}[htp]
 \begin{center}
 \includegraphics[scale=0.5]{search-skew.pdf}
 \end{center}
-\caption{Search |l5| in Skew} \label{fig:search-skew}
+\caption{Search |l7| in Skew} \label{fig:search-skew}
 \end{figure}
 
 
@@ -478,7 +478,7 @@ wihout such label.
 So we just store our field unordered in a structure
 that allows fast random access and depend on the compiler to
 hardcode the path to our fields.
-Following, \cite{OkaThesis} we leaned on Skew Binary Random-Access Lists.
+Following \cite{OkaThesis} we leaned on Skew Binary Random-Access Lists.
 
 \subsection{Skew Binary Random-Access List}\label{sec:hlist}
 
