@@ -162,7 +162,7 @@ to be used in value-level expressions to construct type-level values by
 referring to the types of such expressions.
 
 Type-level functions can be described using multi-parameter classes with functional dependencies. 
-For example, we can encode type-level negation by defining the following class:
+For example, we can encode type-level negation by defining the following class:
 \begin{spec}
 class HNot t t' | t -> t' where
   hNot :: t -> t' 
@@ -698,54 +698,6 @@ instance
 
 \todo{incluir gr\'aficas}
 
-\begin{tikzpicture}[x=0.04cm,y=0.04cm]
-
-  \def\xmin{0}
-  \def\xmax{150}
-  \def\ymin{0}
-  \def\ymax{110}
-
-  % grid
-  \draw[style=help lines, ystep=10, xstep=10] (\xmin,\ymin) grid
-  (\xmax,\ymax);
-
-  % axes
-  \draw[->] (\xmin,\ymin) -- (\xmax,\ymin) node[right] {list length};
-  \draw[->] (\xmin,\ymin) -- (\xmin,\ymax) node[above] {time (s)};
-
-  % xticks and yticks
-  \foreach \x in {10,30,...,\xmax}
-  \node at (\x, \ymin) [below] {\x};
-  \foreach \y in {10,30,...,\ymax}
-  \node at (\xmin,\y) [left] {\y};
-
-  \draw plot coordinates {
-    (0,  2.3)
-    (10, 2.5)
-    (20, 2.8)
-    (30, 3.2)
-    (40, 3.7)
-    (50, 4.3)
-    (60, 5.1)
-    (70, 6.1)
-    (100, 11)
-    (150, 24)
-  };
-
-  \draw plot coordinates {
-    (0,  2.5)
-    (10, 2.7)
-    (20, 3.3)
-    (30, 4.5)
-    (40, 6.3)
-    (50, 8.7)
-    (60,  12)
-    (70,  16)
-    (100, 37)
-    (150,110)
-  };
-\end{tikzpicture}
-
 \begin{tikzpicture}[x=0.04cm,y=0.15cm]
 
   \def\xmin{0}
@@ -767,7 +719,7 @@ instance
   \foreach \y in {4,8,...,\ymax}
   \node at (\xmin,\y) [left] {\y};
 
-  \draw plot coordinates {
+  \draw[blue] plot coordinates {
     (0,  1.2)
     (10, 3.7)
     (20, 5.8)
@@ -779,8 +731,10 @@ instance
     (100, 24)
     (150, 35)
   };
+  \node[right,blue] at (150, 35) {Record};
 
-  \draw plot coordinates {
+
+  \draw[red] plot coordinates {
     (0,  1.6)
     (10, 2.5)
     (20, 2.7)
@@ -792,8 +746,58 @@ instance
     (100,3.2)
     (150,3.7)
   };
+  \node[right,red] at (150, 3.7) {SkewRecord};
 \end{tikzpicture}
 
+\begin{tikzpicture}[x=0.04cm,y=0.04cm]
+
+  \def\xmin{0}
+  \def\xmax{150}
+  \def\ymin{0}
+  \def\ymax{110}
+
+  % grid
+  \draw[style=help lines, ystep=10, xstep=10] (\xmin,\ymin) grid
+  (\xmax,\ymax);
+
+  % axes
+  \draw[->] (\xmin,\ymin) -- (\xmax,\ymin) node[right] {list length};
+  \draw[->] (\xmin,\ymin) -- (\xmin,\ymax) node[above] {time (s)};
+
+  % xticks and yticks
+  \foreach \x in {10,30,...,\xmax}
+  \node at (\x, \ymin) [below] {\x};
+  \foreach \y in {10,30,...,\ymax}
+  \node at (\xmin,\y) [left] {\y};
+
+  \draw[blue] plot coordinates {
+    (0,  2.3)
+    (10, 2.5)
+    (20, 2.8)
+    (30, 3.2)
+    (40, 3.7)
+    (50, 4.3)
+    (60, 5.1)
+    (70, 6.1)
+    (100, 11)
+    (150, 24)
+  };
+  \node[right,blue] at (150, 24) {Record};
+
+  \draw[red] plot coordinates {
+    (0,  2.5)
+    (10, 2.7)
+    (20, 3.3)
+    (30, 4.5)
+    (40, 6.3)
+    (50, 8.7)
+    (60,  12)
+    (70,  16)
+    (100, 37)
+    (150,110)
+  };
+  \node[right,red] at (150,110) {SkewRecord};
+\end{tikzpicture}
 
 \bibliographystyle{plainnat}
 
