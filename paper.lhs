@@ -85,8 +85,8 @@ list =
 \titlebanner{submitted to ICFP 2011}         % These are ignored unless
 \preprintfooter{version of Mar 18, 2011}     % 'preprint' option specified.
 
-\title{Scalable extensible records}
-%\subtitle{How to do Aspect Oriented Programming in Haskell}
+\title{Just Do It While Compiling!}
+\subtitle{Fast Extensible Records In Haskell}
 
 \authorinfo{Bruno Martinez Aguerre}
            {Instituto de Computaci\'{o}n \\ Universidad de la  Rep\'{u}blica\\ Montevideo, Uruguay}
