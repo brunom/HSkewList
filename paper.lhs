@@ -2,7 +2,7 @@
 %\usepackage{pdfsync}
 \usepackage{color}
 \usepackage{graphicx}
-
+ 
 %\usepackage{amsmath}
 \usepackage{tikz}
 %\usepackage{pgflibraryarrows}
@@ -123,29 +123,35 @@ and implements a look-up operation that runs in logarithmic-time.
 
 Although there have been many different proposals for Extensible Records in Haskell 
 \cite{Gaster96apolymorphic, Jones99lightweightextensible, LabeledFunctions, Leijen:fclabels, Leijen:scopedlabels},
-it seems that finding one that fulfills the Haskell community needs is still an open problem.
-The library for strongly typed heterogeneous collections HList \cite{KLS04}
-provides an implementation of extensible records. 
-A drawback of this implementation is that looking-up, the (usually) most used operation on records,
+it is still an open problem to find an implementation that manipulate records with satisfactory efficiency.
+This pearl aims to contribute with a solution in that direction. 
+Our starting point is the library for strongly typed heterogeneous collections HList \cite{KLS04}
+which provides an example implementation of extensible records. 
+A drawback of HList is that looking-up, the (usually) most used operation on records,
 is linear time.
 We propose an alternative implementation for extensible records, using the same techniques than HList,
 with a look-up operation that runs in logarithmic-time.  
 
 Another contribution of this pearl is the trick we use to reduce the run-time work.
 We have observed that, when looking-up an element into a HList,
-the element is searched at compile-time in order to raise an error if the element does not belong to the list.
-This search generates the path the program follows at run-time, to obtain the element.
-In Figure~\ref{fig:search-hlist} we represent this with a dashed arrow for the compile-time search, 
-and a continued arrow for the generated path. 
+the element is first searched at compile-time in order to raise an error in case the element 
+does not belong to the list.
+This search generates the path the program follows at run-time to obtain the element.
+In Figure~\ref{fig:search-hlist} we represent with a dashed arrow the compile-time search, 
+and with a continued arrow the generated path followed at run-time. 
 Since the structure is linear, the search and the path have the same length.
 
-Thus, the key idea is very simple; we propose to use a balanced tree instead of a list (Figure~\ref{fig:search-skew}), 
-in order to be able to use the information given by the compile-time search to make shorter paths.
+Thus, the key idea is very simple. Instead of a linear structure as used by HList, 
+we propose the use of an alternative structure for the representation of heterogeneous collections which 
+is based on balanced trees.   
+The new structure, known as skew lists \cite{Mye83,OkaThesis}, makes it possible to obtain better profits 
+from the information given by the compile-time search, leading to sensible shorter paths in the run-time search 
+(see Figure~\ref{fig:search-skew}).
 
-In the rest of this paper we show the type-level techniques used by HList to implement extensible records (Section~\ref{sec:hlist})
-and how we use these techniques to provide an implementation which is faster at run-time (Section~\ref{sec:faster}). 
-In Section~\ref{sec:efficiency} we show some results about the efficiency of our approach compared to HList,
-whereas in Section~\ref{sec:conclusions} we present some conclusions and future work.
+In the rest of this paper we show the type-level techniques used to implement extensible records by HList (Section~\ref{sec:hlist}) and how we use these techniques to provide an implementation which is faster at 
+run-time (Section~\ref{sec:faster}). 
+In Section~\ref{sec:efficiency} we show some results about the efficiency of our approach compared to HList.
+Finally, in Section~\ref{sec:conclusions} we present some conclusions and possible directions for future work.
 
 
 
