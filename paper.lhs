@@ -706,7 +706,7 @@ instance
   \foreach \y in {10,30,...,\ymax}
   \node at (\xmin,\y) [left] {\y};
 
-  \draw[black] plot coordinates {
+  \draw plot coordinates {
     (0,  2.3)
     (10, 2.5)
     (20, 2.8)
@@ -719,7 +719,42 @@ instance
     (150, 24)
   };
 
-  \draw[blue] plot coordinates {
+  \draw plot coordinates {
+    (0,  2.5)
+    (10, 2.7)
+    (20, 3.3)
+    (30, 4.5)
+    (40, 6.3)
+    (50, 8.7)
+    (60,  12)
+    (70,  16)
+    (100, 37)
+    (150,110)
+  };
+\end{tikzpicture}
+
+\begin{tikzpicture}[x=0.04cm,y=0.15cm]
+
+  \def\xmin{0}
+  \def\xmax{150}
+  \def\ymin{0}
+  \def\ymax{35}
+
+  % grid
+  \draw[style=help lines, ystep=4, xstep=10] (\xmin,\ymin) grid
+  (\xmax,\ymax);
+
+  % axes
+  \draw[->] (\xmin,\ymin) -- (\xmax,\ymin) node[right] {list length};
+  \draw[->] (\xmin,\ymin) -- (\xmin,\ymax) node[above] {time (s)};
+
+  % xticks and yticks
+  \foreach \x in {10,30,...,\xmax}
+  \node at (\x, \ymin) [below] {\x};
+  \foreach \y in {4,8,...,\ymax}
+  \node at (\xmin,\y) [left] {\y};
+
+  \draw plot coordinates {
     (0,  1.2)
     (10, 3.7)
     (20, 5.8)
@@ -732,20 +767,7 @@ instance
     (150, 35)
   };
 
-  \draw[red] plot coordinates {
-    (0,  2.5)
-    (10, 2.7)
-    (20, 3.3)
-    (30, 4.5)
-    (40, 6.3)
-    (50, 8.7)
-    (60,  12)
-    (70,  16)
-    (100, 37)
-    (150,110)
-  };
-
-  \draw[orange] plot coordinates {
+  \draw plot coordinates {
     (0,  1.6)
     (10, 2.5)
     (20, 2.7)
@@ -757,12 +779,6 @@ instance
     (100,3.2)
     (150,3.7)
   };
-
-  % plot the data from the file data.dat
-  % smooth the curve and mark the data point with a dot
-  %\draw[color=blue] plot[smooth,mark=*,mark size=1pt] file {data.dat}
-  % node [right] {data};
-
 \end{tikzpicture}
 
 
