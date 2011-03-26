@@ -352,6 +352,18 @@ instance HExtend e (Record l) (Record (HCons e l))
 \noindent 
 Thus, the following defines a record (|myR|) with seven fields:
 
+%if style==newcode
+\begin{code}
+data L1; l1 = proxy :: Proxy L1
+data L2; l2 = proxy :: Proxy L2
+data L3; l3 = proxy :: Proxy L3
+data L4; l4 = proxy :: Proxy L4
+data L5; l5 = proxy :: Proxy L5
+data L6; l6 = proxy :: Proxy L6
+data L7; l7 = proxy :: Proxy L7
+\end{code}
+%endif
+
 \begin{code}
 myR =  l1  .=.  True     .*. 
        l2  .=.  9        .*. 
