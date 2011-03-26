@@ -414,8 +414,8 @@ class HHasFieldList l r v | l r -> v where
 instance
     (  HEq l l' b
     ,  HHasFieldList' b l (HCons (LVPair l' v') r) v)
-    => HHasFieldList l (HCons (LVPair l' v') r) v 
-where
+    => HHasFieldList l (HCons (LVPair l' v') r) v
+    where
     hListGet l r@(HCons f' _) =
         hListGet' (hEq l (labelLVPair f')) l r
 
@@ -423,8 +423,8 @@ class HHasFieldList' b l r v | b l r -> v where
     hListGet':: b -> l -> r -> v
 
 instance
-    HHasFieldList' HTrue l (HCons (LVPair l v) r) v 
-where
+    HHasFieldList' HTrue l (HCons (LVPair l v) r) v
+    where
     hListGet' _ _ (HCons (LVPair v) _) = v
 
 instance
