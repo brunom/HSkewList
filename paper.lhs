@@ -52,7 +52,7 @@
 
 module Main where
 
-import Data.HList.FakePrelude(HEq, hEq, HTrue, HFalse, HOr, hOr, Proxy, proxy, HSucc, HZero)
+import Data.HList.FakePrelude(HEq, hEq, HTrue, HFalse, HOr, hOr, Proxy, proxy, HSucc, HZero, HCond, hCond)
 import Data.HList.Label4
 import Data.HList.TypeEqGeneric1
 import Data.HList.TypeCastGeneric1
@@ -587,7 +587,7 @@ emptySkewRecord = SkewRecord HNil
 
 instance
     (HSkewExtend (LVPair l v) ts ts',
-    HHasFieldSkew l ts HNothing) =>
+    HSkewHasField l ts HNothing) =>
     HExtend
         (LVPair l v)
         (SkewRecord ts)
@@ -668,45 +668,45 @@ but follow only the right one at runtime.
 
 Mirroring the definitions for linked list records,
 we need a |HHasField| instance for |SkewRecord|
-and an auxiliary type class |HHasFieldSkew|.
+and an auxiliary type class |HSkewHasField|.
 However, deciding on the path to the desired field
 is now much more involved.
 The cases that both the test function and the work function must consider
 are more numerous and involved.
 Thus, we merge both functions.
-|HHasFieldSkew| returns a type level and value level Maybe,
+|HSkewHasField| returns a type level and value level Maybe,
 that is,
 |HNothing| when no field with the label is found,
 and |HJust| of the field's type/value otherwise.
 For branching constructors |HCons| and |HNode|,
 |HPlus| chooses the correct path for us.
 \begin{code}
-class HHasFieldSkew l ts v | l ts -> v where
+class HSkewHasField l ts v | l ts -> v where
     hSkewGet :: l -> ts -> v
-instance HHasFieldSkew l HNil HNothing where
+instance HSkewHasField l HNil HNothing where
     hSkewGet _ _ = HNothing
-instance HHasFieldSkew l HEmpty HNothing where
+instance HSkewHasField l HEmpty HNothing where
     hSkewGet _ _ = HNothing
 instance
-    (HHasFieldSkew l t vt
-    ,HHasFieldSkew l ts vts
+    (HSkewHasField l t vt
+    ,HSkewHasField l ts vts
     ,HPlus vt vts v) =>
-    HHasFieldSkew l (HCons t ts) v where
+    HSkewHasField l (HCons t ts) v where
     hSkewGet l (HCons t ts) =
         hSkewGet l t `hPlus` hSkewGet l ts
 instance
-    (HHasFieldSkew l e et
-    ,HHasFieldSkew l t vt
-    ,HHasFieldSkew l t' vt'
+    (HSkewHasField l e et
+    ,HSkewHasField l t vt
+    ,HSkewHasField l t' vt'
     ,HPlus et vt evt
     ,HPlus evt vt' v) =>
-    HHasFieldSkew l (HNode e t t') v where
+    HSkewHasField l (HNode e t t') v where
     hSkewGet l (HNode e t t') =
         hSkewGet l e `hPlus` hSkewGet l t `hPlus` hSkewGet l t'
 instance
     (HEq l l' b
     ,HMakeMaybe b v m) =>
-    HHasFieldSkew l (LVPair l' v) m where
+    HSkewHasField l (LVPair l' v) m where
     hSkewGet l f =
         hMakeMaybe
             (hEq l (labelLVPair f))
@@ -714,17 +714,132 @@ instance
 \end{code}
 
 Finally, |HHasField| requires
-top level |HHasFieldSkew| to return |HJust|,
+top level |HSkewHasField| to return |HJust|,
 so compilation fails when requiring a non existent field,
 At runtime, |(#)| unwraps the input |SkewRecord|
-and the intermediate |HJust| from |HHasFieldSkew|.
+and the intermediate |HJust| from |HSkewHasField|.
 \begin{code}
 instance
-    (HHasFieldSkew l ts (HJust v)) =>
+    (HSkewHasField l ts (HJust v)) =>
     HHasField l (SkewRecord ts) v where
     SkewRecord ts # l =
         case hSkewGet l ts of HJust e -> e
 \end{code}
+
+\subsection{Update}\label{sec:update}
+
+We can define a type-function |HUpdate| to change the
+type and value of the value of a field.
+Analogously to |HHasField| and |HExtend|,
+|HUpdate| unpacks and repacks the |SkewRecord|
+|HSkewUpdate| doing all the real work.
+|HSkewHasField| checks that the record
+does contain a field with our label,
+though we allow the field to have different value type |v'|.
+
+\begin{code}
+class HUpdate l v r r' | l v r -> r' where
+    hUpdate :: l -> v -> r -> r'
+instance
+    (HSkewHasField l r (HJust v')
+    ,HSkewUpdate l v r r') =>
+    HUpdate l v (SkewRecord r) (SkewRecord r') where
+    hUpdate l v (SkewRecord r) =
+        SkewRecord (hSkewUpdate l v r)
+\end{code}
+
+|HSkewUpdate| is simpler than |HHasField|.
+We don't have to decide which subtree has the field to change.
+Instead, we just call |hSkewUpdate| recursively for all parts.
+The bottom case |LVPair| uses |HCond|
+from the HList type-function collection to only return
+an updated field if the labels match.
+\begin{code}
+class HSkewUpdate l v r r' | l v r -> r' where
+    hSkewUpdate :: l -> v -> r -> r'
+instance HSkewUpdate l v HNil HNil where
+    hSkewUpdate _ _ = id
+instance HSkewUpdate l v HEmpty HEmpty where
+    hSkewUpdate _ _ = id
+instance
+    (HSkewUpdate l v t t'
+    ,HSkewUpdate l v ts ts') =>
+    HSkewUpdate l v (HCons t ts) (HCons t' ts') where
+    hSkewUpdate l v (HCons t ts) =
+        HCons
+            (hSkewUpdate l v t)
+            (hSkewUpdate l v ts)
+instance
+    (HSkewUpdate l v e e'
+    ,HSkewUpdate l v tl tl'
+    ,HSkewUpdate l v tr tr') =>
+    HSkewUpdate l v (HNode e tl tr) (HNode e' tl' tr') where
+    hSkewUpdate l v (HNode e tl tr) =
+        HNode
+            (hSkewUpdate l v e)
+            (hSkewUpdate l v tl)
+            (hSkewUpdate l v tr)
+instance
+    (HEq l l' b
+    ,HCond b (LVPair l v) (LVPair l' v') p) =>
+    HSkewUpdate l v (LVPair l' v') p where
+    hSkewUpdate l v l'v' =
+        hCond
+            (hEq l (labelLVPair l'v'))
+            (l .=. v)
+            (l'v')
+\end{code}
+
+Of course, we want |HUpdate| to run as fast as possible.
+Rebuilding only the path to the field suffices,
+keeping all other subtrees intact,
+so the operation runs in logarithm time to the size of the record.
+But we don't make any effort to reuse untouched parts of our original structure.
+In particular, the |HNode| case calls |hSkewUpdate| for the children
+and reassembles a new |HNode| with the result,
+even when no matching field exists below the current node.
+Taken literally, this program touches all nodes
+and runs in linear time,
+not what we want.
+However, GHC with optimizations enabled is smart enough
+to recognize that we are constructing values already available
+and changes our naive program to the smart, logarithm-time, version.
+
+%if style==newcode
+\begin{code}
+{-# NOINLINE myR' #-}
+updR = hUpdate l1 "hi" myR'
+\end{code}
+%endif
+
+Removing a field is easy based on updating.
+We swap the field we want gone with the first node,
+and then we remove the first node.
+
+%% \begin{code}
+%% class HSkewTail ts ts' | ts -> ts' where
+%%     hSkewTail :: ts -> ts'
+%% instance HSkewTail (HCons (HLeaf e) ts) ts where
+%%     hSkewTail (HCons _ ts) = ts
+%% instance HSkewTail (HCons (HNode e t (HNode e' t' t'')) ts) (HCons t ((HCons (HNode e' t' t'')) ts)) where
+%%     hSkewTail (HCons (HNode _ t t') ts) = HCons t ((HCons t') ts)
+
+%% class HRemove l r r' | l r -> r' where
+%%     hRemove :: l -> r -> r'
+%% %% instance
+%% %%     (HSkewRemove l r r') =>
+%% %%     HRemove l (SkewRecord r) (SkewRecord r') where
+%% %%     hRemove l (SkewRecord r) = SkewRecord (hSkewRemove l r)
+%% %% class HSkewRemove l ts ts' | l ts -> ts' where
+%% %%     hSkewRemove :: l -> ts -> ts'
+%% %% instance 
+%% instance
+%%     (HSkewTail r' r'') =>
+%%     HRemove l (SkewRecord r) (SkewRecord r'') where
+%%     hRemove l (SkewRecord r) = SkewRecord (hSkewRemove l r)
+
+%% \end{code}
+
 
 \section{Efficiency}\label{sec:efficiency}
 
