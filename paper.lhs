@@ -83,7 +83,7 @@ list =
 %\copyrightdata{978-1-60558-332-7/09/08}
 
 \titlebanner{submitted to ICFP 2011}         % These are ignored unless
-\preprintfooter{version of Mar 18, 2011}     % 'preprint' option specified.
+\preprintfooter{version of May 21, 2011}     % 'preprint' option specified.
 
 \title{Just Do It While Compiling!}
 \subtitle{Fast Extensible Records In Haskell}
@@ -123,13 +123,13 @@ and implements a look-up operation that runs in logarithmic-time.
 
 Although there have been many different proposals for Extensible Records in Haskell 
 \cite{Gaster96apolymorphic, Jones99lightweightextensible, LabeledFunctions, Leijen:fclabels, Leijen:scopedlabels},
-it is still an open problem to find an implementation that manipulate records with satisfactory efficiency.
-This pearl aims to contribute with a solution in that direction. 
+it is still an open problem to find an implementation that manipulates records with satisfactory efficiency.
+This pearl aims to contribute a solution in that direction. 
 Our starting point is the library for strongly typed heterogeneous collections HList \cite{KLS04}
 which provides an example implementation of extensible records. 
-A drawback of HList is that looking-up, the (usually) most used operation on records,
+A drawback of HList is that looking-up, the most used operation on records,
 is linear time.
-We propose an alternative implementation for extensible records, using the same techniques than HList,
+We propose an alternative implementation for extensible records, using the same techniques as HList,
 with a look-up operation that runs in logarithmic-time.  
 
 Another contribution of this pearl is the trick we use to reduce the run-time work.
@@ -144,7 +144,7 @@ Since the structure is linear, the search and the path have the same length.
 Thus, the key idea is very simple. Instead of a linear structure as used by HList, 
 we propose the use of an alternative structure for the representation of heterogeneous collections which 
 is based on balanced trees.   
-The new structure, known as skew lists \cite{Mye83,OkaThesis}, makes it possible to obtain better profits 
+The new structure, known as skew lists \cite{Mye83,OkaThesis}, better profits 
 from the information given by the compile-time search, leading to sensible shorter paths in the run-time search 
 (see Figure~\ref{fig:search-skew}).
 
@@ -220,7 +220,7 @@ Observe that the computation is completely at the type-level;
 no interesting value-level computation takes place.
 
 Another example is the type-level representation of the maybe type. 
-In this case we are interesting in manipulating a value-level value associated with each type constructor.
+In this case we are interested in manipulating a value-level value associated with each type constructor.
 
 \begin{code}
 data HNothing  = HNothing
@@ -276,20 +276,19 @@ instance  HList HNil
 instance  HList l => HList (HCons e l)
 \end{spec}
 
-For space reasons, we we will avoid the inclusion of this well-formedness condition for 
-heterogeneous lists as well as for other type-level types, like naturals or booleans,
-in order to keep codes shorter. 
+For space reasons, we won't include this well-formedness condition for 
+heterogeneous lists or other type-level types, like naturals or booleans.
 
 The following class describes the extension of heterogeneous collections. 
 
 \begin{code}
-class HExtend e l l' | e l -> l', l' -> e l
+class HExtend e l l' | e l -> l'
     where (.*.) :: e -> l -> l'
 \end{code}
 
 The functional dependency |e l -> l'| makes |HExtend| a type-level function.
 It specifies the extension of a collection of type |l| with an element of type |e|,
-resulting a collection of type |l'|.
+resulting in a collection of type |l'|.
 Function |(.*.)| performs the same computation at the level of values.
 
 %We removed |l' -> e l|, an additional dependency present in the original HList formulation.
@@ -333,6 +332,8 @@ labelLVPair :: LVPair l v -> l
 labelLVPair = undefined
 \end{code}
 
+\noindent
+
 %\noindent 
 %Since we need to represent many labels, we introduce a polymorphic type |Proxy| to represent them;
 %by choosing a different phantom type for each label to be represented we can distinguish them:
@@ -350,9 +351,10 @@ instance HExtend e (Record l) (Record (HCons e l))
 \end{code}
 
 \noindent 
-Thus, the following defines a record (|myR|) with seven fields:
+Thus, using |HList|'s |proxy| constructor for labels, that automagically instances the key |HEq| typeclass
+to test two types for equality,
+he following defines a record (|myR|) with seven fields:
 
-%if style==newcode
 \begin{code}
 data L1; l1 = proxy :: Proxy L1
 data L2; l2 = proxy :: Proxy L2
@@ -361,10 +363,7 @@ data L4; l4 = proxy :: Proxy L4
 data L5; l5 = proxy :: Proxy L5
 data L6; l6 = proxy :: Proxy L6
 data L7; l7 = proxy :: Proxy L7
-\end{code}
-%endif
 
-\begin{code}
 myR =  l1  .=.  True     .*. 
        l2  .=.  9        .*. 
        l3  .=.  "bla"    .*. 
@@ -476,17 +475,21 @@ bla =
                                               HCons  e  _    -> e
 \end{spec}
 
-When the number of fields increases,
-as in EDSLs that use extensible records internally \cite{FlyFirstClass},
-we just bump GHC's context reduction stack and the program compiles.
-At runtime, however, we may hurt from the linear time lookup algorithm.
-The natural replacement when lookup in a linked list is slow
-is usually a search tree.
+In some extensible record applications,
+such as EDSLs \cite{FlyFirstClass},
+fields are auto generated
+and number in the dozens.
+Increasing the size of GHC's context reduction stack
+makes the program compiles
+but at runtime the linear time lookup algorithm
+hurts performance.
+The usual replacement when lookup in a linked list is slow
+is a search tree.
 In that case we would need to define a |HOrd| type-function
 analogue to HList's magic |HEq|
 and port some staple balanced tree to compile-time,
 tricky rotations and all.
-As unappealing as this is,
+As unappealing as this already is,
 the real roadblock is |HOrd|.
 Without help from the compiler,
 defining such type function for
@@ -504,6 +507,10 @@ So we just store our field unordered in a structure
 that allows fast random access and depend on the compiler to
 hardcode the path to our fields.
 Following \cite{OkaThesis} we leaned on Skew Binary Random-Access Lists.
+Other, perhaps simpler, data structures
+such as Braun trees \cite{brauntrees}
+don't offer constant time add
+and are not drop-in replacements for simple linear lists.
 
 \subsection{Skew Binary Random-Access List}\label{sec:skew}
 
@@ -518,7 +525,7 @@ except that the first two trees may be of equal size.
 Because of the size restriction,
 the spine is bounded by the logarithm of the element count,
 as is each tree.
-Hence, we can get to any element in logarithm effort.
+Hence, we can get to any element in logarithmic effort.
 
 Insertion maintaining the invariant is constant time
 and considers two cases.
@@ -611,7 +618,7 @@ and put them below a new |HNode|,
 or just insert a new |HLeaf|.
 The name evokes the carry possible when adding two numbers.
 If each top level tree is a digit,
-building a new, taller, is a form of carry,
+building a new, taller tree is a form of carry,
 so |HSkewCarry| return |HTrue|.
 \begin{code}
 class HSkewCarry l b | l -> b
@@ -672,7 +679,7 @@ and an auxiliary type class |HSkewHasField|.
 However, deciding on the path to the desired field
 is now much more involved.
 The cases that both the test function and the work function must consider
-are more numerous and involved.
+are more numerous and long.
 Thus, we merge both functions.
 |HSkewHasField| returns a type level and value level Maybe,
 that is,
@@ -715,7 +722,7 @@ instance
 
 Finally, |HHasField| requires
 top level |HSkewHasField| to return |HJust|,
-so compilation fails when requiring a non existent field,
+so compilation fails when looking for a non existent field,
 At runtime, |(#)| unwraps the input |SkewRecord|
 and the intermediate |HJust| from |HSkewHasField|.
 \begin{code}
@@ -752,7 +759,7 @@ instance
 We don't have to decide which subtree has the field to change.
 Instead, we just call |hSkewUpdate| recursively for all parts.
 The bottom case |LVPair| uses |HCond|
-from the HList type-function collection to only return
+from the |HList| type-function collection to only return
 an updated field if the labels match.
 \begin{code}
 class HSkewUpdate l e r r' | l e r -> r' where
@@ -885,7 +892,7 @@ The program constructs the list once
 and runs a 100.000.000 iteration |(#)| loop.
 Our laptop is a Celeron M 1.4 Ghz single core with 736 MB of RAM.
 
-\begin{tikzpicture}[x=0.04cm,y=0.16cm]
+\begin{tikzpicture}[x=0.03cm,y=0.12cm]
 
   \def\xmin{0}
   \def\xmax{150}
@@ -949,7 +956,7 @@ The dark side is that compile time explodes for |SkewRecord|,
 so rapid prototyping may be better served by using plain |Record|
 for debug runs:
 
-\begin{tikzpicture}[x=0.04cm,y=0.04cm]
+\begin{tikzpicture}[x=0.03cm,y=0.03cm]
 
   \def\xmin{0}
   \def\xmax{150}

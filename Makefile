@@ -18,4 +18,4 @@ paper.pdf : paper.tex  biblio.bib
 	pdflatex $(LTX_OPTS) paper.tex
 
 clean :
-	rm -f *.aux *.bbl *blg *.log *.ptb *.tex *.pdf
+	rm -f *.aux *.bbl *blg *.log *.ptb *.tex paper.pdf
