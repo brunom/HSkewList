@@ -352,7 +352,8 @@ instance HExtend e (Record l) (Record (HCons e l))
 
 \noindent 
 Thus, using |HList|'s |proxy| constructor for labels, that automagically instances the key |HEq| typeclass
-to test two types for equality,
+to test two types for equality
+(see TypeEqGeneric1.hs and TypeEqGeneric2.hs in |HList| for details),
 he following defines a record (|myR|) with seven fields:
 
 \begin{code}
@@ -475,10 +476,15 @@ bla =
                                               HCons  e  _    -> e
 \end{spec}
 
-In some extensible record applications,
-such as EDSLs \cite{FlyFirstClass},
-fields are auto generated
-and number in the dozens.
+Extensible records can double as
+"static type-safe" dictionaries, that is,
+collections with no label duplication
+and compile-time verified label availability.
+For example, \cite{FlyFirstClass}], a library for first-class attribute
+grammars, uses extensible records to encode the collection of
+attributes associated to each non-terminal. If we wanted to use it to
+implement a system with a big number of attributes (i.e. a compiler)
+an efficient structure would be needed.
 Increasing the size of GHC's context reduction stack
 makes the program compiles
 but at runtime the linear time lookup algorithm
@@ -506,18 +512,29 @@ wihout such label.
 So we just store our field unordered in a structure
 that allows fast random access and depend on the compiler to
 hardcode the path to our fields.
+
 Following \cite{OkaThesis} we leaned on Skew Binary Random-Access Lists.
 Other, perhaps simpler, data structures
 such as Braun trees \cite{brauntrees}
-don't offer constant time add
+don't offer constant time insertion
 and are not drop-in replacements for simple linear lists.
-
+A structure with logarithmic insertion slows down
+applications heavy on record modification.
+That aside, the key property
+of searching at compile-time while retrieving at runtime
+works unchanged in other balanced tree structures.
 \subsection{Skew Binary Random-Access List}\label{sec:skew}
 
 We'll describe Skew Binary Random-Access List \cite{Mye83} in a less principled
 but easier and more direct fashion
 than \cite{OkaThesis}, which is founded on numerical representations.
 A skew list is a linked list spine of complete binary trees.
+
+Skew list is not optimal for merging records.  In the view of tree
+instances as numbers, merging is equivalent to number addition.  Some
+priority queue structures do support fast merging (or melding), but
+usually the resulting trees are very deep and don't support efficient
+access to some elements.
 
 The invariant of skew lists is that the height of trees
 get strictly larger along the linked list,
@@ -951,6 +968,22 @@ so elements are at most 5 hops away.
 But a 28 size skew lists contains trees sized
 1, 1, 3, 7 and 15,
 and getting to the last takes 8 hops.
+
+Up to ten elements, simple linked lists are faster than skew lists.
+By fusing the spine list and the tree nodes,
+skew lists can be tweaked to improve the performance with few elements.
+This results in a single node type,
+with an element and three child node references,
+one to the next node,
+one to the right subtree,
+and one to the node of the next tree.
+We chose the unfusioned exposition for clarity.
+Another option is to use linked list for small records and switch to
+skew list when over 10 fields.
+Since the test is done at compile-time, the adaptive structure has no
+runtime overhead
+above having to copy the 10 fields from the linked list to the tree
+when the limit is surpassed.
 
 The dark side is that compile time explodes for |SkewRecord|,
 so rapid prototyping may be better served by using plain |Record|
