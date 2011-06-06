@@ -415,8 +415,8 @@ which also uses |HCons| and |HNil| internally.
 
 \begin{code}
 instance
-    (HHasFieldList l r v)
-    => HHasField l (Record r) v where
+    HHasFieldList l r v =>
+    HHasField l (Record r) v where
     Record r # l = hListGet l r
 
 class HHasFieldList l r v | l r -> v where
@@ -424,9 +424,8 @@ class HHasFieldList l r v | l r -> v where
 
 instance
     (  HEq l l' b
-    ,  HHasFieldList' b l (HCons (LVPair l' v') r) v)
-    => HHasFieldList l (HCons (LVPair l' v') r) v
-    where
+    ,  HHasFieldList' b l (HCons (LVPair l' v') r) v) =>
+       HHasFieldList l (HCons (LVPair l' v') r) v where
     hListGet l r@(HCons f' _) =
         hListGet' (hEq l (labelLVPair f')) l r
 
@@ -609,12 +608,12 @@ emptySkewRecord :: SkewRecord HNil
 emptySkewRecord = SkewRecord HNil
 
 instance
-    (HSkewExtend (LVPair l v) ts ts',
-    HSkewHasField l ts HNothing) =>
-    HExtend
-        (LVPair l v)
-        (SkewRecord ts)
-        (SkewRecord ts') where
+    (  HSkewExtend (LVPair l v) ts ts'
+    ,  HSkewHasField l ts HNothing) =>
+       HExtend
+         (LVPair l v)
+         (SkewRecord ts)
+         (SkewRecord ts') where
     e .*. SkewRecord ts =
         SkewRecord (hSkewExtend e ts)
 \end{code}
@@ -625,8 +624,9 @@ and returns it.
 class HComplete t h | t -> h
 instance HComplete HEmpty HZero
 instance
-    (HComplete t h, HComplete t' h) =>
-    HComplete (HNode e t t') (HSucc h)
+    (  HComplete t h
+    ,  HComplete t' h) =>
+       HComplete (HNode e t t') (HSucc h)
 \end{code}
 
 |HSkewCarry| finds out if we need take two existing trees
@@ -641,10 +641,10 @@ class HSkewCarry l b | l -> b
 instance HSkewCarry HNil HFalse
 instance HSkewCarry (HCons t HNil) HFalse
 instance
-    (HComplete t h
-    ,HComplete t' h'
-    ,HEq h h' b)
-    => HSkewCarry (HCons t (HCons t' ts)) b
+    (  HComplete t h
+    ,  HComplete t' h'
+    ,  HEq h h' b) =>
+       HSkewCarry (HCons t (HCons t' ts)) b
 hSkewCarry :: HSkewCarry l b => l -> b
 hSkewCarry = undefined
 \end{code}
@@ -660,9 +660,9 @@ a smart test type-function saves on repetition.
 class HSkewExtend e l l' | e l -> l'
     where hSkewExtend :: e -> l -> l'
 instance
-    (HSkewCarry l b
-    ,HSkewExtend' b e l l') =>
-    HSkewExtend e l l' where
+    (  HSkewCarry l b
+    ,  HSkewExtend' b e l l') =>
+       HSkewExtend e l l' where
     hSkewExtend e l =
         hSkewExtend' (hSkewCarry l) e l
 
@@ -712,27 +712,27 @@ instance HSkewHasField l HNil HNothing where
 instance HSkewHasField l HEmpty HNothing where
     hSkewGet _ _ = HNothing
 instance
-    (HSkewHasField l t vt
-    ,HSkewHasField l ts vts
-    ,HPlus vt vts v) =>
-    HSkewHasField l (HCons t ts) v where
+    (  HSkewHasField l t vt
+    ,  HSkewHasField l ts vts
+    ,  HPlus vt vts v) =>
+       HSkewHasField l (HCons t ts) v where
     hSkewGet l (HCons t ts) =
         hSkewGet l t `hPlus` hSkewGet l ts
 instance
-    (HSkewHasField l e et
-    ,HSkewHasField l t vt
-    ,HSkewHasField l t' vt'
-    ,HPlus et vt evt
-    ,HPlus evt vt' v) =>
-    HSkewHasField l (HNode e t t') v where
+    (  HSkewHasField l e et
+    ,  HSkewHasField l t vt
+    ,  HSkewHasField l t' vt'
+    ,  HPlus et vt evt
+    ,  HPlus evt vt' v) =>
+       HSkewHasField l (HNode e t t') v where
     hSkewGet l (HNode e t t') =
         hSkewGet l e 
             `hPlus` hSkewGet l t 
                `hPlus` hSkewGet l t'
 instance
-    (HEq l l' b
-    ,HMakeMaybe b v m) =>
-    HSkewHasField l (LVPair l' v) m where
+    (  HEq l l' b
+    ,  HMakeMaybe b v m) =>
+       HSkewHasField l (LVPair l' v) m where
     hSkewGet l f =
         hMakeMaybe
             (hEq l (labelLVPair f))
@@ -746,7 +746,7 @@ At run time, |(#)| unwraps the input |SkewRecord|
 and the intermediate |HJust| from |HSkewHasField|.
 \begin{code}
 instance
-    (HSkewHasField l ts (HJust v)) =>
+    HSkewHasField l ts (HJust v) =>
     HHasField l (SkewRecord ts) v where
     SkewRecord ts # l =
         case hSkewGet l ts of HJust e -> e
@@ -767,9 +767,9 @@ does contain a field with our label.
 class HUpdate l e r r' | l e r -> r' where
     hUpdate :: l -> e -> r -> r'
 instance
-    (HSkewHasField l r (HJust v)
-    ,HSkewUpdate l e r r') =>
-    HUpdate l e (SkewRecord r) (SkewRecord r') where
+    (  HSkewHasField l r (HJust v)
+    ,  HSkewUpdate l e r r') =>
+       HUpdate l e (SkewRecord r) (SkewRecord r') where
     hUpdate l e (SkewRecord r) =
         SkewRecord (hSkewUpdate l e r)
 \end{code}
@@ -788,28 +788,28 @@ instance HSkewUpdate l e HNil HNil where
 instance HSkewUpdate l e HEmpty HEmpty where
     hSkewUpdate _ _ = id
 instance
-    (HSkewUpdate l e t t'
-    ,HSkewUpdate l e ts ts') =>
-    HSkewUpdate l e (HCons t ts) (HCons t' ts') where
+    (  HSkewUpdate l e t t'
+    ,  HSkewUpdate l e ts ts') =>
+       HSkewUpdate l e (HCons t ts) (HCons t' ts') where
     hSkewUpdate l e (HCons t ts) =
         HCons
             (hSkewUpdate l e t)
             (hSkewUpdate l e ts)
 instance
-    (HSkewUpdate l e e' e''
-    ,HSkewUpdate l e tl tl'
-    ,HSkewUpdate l e tr tr') =>
-    HSkewUpdate l e (HNode e' tl tr) (HNode e'' tl' tr') 
-    where
-      hSkewUpdate l e (HNode e' tl tr) =
+    (  HSkewUpdate l e e' e''
+    ,  HSkewUpdate l e tl tl'
+    ,  HSkewUpdate l e tr tr') =>
+       HSkewUpdate l e (HNode e' tl tr) (HNode e'' tl' tr')
+       where
+    hSkewUpdate l e (HNode e' tl tr) =
         HNode
             (hSkewUpdate l e e')
             (hSkewUpdate l e tl)
             (hSkewUpdate l e tr)
 instance
-    (HEq l l' b
-    ,HCond b e (LVPair l' v') p) =>
-    HSkewUpdate l e (LVPair l' v') p where
+    (  HEq l l' b
+    ,  HCond b e (LVPair l' v') p) =>
+       HSkewUpdate l e (LVPair l' v') p where
     hSkewUpdate l e e' =
         hCond
             (hEq l (labelLVPair e'))
@@ -858,9 +858,9 @@ instance
 class HRemove l r r' | l r -> r' where
     hRemove :: l -> r -> r'
 instance
-    (HSkewUpdate l e (HCons (HNode e t t') ts) r'
-    ,HSkewTail r' r'') =>
-    HRemove
+    (  HSkewUpdate l e (HCons (HNode e t t') ts) r'
+    ,  HSkewTail r' r'') =>
+       HRemove
         l
         (SkewRecord (HCons (HNode e t t') ts))
         (SkewRecord r'') where
