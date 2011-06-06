@@ -1064,15 +1064,16 @@ Figure~\ref{compile_time}, so rapid prototyping may be better served by using pl
 
 \section{Conclusions and Future Work}\label{sec:conclusions}
 
-Using type-level programming techniques we have developed 
+Using type level programming techniques we have developed 
 an implementation of extensible records for Haskell that at run time 
-is logarithmic-time at searching and removing elements and constant-time at
-inserting elements.
+is logarithmic time at searching and removing elements and constant time at
+inserting elements. This run time perfomance is achieved by moving 
+most of the effort to compile time. 
 
-Much of the effort is done at compile time. 
 Interesting future work is to find a way to reduce compilation time.
 Experiments demonstrate that GHC memoizes class instances,
-but some particularity of our instances confuse the mechanism.
+but some particularity of our instances seem to confuse the mechanism.
+
 \bibliographystyle{plainnat}
 
 \begin{flushleft}
