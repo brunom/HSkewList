@@ -108,7 +108,7 @@ with a look-up operation that is linear-time in the number of fields.
 In this paper, we use type-level programming techniques
 to develop a more efficient representation of extensible records,
 which moves most of the effort concerning the manipulation
-of the record representation to compile-time
+of the record representation to compile time
 and implements a look-up operation that runs in logarithmic-time.
 \end{abstract}
 
@@ -132,37 +132,36 @@ is linear time.
 We propose an alternative implementation for extensible records, using the same techniques as HList,
 with a look-up operation that runs in logarithmic-time.  
 
-Another contribution of this paper is the trick we use to reduce the run-time work.
+Another contribution of this paper is the trick we use to reduce the run time work.
 We have observed that, when looking-up an element into a HList,
-the element is first searched at compile-time in order to raise an error in case the element 
+the element is first searched at compile time in order to raise an error in case the element 
 does not belong to the list.
-This search generates the path the program follows at run-time to obtain the element.
-In Figure~\ref{fig:search-hlist} we represent with a dashed arrow the compile-time search, 
-and with a continued arrow the generated path followed at run-time. 
+This search generates the path the program follows at run time to obtain the element.
+In Figure~\ref{fig:search-hlist} we represent with a dashed arrow the compile time search, 
+and with a continued arrow the generated path followed at run time. 
 Since the structure is linear, the search and the path have the same length.
 
-Thus, the key idea is very simple. Instead of a linear structure as used by HList, 
-we propose the use of an alternative structure for the representation of heterogeneous collections which 
-is based on balanced trees.
-Such a structure better profits 
-from the information given by the compile-time search, leading to logarithmic length paths in the run-time search 
-(see Figure~\ref{fig:search-skew}).
-
-In the rest of this paper we show the type-level techniques used to implement extensible records by HList (Section~\ref{sec:hlist}) and how we use these techniques to provide an implementation
-based on so called skew lists \cite{Mye83,OkaThesis}
-which are faster at 
-run-time (Section~\ref{sec:faster}). 
-In Section~\ref{sec:efficiency} we show some results about the efficiency of our approach compared to HList.
-Finally, in Section~\ref{sec:conclusions} we present some conclusions and possible directions for future work.
-
-
-
-\begin{figure}[htp]
+\begin{figure}[tp]
 \begin{center}
 \includegraphics[scale=0.5]{search-hlist.pdf}
 \end{center}
 \caption{Search |l7| in HList} \label{fig:search-hlist}
 \end{figure}
+
+Thus, the key idea is very simple. Instead of a linear structure as used by HList, 
+we propose the use of an alternative structure for the representation of heterogeneous collections which 
+is based on balanced trees.
+Such a structure better profits 
+from the information given by the compile time search, leading to logarithmic length paths in the run time search 
+(see Figure~\ref{fig:search-skew}).
+
+In the rest of this paper we show the type-level techniques used to implement extensible records by HList (Section~\ref{sec:hlist}) and how we use these techniques to provide an implementation
+based on so called skew lists \cite{Mye83,OkaThesis}
+which are faster at 
+run time (Section~\ref{sec:faster}). 
+In Section~\ref{sec:efficiency} we show some results about the efficiency of our approach compared to HList.
+Finally, in Section~\ref{sec:conclusions} we present some conclusions and possible directions for future work.
+
 
 \begin{figure}[htp]
 \begin{center}
@@ -278,7 +277,7 @@ instance  HList HNil
 instance  HList l => HList (HCons e l)
 \end{spec}
 
-For space reasons, we won't include this well-formedness condition for 
+For space reasons, we will not include this well-formedness condition for 
 heterogeneous lists or other type-level types, like naturals or booleans.
 
 The following class describes the extension of heterogeneous collections. 
@@ -483,13 +482,13 @@ implement a system with a big number of attributes (i.e. a compiler)
 an efficient structure would be needed.
 Increasing the size of GHC's context reduction stack
 makes the program compiles
-but at runtime the linear time lookup algorithm
+but at run time the linear time lookup algorithm
 hurts performance.
 The usual replacement when lookup in a linked list is slow
 is a search tree.
 In that case we would need to define a |HOrd| type-function
 analogue to HList's magic |HEq|
-and port some staple balanced tree to compile-time,
+and port some staple balanced tree to compile time,
 tricky rotations and all.
 As unappealing as this already is,
 the real roadblock is |HOrd|.
@@ -499,10 +498,10 @@ unstructured labels is beyond (our) reach.
 
 \section{Faster Extensible Records}\label{sec:faster}
 
-The key insight is that sub-linear behavior is only needed at runtime.
-We are willing to keep the work done at compile-time superlinear
-if it helps us to speed up our programs at runtime.
-|HHasField| already looks for our label at compile-time
+The key insight is that sub-linear behavior is only needed at run time.
+We are willing to keep the work done at compile time superlinear
+if it helps us to speed up our programs at run time.
+|HHasField| already looks for our label at compile time
 to fail compilation if we require a field for a record
 wihout such label.
 So we just store our field unordered in a structure
@@ -512,16 +511,16 @@ hardcode the path to our fields.
 Following \cite{OkaThesis} we leaned on Skew Binary Random-Access Lists.
 Other, perhaps simpler, data structures
 such as Braun trees \cite{brauntrees}
-don't offer constant time insertion
+do not offer constant time insertion
 and are not drop-in replacements for simple linear lists.
 A structure with logarithmic insertion slows down
 applications heavy on record modification.
 That aside, the key property
-of searching at compile-time while retrieving at runtime
+of searching at compile time while retrieving at run time
 works unchanged in other balanced tree structures.
 \subsection{Skew Binary Random-Access List}\label{sec:skew}
 
-We'll describe Skew Binary Random-Access List \cite{Mye83} in a less principled
+We will describe Skew Binary Random-Access List \cite{Mye83} in a less principled
 but easier and more direct fashion
 than \cite{OkaThesis}, which is founded on numerical representations.
 A skew list is a linked list spine of complete binary trees.
@@ -560,7 +559,7 @@ two previous sub-trees.
 Skew list is not optimal for merging records.  In the view of tree
 instances as numbers, merging is equivalent to number addition.  Some
 priority queue structures do support fast merging (or melding), but
-usually the resulting trees are very deep and don't support efficient
+usually the resulting trees are very deep and do not support efficient
 access to some elements.
 
 \subsection{SkewRecord}
@@ -650,7 +649,7 @@ hSkewCarry = undefined
 In this case, |HSkewCarry| is responsible for discriminating
 the current case.
 Because pattern matching in type classes is more limited than
-runtime value pattern matching
+run time value pattern matching
 and as-patterns are missing,
 a smart test type-function saves on repetition.
 \begin{code}
@@ -684,8 +683,8 @@ instance
 
 The missing piece is |HHasField| for |SkewRecord|.
 As already mentioned,
-we explore all paths at compile-time
-but follow only the right one at runtime.
+we explore all paths at compile time
+but follow only the right one at run time.
 
 Mirroring the definitions for linked list records,
 we need a |HHasField| instance for |SkewRecord|
@@ -723,7 +722,9 @@ instance
     ,  HPlus evt vt' v) =>
        HSkewHasField l (HNode e t t') v where
     hSkewGet l (HNode e t t') =
-        hSkewGet l e `hPlus` hSkewGet l t `hPlus` hSkewGet l t'
+        hSkewGet l e 
+            `hPlus` hSkewGet l t 
+               `hPlus` hSkewGet l t'
 instance
     (  HEq l l' b
     ,  HMakeMaybe b v m) =>
@@ -737,7 +738,7 @@ instance
 Finally, |HHasField| requires
 top level |HSkewHasField| to return |HJust|,
 so compilation fails when looking for a non existent field,
-At runtime, |(#)| unwraps the input |SkewRecord|
+At run time, |(#)| unwraps the input |SkewRecord|
 and the intermediate |HJust| from |HSkewHasField|.
 \begin{code}
 instance
@@ -770,7 +771,7 @@ instance
 \end{code}
 
 |HSkewUpdate| is simpler than |HHasField|.
-We don't have to decide which subtree has the field to change.
+We do not have to decide which subtree has the field to change.
 Instead, we just call |hSkewUpdate| recursively for all parts.
 The bottom case |LVPair| uses |HCond|
 from the |HList| type-function collection to only return
@@ -816,7 +817,7 @@ Of course, we want |HUpdate| to run as fast as possible.
 Rebuilding only the path to the field suffices,
 keeping all other subtrees intact,
 so the operation runs in logarithm time to the size of the record.
-But we don't make any effort to reuse untouched parts of our original structure.
+But we do not make any effort to reuse untouched parts of our original structure.
 In particular, the |HNode| case calls |hSkewUpdate| for the children
 and reassembles a new |HNode| with the result,
 even when no matching field exists below the current node.
@@ -874,9 +875,10 @@ instance
 
 
 Let us see what happens in the worst-case scenario for both representations, 
-i.e. looking-up the last field of the record.
+i.e. looking-up the last field of a record.
 
-In the example, when using HList (|myR|) we know that the core code results in a |case| cascade with depth 7.
+In the example, when using HList (|myR|) we know that the core code for lookup 
+results in a |case| cascade with depth 7.
 This is the case of Figure~\ref{fig:search-hlist} of section~\ref{sec:intro}.
 
 
@@ -903,7 +905,7 @@ last =
   case t121   of HNode  e   _   _     ->
   e
 \end{spec}
-Thus, getting to |l7| only traverses a fraction of the elements,
+Thus, getting to |l7| at run time only traverses a fraction of the elements,
 as we have seen in Figure~\ref{fig:search-skew}.
 
 
@@ -913,7 +915,10 @@ We time accessing the last of an increasing number of fields.
 The program constructs the list once
 and runs a 100.000.000 iteration |(#)| loop.
 Our laptop is a Celeron M 1.4 Ghz single core with 736 MB of RAM.
+Run time comparisons are shown in Figure~\ref{run_time}.
 
+\begin{figure}[h]
+\begin{center}
 \begin{tikzpicture}[x=0.03cm,y=0.12cm]
 
   \def\xmin{0}
@@ -964,8 +969,11 @@ Our laptop is a Celeron M 1.4 Ghz single core with 736 MB of RAM.
   };
   \node[right,red] at (150, 3.7) {SkewRecord};
 \end{tikzpicture}
+\end{center}
+\caption{Running time}
+\label{run_time}
+\end{figure}
 
-\noindent
 Note how the |SkewRecord| version barely increases the run time at a logarithm rate.
 Actually, sometimes larger records run faster.
 For example, a 31 size skew list contains a single tree,
@@ -985,15 +993,16 @@ and one to the node of the next tree.
 We chose the unfusioned exposition for clarity.
 Another option is to use linked list for small records and switch to
 skew list when over 10 fields.
-Since the test is done at compile-time, the adaptive structure has no
-runtime overhead
+Since the test is done at compile time, the adaptive structure has no
+run time overhead
 above having to copy the 10 fields from the linked list to the tree
 when the limit is surpassed.
 
-The dark side is that compile time explodes for |SkewRecord|,
-so rapid prototyping may be better served by using plain |Record|
-for debug runs:
+The dark side is that compile time explodes for |SkewRecord|, as showed in 
+Figure~\ref{compile_time}, so rapid prototyping may be better served by using plain |Record|.
 
+\begin{figure}[h]
+\begin{center}
 \begin{tikzpicture}[x=0.03cm,y=0.03cm]
 
   \def\xmin{0}
@@ -1043,12 +1052,16 @@ for debug runs:
   };
   \node[right,red] at (150,110) {SkewRecord};
 \end{tikzpicture}
+\end{center}
+\caption{Compile time}
+\label{compile_time}
+\end{figure}
 
 
 \section{Conclusions and Future Work}\label{sec:conclusions}
 
 Using type-level programming techniques we have developed 
-an implementation of extensible records for Haskell that at run-time 
+an implementation of extensible records for Haskell that at run time 
 is logarithmic-time at searching and removing elements and constant-time at
 inserting elements.
 
