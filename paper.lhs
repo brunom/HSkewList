@@ -52,7 +52,7 @@
 
 module Main where
 
-import Data.HList.FakePrelude(HEq, hEq, HTrue, HFalse, HOr, hOr, Proxy, proxy, HSucc, HZero, HCond, hCond)
+import Data.HList.FakePrelude(HEq, hEq, HTrue, HFalse, HOr, hOr, Proxy, HSucc, HZero, HCond, hCond)
 import Data.HList.Label4
 import Data.HList.TypeEqGeneric1
 import Data.HList.TypeCastGeneric1
@@ -78,12 +78,12 @@ list =
 
 \begin{document}
 
-\conferenceinfo{ICFP'11,} {September 19--21, 2011, Tokyo, Japan}
+\conferenceinfo{Haskell Symposium 2011,} {September 22, 2011, Tokyo, Japan}
 \CopyrightYear{2011}
 %\copyrightdata{978-1-60558-332-7/09/08}
 
-\titlebanner{submitted to ICFP 2011}         % These are ignored unless
-\preprintfooter{version of May 21, 2011}     % 'preprint' option specified.
+\titlebanner{submitted to Haskell Symposium 2011}         % These are ignored unless
+\preprintfooter{version of Jun 6, 2011}     % 'preprint' option specified.
 
 \title{Just Do It While Compiling!}
 \subtitle{Fast Extensible Records In Haskell}
@@ -105,7 +105,7 @@ provides an implementation of extensible records in Haskell
 that needs only a few common extensions of the language.
 In HList, records are represented as linked lists of label-value pairs
 with a look-up operation that is linear-time in the number of fields.
-In this pearl, we use type-level programming techniques
+In this paper, we use type-level programming techniques
 to develop a more efficient representation of extensible records,
 which moves most of the effort concerning the manipulation
 of the record representation to compile-time
@@ -124,15 +124,15 @@ and implements a look-up operation that runs in logarithmic-time.
 Although there have been many different proposals for Extensible Records in Haskell 
 \cite{Gaster96apolymorphic, Jones99lightweightextensible, LabeledFunctions, Leijen:fclabels, Leijen:scopedlabels},
 it is still an open problem to find an implementation that manipulates records with satisfactory efficiency.
-This pearl aims to contribute a solution in that direction. 
+This paper aims to contribute a solution in that direction. 
 Our starting point is the library for strongly typed heterogeneous collections HList \cite{KLS04}
 which provides an example implementation of extensible records. 
-A drawback of HList is that looking-up, the most used operation on records,
+A drawback of HList is that look-up, the most used operation on records,
 is linear time.
 We propose an alternative implementation for extensible records, using the same techniques as HList,
 with a look-up operation that runs in logarithmic-time.  
 
-Another contribution of this pearl is the trick we use to reduce the run-time work.
+Another contribution of this paper is the trick we use to reduce the run-time work.
 We have observed that, when looking-up an element into a HList,
 the element is first searched at compile-time in order to raise an error in case the element 
 does not belong to the list.
@@ -143,12 +143,14 @@ Since the structure is linear, the search and the path have the same length.
 
 Thus, the key idea is very simple. Instead of a linear structure as used by HList, 
 we propose the use of an alternative structure for the representation of heterogeneous collections which 
-is based on balanced trees.   
-The new structure, known as skew lists \cite{Mye83,OkaThesis}, better profits 
-from the information given by the compile-time search, leading to sensible shorter paths in the run-time search 
+is based on balanced trees.
+Such a structure better profits 
+from the information given by the compile-time search, leading to logarithmic length paths in the run-time search 
 (see Figure~\ref{fig:search-skew}).
 
-In the rest of this paper we show the type-level techniques used to implement extensible records by HList (Section~\ref{sec:hlist}) and how we use these techniques to provide an implementation which is faster at 
+In the rest of this paper we show the type-level techniques used to implement extensible records by HList (Section~\ref{sec:hlist}) and how we use these techniques to provide an implementation
+based on so called skew lists \cite{Mye83,OkaThesis}
+which are faster at 
 run-time (Section~\ref{sec:faster}). 
 In Section~\ref{sec:efficiency} we show some results about the efficiency of our approach compared to HList.
 Finally, in Section~\ref{sec:conclusions} we present some conclusions and possible directions for future work.
@@ -166,7 +168,7 @@ Finally, in Section~\ref{sec:conclusions} we present some conclusions and possib
 \begin{center}
 \includegraphics[scale=0.5]{search-skew.pdf}
 \end{center}
-\caption{Search |l7| in Skew} \label{fig:search-skew}
+\caption{Search |l7| in balanced tree} \label{fig:search-skew}
 \end{figure}
 
 \section{HList}\label{sec:hlist}
@@ -334,14 +336,11 @@ labelLVPair = undefined
 
 \noindent
 
-%\noindent 
-%Since we need to represent many labels, we introduce a polymorphic type |Proxy| to represent them;
-%by choosing a different phantom type for each label to be represented we can distinguish them:
-%
-%\begin{spec}
-%data Proxy e ; proxy = undefined :: Proxy e
-%\end{spec}
-
+\noindent 
+Labels are represented by |HList|'s |Proxy| type constructor.
+|HList| defines the key typeclass |HEq| so that
+a proxy only equals itself.
+By choosing a different phantom type for each label to be represented we can distinguish them.
 
 The instance of |HExtend| for records extends the list with a new field:
 
@@ -351,19 +350,16 @@ instance HExtend e (Record l) (Record (HCons e l))
 \end{code}
 
 \noindent 
-Thus, using |HList|'s |proxy| constructor for labels, that automagically instances the key |HEq| typeclass
-to test two types for equality
-(see TypeEqGeneric1.hs and TypeEqGeneric2.hs in |HList| for details),
-he following defines a record (|myR|) with seven fields:
+Thus, the following defines a record (|myR|) with seven fields:
 
 \begin{code}
-data L1; l1 = proxy :: Proxy L1
-data L2; l2 = proxy :: Proxy L2
-data L3; l3 = proxy :: Proxy L3
-data L4; l4 = proxy :: Proxy L4
-data L5; l5 = proxy :: Proxy L5
-data L6; l6 = proxy :: Proxy L6
-data L7; l7 = proxy :: Proxy L7
+data L1; l1 = undefined :: Proxy L1
+data L2; l2 = undefined :: Proxy L2
+data L3; l3 = undefined :: Proxy L3
+data L4; l4 = undefined :: Proxy L4
+data L5; l5 = undefined :: Proxy L5
+data L6; l6 = undefined :: Proxy L6
+data L7; l7 = undefined :: Proxy L7
 
 myR =  l1  .=.  True     .*. 
        l2  .=.  9        .*. 
@@ -471,16 +467,17 @@ For example, this is the GHC core of the example:
 \begin{spec}
 bla =
   case myR  of 
-    HCons  _  rs1  ->  case rs1  of 
-                         HCons  _  rs2  ->  case rs2  of 
-                                              HCons  e  _    -> e
+  HCons  _  rs1  ->  case rs1  of 
+  HCons  _  rs2  ->  case rs2  of 
+  HCons  e  _    -> e
 \end{spec}
 
 Extensible records can double as
 "static type-safe" dictionaries, that is,
-collections with no label duplication
-and compile-time verified label availability.
-For example, \cite{FlyFirstClass}], a library for first-class attribute
+collections that guarantee at compile time
+that no label is duplicated
+and that all labels searched for are available.
+For example, \cite{FlyFirstClass}, a library for first-class attribute
 grammars, uses extensible records to encode the collection of
 attributes associated to each non-terminal. If we wanted to use it to
 implement a system with a big number of attributes (i.e. a compiler)
@@ -530,12 +527,6 @@ but easier and more direct fashion
 than \cite{OkaThesis}, which is founded on numerical representations.
 A skew list is a linked list spine of complete binary trees.
 
-Skew list is not optimal for merging records.  In the view of tree
-instances as numbers, merging is equivalent to number addition.  Some
-priority queue structures do support fast merging (or melding), but
-usually the resulting trees are very deep and don't support efficient
-access to some elements.
-
 The invariant of skew lists is that the height of trees
 get strictly larger along the linked list,
 except that the first two trees may be of equal size.
@@ -567,6 +558,11 @@ two previous sub-trees.
 \caption{Insertion in a Skew} \label{fig:insert}
 \end{figure}
 
+Skew list is not optimal for merging records.  In the view of tree
+instances as numbers, merging is equivalent to number addition.  Some
+priority queue structures do support fast merging (or melding), but
+usually the resulting trees are very deep and don't support efficient
+access to some elements.
 
 \subsection{SkewRecord}
 
@@ -664,7 +660,8 @@ instance
     (HSkewCarry l b
     ,HSkewExtend' b e l l') =>
     HSkewExtend e l l' where
-    hSkewExtend e l = hSkewExtend' (hSkewCarry l) e l
+    hSkewExtend e l =
+        hSkewExtend' (hSkewCarry l) e l
 
 class HSkewExtend' b e l l' | b e l -> l' where
     hSkewExtend' :: b -> e -> l -> l'
@@ -845,15 +842,22 @@ class HSkewTail ts ts' | ts -> ts' where
     hSkewTail :: ts -> ts'
 instance HSkewTail (HCons (HLeaf e) ts) ts where
     hSkewTail (HCons _ ts) = ts
-instance HSkewTail (HCons (HNode e t (HNode e' t' t'')) ts) (HCons t ((HCons (HNode e' t' t'')) ts)) where
-    hSkewTail (HCons (HNode _ t t') ts) = HCons t ((HCons t') ts)
+instance
+    HSkewTail
+        (HCons (HNode e t (HNode e' t' t'')) ts)
+        (HCons t ((HCons (HNode e' t' t'')) ts)) where
+    hSkewTail (HCons (HNode _ t t') ts) =
+        HCons t ((HCons t') ts)
 
 class HRemove l r r' | l r -> r' where
     hRemove :: l -> r -> r'
 instance
     (HSkewUpdate l e (HCons (HNode e t t') ts) r'
     ,HSkewTail r' r'') =>
-    HRemove l (SkewRecord (HCons (HNode e t t') ts)) (SkewRecord r'') where
+    HRemove
+        l
+        (SkewRecord (HCons (HNode e t t') ts))
+        (SkewRecord r'') where
     hRemove l (SkewRecord (HCons (HNode e t t') ts)) =
         SkewRecord $
         hSkewTail $
@@ -869,7 +873,7 @@ instance
 
 
 Let us see what happens in the worst-case scenario for both representations, 
-i.e. looking-up the last element of the list.
+i.e. looking-up the last field of the record.
 
 In the example, when using HList (|myR|) we know that the core code results in a |case| cascade with depth 7.
 This is the case of Figure~\ref{fig:search-hlist} of section~\ref{sec:intro}.
