@@ -141,6 +141,13 @@ In Figure~\ref{fig:search-hlist} we represent with a dashed arrow the compile ti
 and with a continued arrow the generated path followed at run time. 
 Since the structure is linear, the search and the path have the same length.
 
+\begin{figure}[tp]
+\begin{center}
+\includegraphics[scale=0.5]{search-hlist.pdf}
+\end{center}
+\caption{Search |l7| in HList} \label{fig:search-hlist}
+\end{figure}
+
 Thus, the key idea is very simple. Instead of a linear structure as used by HList, 
 we propose the use of an alternative structure for the representation of heterogeneous collections which 
 is based on balanced trees.
@@ -155,14 +162,6 @@ run time (Section~\ref{sec:faster}).
 In Section~\ref{sec:efficiency} we show some results about the efficiency of our approach compared to HList.
 Finally, in Section~\ref{sec:conclusions} we present some conclusions and possible directions for future work.
 
-
-
-\begin{figure}[htp]
-\begin{center}
-\includegraphics[scale=0.5]{search-hlist.pdf}
-\end{center}
-\caption{Search |l7| in HList} \label{fig:search-hlist}
-\end{figure}
 
 \begin{figure}[htp]
 \begin{center}
