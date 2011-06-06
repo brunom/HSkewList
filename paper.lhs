@@ -124,18 +124,18 @@ and implements a look-up operation that runs in logarithmic-time.
 Although there have been many different proposals for Extensible Records in Haskell 
 \cite{Gaster96apolymorphic, Jones99lightweightextensible, LabeledFunctions, Leijen:fclabels, Leijen:scopedlabels},
 it is still an open problem to find an implementation that manipulates records with satisfactory efficiency.
-This paper aims to contribute a solution in that direction. 
+This paper aims to contribute with a solution in that direction. 
 Our starting point is the library for strongly typed heterogeneous collections HList \cite{KLS04}
 which provides an example implementation of extensible records. 
-A drawback of HList is that look-up, the most used operation on records,
+A drawback of HList is that lookup, the most used operation on records,
 is linear time.
 We propose an alternative implementation for extensible records, using the same techniques as HList,
-with a look-up operation that runs in logarithmic-time.  
+with a lookup operation that runs in logarithmic time.  
 
 Another contribution of this paper is the trick we use to reduce the run time work.
-We have observed that, when looking-up an element into a HList,
-the element is first searched at compile time in order to raise an error in case the element 
-does not belong to the list.
+We have observed that, when looking-up an element in a HList,
+the element is first searched at compile time in order to determine whether it
+belongs to the list and raise an error when it does not.
 This search generates the path the program follows at run time to obtain the element.
 In Figure~\ref{fig:search-hlist} we represent with a dashed arrow the compile time search, 
 and with a continued arrow the generated path followed at run time. 
@@ -152,16 +152,8 @@ Thus, the key idea is very simple. Instead of a linear structure as used by HLis
 we propose the use of an alternative structure for the representation of heterogeneous collections which 
 is based on balanced trees.
 Such a structure better profits 
-from the information given by the compile time search, leading to logarithmic length paths in the run time search 
+from the information given by the compile time search, leading to logarithmic length paths in the run time traversal
 (see Figure~\ref{fig:search-skew}).
-
-In the rest of this paper we show the type-level techniques used to implement extensible records by HList (Section~\ref{sec:hlist}) and how we use these techniques to provide an implementation
-based on so called skew lists \cite{Mye83,OkaThesis}
-which are faster at 
-run time (Section~\ref{sec:faster}). 
-In Section~\ref{sec:efficiency} we show some results about the efficiency of our approach compared to HList.
-Finally, in Section~\ref{sec:conclusions} we present some conclusions and possible directions for future work.
-
 
 \begin{figure}[htp]
 \begin{center}
@@ -169,6 +161,18 @@ Finally, in Section~\ref{sec:conclusions} we present some conclusions and possib
 \end{center}
 \caption{Search |l7| in balanced tree} \label{fig:search-skew}
 \end{figure}
+
+
+In the rest of this paper we review the type-level techniques used to implement extensible records by HList (Section~\ref{sec:hlist}) and how we use these techniques to provide an alternative implementation, based on so called skew lists \cite{Mye83,OkaThesis},
+which turns out to be faster at run time (Section~\ref{sec:faster}). 
+In Section~\ref{sec:efficiency} we show some results about the efficiency of our approach compared to HList.
+Finally, in Section~\ref{sec:conclusions} we present some conclusions and possible directions for future work.
+
+Although this paper is focused on showing a more efficient implementation of extensible records,
+our aim is mainly to show how harnessing type level programming techniques it is possible
+to improve the run time performance of some operations by moving certain computations to compile time.
+Type level programming is commonly used to increase the expressivity and type safety of programs,
+but in this paper we show it can also be helpful for efficiency matters.
 
 \section{HList}\label{sec:hlist}
 
