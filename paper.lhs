@@ -887,7 +887,7 @@ myR' =  l1  .=.  True     .*.
 
 last = myR' # l7
 \end{code}
-the resulting core code is:
+the resulting core code is:\marcos{explicar un poco esto}
 
 \begin{spec}
 last =
