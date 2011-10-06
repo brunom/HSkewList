@@ -874,7 +874,7 @@ instance
         case hSkewGet l ts of HJust e -> e
 \end{code}
 
-When we repeat the experiment above but we emptySkewRecord to construct a |SkewRecord|:
+When we repeat the experiment above but using |emptySkewRecord| to construct a |SkewRecord|:
 \begin{code}
 myR' =  l1  .=.  True     .*. 
         l2  .=.  9        .*. 
