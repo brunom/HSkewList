@@ -14,9 +14,9 @@
 \newcommand{\bruno}[1]{\textcolor{red}{\textbf{Bruno:}#1}}
 \newcommand{\alberto}[1]{\textcolor{red}{\textbf{Alerto:}#1}}
 \newcommand{\marcos}[1]{\textcolor{red}{\textbf{Marcos:}#1}}
-\renewcommand{\bruno}[1]{}
-\renewcommand{\alberto}[1]{}
-\renewcommand{\marcos}[1]{}
+%\renewcommand{\bruno}[1]{}
+%\renewcommand{\alberto}[1]{}
+%\renewcommand{\marcos}[1]{}
 %let paper = True
 
 %include lhs2TeX.fmt
@@ -147,12 +147,6 @@ list =
 \maketitle
 
 \begin{abstract}
-We propose an internal encoding for extensible records
-that does lookup in logarithmic time
-without needing a total order on the labels
-while preserving the fast insertion of simple linked lists.
-Through staged compilation,
-the required slow search for a field is moved to compile time.
 The library for strongly typed heterogeneous collections HList
 provides an implementation of extensible records in Haskell
 that needs only a few common extensions of the language.
@@ -160,6 +154,12 @@ In HList, records are represented as linked lists of label-value pairs
 with a look-up operation that is linear-time in the number of fields.
 In this paper, we use type-level programming techniques
 to develop a more efficient representation of extensible records for HList.
+We propose an internal encoding for extensible records
+that does lookup in logarithmic time
+without needing a total order on the labels,
+while preserving the fast insertion of simple linked lists.
+Through staged compilation,
+the required slow search for a field is moved to compile time. \marcos{movi esto para el final, porque me parece que tenia mas sentido asi}
 \end{abstract}
 
 %\category{D.3.3}{Programming languages}{Language Constructs and Features}
@@ -176,11 +176,12 @@ Although there have been many different proposals for Extensible Records in Hask
 it is still an open problem to find an implementation that manipulates records with satisfactory efficiency.
 Imperative dynamic languages use hash tables for objects,
 achieving constant time insertion and lookup,
-but this implementation doesn't allow for persistency as required for functional languages.
+but this implementation does not allow for persistency as required for functional languages.
 The usual strategies for record insertion in functional languages are
 copying all existing fields along with the new one to a brand new tuple,
-and using a linked list.
-The tuple strategy offers the fastest possible lookup, but insertion is linear time.
+or using a linked list.
+The tuple strategy \marcos{primera vez que se usa ese nombre.} offers the fastest possible lookup, but insertion is linear time.
+\marcos{tenemos alguna referencia para darle fuerza a estos argumentos?}
 The linked list sits in opposite in the tradeoff curve,
 with constant time insertion but linear time lookup.
 Since a record is essentially a dictionary,
@@ -220,6 +221,12 @@ Such a structure better profits
 from the information given by the compile time search, leading to logarithmic length paths in the run time traversal
 (see Figure~\ref{fig:search-skew}).
 
+Although this paper is focused on showing a more efficient implementation of extensible records,
+our aim is mainly to show how harnessing type level programming techniques it is possible
+to improve the run time performance of some operations by moving certain computations to compile time.
+Type level programming is commonly used to increase the expressivity and type safety of programs,
+but in this paper we show it can also be helpful for efficiency matters. \marcos{otro movimiento, me parece que queda mejor aca}
+
 \begin{figure}[htp]
 \begin{center}
 \includegraphics[scale=0.5]{search-skew.pdf}
@@ -233,11 +240,6 @@ which turns out to be faster at run time (Section~\ref{sec:faster}).
 In Section~\ref{sec:efficiency} we show some results about the efficiency of our approach compared to HList.
 Finally, in Section~\ref{sec:conclusions} we present some conclusions and possible directions for future work.
 
-Although this paper is focused on showing a more efficient implementation of extensible records,
-our aim is mainly to show how harnessing type level programming techniques it is possible
-to improve the run time performance of some operations by moving certain computations to compile time.
-Type level programming is commonly used to increase the expressivity and type safety of programs,
-but in this paper we show it can also be helpful for efficiency matters.
 
 \section{HList}\label{sec:hlist}
 
@@ -268,8 +270,6 @@ For example, we can encode type-level negation by defining the following class:
 class HNot t t' | t -> t' where
   hNot :: t -> t' 
 \end{spec}
-
-\noindent
 The functional dependency |t -> t'| expresses that the parameter |t|
 uniquely determines the parameter |t'|. 
 Therefore, once |t| is instantiated,
@@ -282,8 +282,6 @@ the function itself is defined by the following instance declarations:
 instance HNot  HFalse  HTrue   where hNot _ = hTrue
 instance HNot  HTrue   HFalse  where hNot _ = hFalse
 \end{spec}
-
-\noindent 
 If we write the expression |(hNot hFalse)|, then we know that |t| is |HFalse|. 
 So, the first instance of |hNot| is selected and thus |t'| is inferred to be |HTrue|.
 Observe that the computation is completely at the type-level; 
@@ -381,7 +379,6 @@ emptyRecord :: Record HNil
 emptyRecord = Record HNil
 \end{code}
 
-\noindent
 A field with label |l| and value of type |v| is represented by the type:
 
 \begin{code}
@@ -546,6 +543,9 @@ bla =
   HCons  e  _    -> e
 \end{spec}
 
+
+\section{Faster Extensible Records}\label{sec:faster}
+
 Extensible records can double as
 "static type-safe" dictionaries, that is,
 collections that guarantee at compile time
@@ -557,9 +557,9 @@ attributes associated to each non-terminal. If we wanted to use it to
 implement a system with a big number of attributes (i.e. a compiler)
 an efficient structure would be needed.
 Increasing the size of GHC's context reduction stack
-makes the program compiles
+makes the program compile
 but at run time the linear time lookup algorithm
-hurts performance.
+hurts performance.\marcos{queda un poco rara esta frase aca}
 The usual replacement when lookup in a linked list is slow
 is a search tree.
 In that case we would need to define a |HOrd| type-function
@@ -570,9 +570,7 @@ As unappealing as this already is,
 the real roadblock is |HOrd|.
 Without help from the compiler,
 defining such type function for
-unstructured labels is beyond (our) reach.
-
-\section{Faster Extensible Records}\label{sec:faster}
+unstructured labels is beyond (our) reach. \marcos{movi tod el parrafo para aca para darle mas ``visibilidad"}
 
 The key insight is that sub-linear behavior is only needed at run time.
 We are willing to keep the work done at compile time superlinear
@@ -673,7 +671,6 @@ We define a new tag |SkewRecord|
 and the corresponding |HExtend| instance
 to be able to use |(.*.)|,
 as we did for |Record|.
-|HSkewRecord| does the actual work.
 
 \begin{code}
 newtype SkewRecord r = SkewRecord r
@@ -690,6 +687,10 @@ instance
     e .*. SkewRecord ts =
         SkewRecord (hSkewExtend e ts)
 \end{code}
+The class |HSkewExtend| does the actual work.
+With the constraint |(HSkewHasField l ts HNothing)| 
+we restrict the extending record |(SkewRecord ts)| to not
+include a field with label |l|.
 
 \noindent
 |HComplete| below checks that all root to leaf paths have the same length
@@ -702,14 +703,17 @@ instance
     ,  HComplete t' h) =>
        HComplete (HNode e t t') (HSucc h)
 \end{code}
+For a node |(HNode e t t')|, if |t| and |t'| have different lenghts
+a compile-time error will be produced since there is no 
+instance defined for this case.
 
 \noindent
-|HSkewCarry| finds out if we need take two existing trees
+|HSkewCarry| finds out if we need to take two existing trees
 and put them below a new |HNode|,
 or just insert a new |HLeaf|.
 The name evokes the carry possible when adding two numbers.
 If each top level tree is a digit,
-building a new, taller tree is a form of carry,
+building a new taller tree is a form of carry,
 so |HSkewCarry| returns |HTrue|.
 \begin{code}
 class HSkewCarry l b | l -> b
@@ -907,7 +911,7 @@ Analogously to |HHasField| and |HExtend|,
 |HUpdate| unpacks and repacks the |SkewRecord|,
 |HSkewUpdate| doing all the real work.
 |HSkewHasField| checks that the record
-does contain a field with our label.
+does contain a field with our label. \marcos{hay que meter m\'as texto entre medio del c\'odigo de update}
 
 \begin{code}
 class HUpdate l e r r' | l e r -> r' where
@@ -1146,6 +1150,7 @@ so long compile times are amortized.
 For development, when rapid turn around is key,
 |Record| can be used, as the interface is the same.
 Others have also found performance regressions in newer ghc versions \cite{PerfLeaks}.
+\marcos{hay que darle un poco m\'as a este p\'arrafo. falta tambi\'en decir que ambos son exponenciales}
 
 \begin{figure}[h]
 \begin{center}
@@ -1203,7 +1208,8 @@ Others have also found performance regressions in newer ghc versions \cite{PerfL
 \end{center}
 \caption{Compile time}
 \label{compile_time}
-\end{figure}
+\end{figure}\marcos{por qu\'e la gr\'afica empieza en 30?? otra cosa, yo seguir\'ia la gr\'afica de SkewRecord y/o recortar\'ia la de Record para que se corten en el mismo lado (ej 140 s).}
+ 
 
 
 \section{Conclusions and Future Work}\label{sec:conclusions}
@@ -1217,6 +1223,7 @@ most of the effort to compile time.
 Interesting future work is to find a way to reduce compilation time.
 Experiments demonstrate that GHC memoizes class instances,
 but some particularity of our instances seem to confuse the mechanism.
+\marcos{mencionar posibles usos? AspectAG, OOHaskell, etc}
 
 \bibliographystyle{plainnat}
 
