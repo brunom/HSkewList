@@ -307,13 +307,15 @@ and implements a look-up operation that runs in logarithmic-time.
 %\terms Design, Languages, Performance, Standardization
 
 \keywords
- Haskell, HList, Extensible Records, Class system, Functional Dependencies, Type-level programming, Balanced Trees 
+ Extensible Records, Type-level programming, Staged Computation, Haskell, HList, Balanced Trees 
 
 \section{Introduction} \label{sec:intro}
 
 Although there have been many different proposals for Extensible Records in Haskell 
 \cite{Gaster96apolymorphic, Jones99lightweightextensible, LabeledFunctions, Leijen:fclabels, Leijen:scopedlabels},
 it is still an open problem to find an implementation that manipulates records with satisfactory efficiency.
+\textbf{comparar posibles abordajes a extensible records. Importancia de registros
+inmutables.}
 This paper aims to contribute with a solution in that direction. 
 Our starting point is the library for strongly typed heterogeneous collections HList \cite{KLS04}
 which provides an example implementation of extensible records. 
@@ -471,7 +473,7 @@ instance  HList HNil
 instance  HList l => HList (HCons e l)
 \end{spec}
 
-For space reasons, we will not include this well-formedness condition for 
+To improve readability, we will not include this well-formedness condition for 
 heterogeneous lists or other type-level types, like naturals or booleans.
 
 The following class describes the extension of heterogeneous collections. 
@@ -1064,7 +1066,7 @@ instance
 
 \section{Efficiency}\label{sec:efficiency}
 
-
+\textbf{mover el principio a donde se introduce HasFiled}
 
 
 
@@ -1194,6 +1196,9 @@ when the limit is surpassed.
 
 The dark side is that compile time explodes for |SkewRecord|, as showed in 
 Figure~\ref{compile_time}, so rapid prototyping may be better served by using plain |Record|.
+\textbf{Tener en cuenta que se copila mucho menos de lo que se corre, pero una alternativa es que, dado que se tiene la misma API, se desarrolla usando record de HList y se compila en forma definitiva usando HSkewlists.
+
+Seguir la grafica para mostrar que ambas tienen un comportamiento exponencial.}
 
 \begin{figure}[h]
 \begin{center}
