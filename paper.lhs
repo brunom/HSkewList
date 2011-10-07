@@ -129,8 +129,8 @@ list =
 \CopyrightYear{2011}
 %\copyrightdata{978-1-60558-332-7/09/08}
 
-\titlebanner{submitted to Haskell Symposium 2011}         % These are ignored unless
-\preprintfooter{version of Jun 6, 2011}     % 'preprint' option specified.
+%\titlebanner{submitted to Haskell Symposium 2011}         % These are ignored unless
+\preprintfooter{version of Oct 6, 2011}     % 'preprint' option specified.
 
 \title{Just Do It While Compiling!}
 \subtitle{Fast Extensible Records In Haskell}
@@ -180,7 +180,7 @@ but this implementation does not allow for persistency as required for functiona
 The usual strategies for record insertion in functional languages are
 copying all existing fields along with the new one to a brand new tuple,
 or using a linked list.
-The tuple strategy \marcos{primera vez que se usa ese nombre.} offers the fastest possible lookup, but insertion is linear time.
+The tuple strategy \marcos{primera vez que se usa ese nombre.} \bruno{eh? la oracion anterior, de las estrategias, dice que se copia a una nueva tupla} offers the fastest possible lookup, but insertion is linear time.
 \marcos{tenemos alguna referencia para darle fuerza a estos argumentos?}
 The linked list sits in opposite in the tradeoff curve,
 with constant time insertion but linear time lookup.
@@ -1072,7 +1072,7 @@ Run time comparisons are shown in Figure~\ref{run_time}.
   \def\ymax{35}
 
   % grid
-  \draw[style=help lines, ystep=2.5, xstep=10] (\xmin,\ymin) grid
+  \draw[style=help lines, xstep=10, ystep=2.5] (\xmin,\ymin) grid
   (\xmax,\ymax);
 
   % axes
@@ -1143,26 +1143,32 @@ run time overhead
 above having to copy the 10 fields from the linked list to the tree
 when the limit is surpassed.
 
-The dark side is that compile time is worse for |SkewRecord|, as showed in 
-Figure~\ref{compile_time}.
-Rembember that a compiled program is run many times,
+Figure~\ref{compile_time} shows that compile time for both implementations grows super linearly and rapidly accelerating.
+Already at two hundred fields |SkewRecord| is unwieldly,
+while plain |Record| is still usable.
+Were we to stop the comparison there,
+it would give the impression that the structures behave qualitatively different.
+Further increase in the number of fields uncovers however
+that the difference is most likely a matter of constants.
+Others have also found performance regressions in newer ghc versions \cite{PerfLeaks} and suggest constraint reordering and striving for tail calls.
+It didn't work for us and it made the presentation less clear.
+As always, rembember that a compiled program is run many times,
 so long compile times are amortized.
 For development, when rapid turn around is key,
 |Record| can be used, as the interface is the same.
-Others have also found performance regressions in newer ghc versions \cite{PerfLeaks}.
-\marcos{hay que darle un poco m\'as a este p\'arrafo. falta tambi\'en decir que ambos son exponenciales}
+\marcos{hay que darle un poco m\'as a este p\'arrafo. falta tambi\'en decir que ambos son exponenciales} \bruno{a ver ahi?}
 
 \begin{figure}[h]
 \begin{center}
-\begin{tikzpicture}[x=0.014cm,y=0.03cm]
+\begin{tikzpicture}[x=0.012cm,y=0.030cm]
 
   \def\xmin{0}
-  \def\xmax{450}
+  \def\xmax{425}
   \def\ymin{0}
-  \def\ymax{165}
+  \def\ymax{140}
 
   % grid
-  \draw[style=help lines, ystep=20, xstep=25] (\xmin,\ymin) grid
+  \draw[style=help lines, xstep=25, ystep=10] (\xmin,\ymin) grid
   (\xmax,\ymax);
 
   % axes
@@ -1176,6 +1182,7 @@ Others have also found performance regressions in newer ghc versions \cite{PerfL
   \node at (\xmin,\y) [left] {\y};
 
   \draw[blue] plot coordinates {
+    (0, 0)
     (30, 1.02)
     (40, 1.18)
     (50, 1.42)
@@ -1188,11 +1195,12 @@ Others have also found performance regressions in newer ghc versions \cite{PerfL
     (300, 45.9)
     (350, 79.5)
     (400, 103)
-    (450, 165)
-  };
+    (425, 140)
+   };
   \node[right,blue] at (150, 24) {Record};
 
   \draw[red] plot coordinates {
+    (0, 0)
     (30, 1.31)
     (40, 1.90)
     (50, 2.64)
@@ -1201,14 +1209,14 @@ Others have also found performance regressions in newer ghc versions \cite{PerfL
     (100, 10.7)
     (150, 31.9)
     (200, 70.7)
-    (250, 136)
+    (250, 140)
   };
   \node[right,red] at (150,110) {SkewRecord};
 \end{tikzpicture}
 \end{center}
 \caption{Compile time}
 \label{compile_time}
-\end{figure}\marcos{por qu\'e la gr\'afica empieza en 30?? otra cosa, yo seguir\'ia la gr\'afica de SkewRecord y/o recortar\'ia la de Record para que se corten en el mismo lado (ej 140 s).}
+\end{figure}\marcos{por qu\'e la gr\'afica empieza en 30?? otra cosa, yo seguir\'ia la gr\'afica de SkewRecord y/o recortar\'ia la de Record para que se corten en el mismo lado (ej 140 s).} \bruno{retoque eso}
  
 
 
