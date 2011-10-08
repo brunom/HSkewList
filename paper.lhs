@@ -62,7 +62,20 @@ infixr 4 .=.
 infixr 9 #
 
 main = go (99999999::Int) where
-    go i = if i == 0 then return() else go (i - make i # l2)
+    go i = if i == 0 then return() else go (i - (hUpdate l2 (l3 .=. 1)  (make i) # l3))
+
+instance
+    HUpdate l e (Record HNil) (Record HNil) where
+    hUpdate _ _ = id
+
+instance
+    (  HSkewUpdate l e t t'
+    ,  HUpdate l e (Record ts) (Record ts')) =>
+       HUpdate l e (Record (HCons t ts)) (Record (HCons t' ts')) where
+    hUpdate l e (Record (HCons t ts)) =
+        Record (HCons
+            (hSkewUpdate l e t)
+            (case (hUpdate l e (Record ts)) of Record ts -> ts))
 
 {-# NOINLINE make #-}
 make i = list
@@ -82,28 +95,24 @@ make i = list
 
 
 
-
-
-
-
-
-
-
-
-
-
-
-
-
-
 list =
     l1 .=. 0 .*.
-    l2 .=. 1 .*.
+    l2 .=. 0 .*.
 --    emptyRecord
     emptySkewRecord
 \end{code}
 %endif
 
+%% update&lookup
+%% largo:0   skew:0.55 list:0.27
+%% largo:10  skew:0.87 list:1.21
+%% largo:20  skew:1.00 list:2.09
+%% largo:40  skew:1.10 list:14.39
+%% largo:100 skew:1.18 list:63.4
+
+
+
+%% lookup
 %% largo:10  skew:     list:0.783
 %% largo:20  skew:0.961 list:0.872
 %% largo:30  skew:1.31 list:1.02
@@ -125,7 +134,7 @@ list =
 
 \begin{document}
 
-\conferenceinfo{Haskell Symposium 2011,} {September 22, 2011, Tokyo, Japan}
+\conferenceinfo{Workshop on Partial Evaluation and Program Manipulation,} {Mon-Tue, January 23-24, 2012, Philadelphia, Pennsylvania, USA }
 \CopyrightYear{2011}
 %\copyrightdata{978-1-60558-332-7/09/08}
 

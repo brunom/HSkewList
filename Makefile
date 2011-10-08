@@ -1,7 +1,10 @@
 all: paper.pdf paper.exe
 
+run : paper.exe
+	time ./paper.exe
+
 paper.exe : paper.hs
-	time ghc -O --make paper.hs -o paper.exe 2>&1
+	time ghc -O -fcontext-stack=999 --make paper.hs -o paper.exe 2>&1
 
 paper.hs : paper.lhs
 	lhs2TeX paper.lhs -o paper.hs --newcode
