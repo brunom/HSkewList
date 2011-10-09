@@ -448,7 +448,7 @@ myR =  l1  .=.  True     .*.
 %% \noindent Since our lists will represent collections of attributes
 %% we want to express statically that we do not have more than a single definition for each attribute occurrence
 %% and so the labels in a record should be all different.
-%% This constraint is represented by requiring an instance of the class |HRLabelSet| to be available when defining extendability for records:
+%% This constraint is represented by requiring an instance of the class |HRLabelSet| to be available when defining extendibility for records:
 
 %% \begin{code}
 %% instance HRLabelSet (HCons (LVPair l v) r)
@@ -592,7 +592,7 @@ We are willing to keep the work done at compile time superlinear
 if it helps us to speed up our programs at run time.
 |HHasField| already looks for our label at compile time
 to fail compilation if we require a field for a record
-wihout such label.
+without such label.
 So we just store our field unordered in a structure
 that allows fast random access and depend on the compiler to
 hardcode the path to our fields.
@@ -718,7 +718,7 @@ instance
     ,  HComplete t' h) =>
        HComplete (HNode e t t') (HSucc h)
 \end{code}
-For a node |(HNode e t t')|, if |t| and |t'| have different lenghts
+For a node |(HNode e t t')|, if |t| and |t'| have different lengths
 a compile-time error will be produced since there is no 
 instance defined for this case.
 
@@ -767,7 +767,7 @@ class HSkewExtend' b e l l' | b e l -> l' where
 \end{code}
 
 \noindent
-Here |HFalse| means that we shouln't add up the first two trees of the spine.
+Here |HFalse| means that we shouldn't add up the first two trees of the spine.
 Either the size of the trees are different, or the spine is empty or a singleton.
 We just use |HLeaf| to insert a new tree at the beginning of the spine.
 \begin{code}
@@ -1179,7 +1179,7 @@ above having to copy the 10 fields from the linked list to the tree
 when the limit is surpassed.
 
 Figure~\ref{compile_time} shows that compile time for both implementations grows super linearly and rapidly accelerating.
-Already at two hundred fields |SkewRecord| is unwieldly,
+Already at two hundred fields |SkewRecord| is unwieldy,
 while plain |Record| is still usable.
 Were we to stop the comparison there,
 it would give the impression that the structures behave qualitatively different.
@@ -1188,7 +1188,7 @@ that the difference is most likely a matter of constants.
 Others have also found performance regressions in newer ghc versions \cite{PerfLeaks} 
 and suggest constraint reordering and striving for tail calls.
 It didn't work for us and it made the presentation less clear.
-As always, rembember that a compiled program is run many times,
+As always, remember that a compiled program is run many times,
 so long compile times are amortized.
 For development, when rapid turn around is key,
 |Record| can be used, as the interface is the same.
@@ -1261,7 +1261,7 @@ For development, when rapid turn around is key,
 Using type level programming techniques we have developed 
 an implementation of extensible records for Haskell that at run time 
 is logarithmic time at searching and removing elements and constant time at
-inserting elements. This run time perfomance is achieved by moving 
+inserting elements. This run time performance is achieved by moving 
 most of the effort to compile time. 
 
 Interesting future work is to find a way to reduce compilation time.
@@ -1286,3 +1286,4 @@ but some particularity of our instances seem to confuse the mechanism.
 %%% TeX-default-extension: "lhs" **
 %%% TeX-region: "_region_" **
 %%% End: **
+
