@@ -469,10 +469,10 @@ class HHasField l r v | l r -> v where
 At the type-level it is statically checked that the record |r| indeed has
 a field with label |l| associated with a value of the type |v|.
 At value-level the operator |(#)| returns the value of type |v|.
-For example, the following expression returns the string |"bla"|:
+For example, the following expression returns the string |"last"|:
 
 \begin{code}
-bla = myR # l3
+last = myR # l7
 \end{code}
 
 \noindent
@@ -535,7 +535,9 @@ instance
 \end{code}
 
 \noindent
-Otherwise, |HHasFieldList'| calls back to |HHasFieldList| to continue the search.  The two type-functions are mutually recursive.  There's no case for the empty list; lookup fails.
+Otherwise, |HHasFieldList'| calls back to |HHasFieldList| to continue the search.  
+The two type-functions are mutually recursive.  
+There's no case for the empty list; lookup fails.
 
 At the value level, the functions |hListGet| and |hListGet'| are trivial,
 devoid of logic and conditions.
@@ -545,10 +547,14 @@ The code is inlined to a case cascade, but the program must traverse the linked 
 For example, this is the GHC core of the example:
 
 \begin{spec}
-bla =
+last =
   case myR  of 
   HCons  _  rs1  ->  case rs1  of 
   HCons  _  rs2  ->  case rs2  of 
+  HCons  _  rs3  ->  case rs3  of 
+  HCons  _  rs4  ->  case rs4  of 
+  HCons  _  rs5  ->  case rs5  of 
+  HCons  _  rs6  ->  case rs6  of 
   HCons  e  _    -> e
 \end{spec}
 
@@ -883,7 +889,8 @@ instance
         case hSkewGet l ts of HJust e -> e
 \end{code}
 
-When we repeat the experiment above but using |emptySkewRecord| to construct a |SkewRecord|:
+When we repeat the experiment at the end of subsection \ref{sec:extensiblerecords}, 
+but using |emptySkewRecord| to construct a |SkewRecord|:
 \begin{code}
 myR' =  l1  .=.  True     .*. 
         l2  .=.  9        .*. 
@@ -906,7 +913,7 @@ last =
   case t121   of HNode  e   _   _     ->
   e
 \end{spec}
-Thus, getting to |l7| at run time only traverses a fraction of the elements,
+Thus, getting to |l7| at run time only traverses a (logarithmic length) fraction of the elements,
 as we have seen in Figure~\ref{fig:search-skew}.
 Later we'll examine runtime benchmarks.
 
@@ -918,7 +925,7 @@ a field of some label
 with a new field with possibly new label and value.
 Analogously to |HHasField| and |HExtend|,
 |HUpdate| unpacks and repacks the |SkewRecord|,
-|HSkewUpdate| doing all the real work.
+doing |HSkewUpdate| all the real work.
 |HSkewHasField| checks that the record
 does contain a field with our label. \marcos{hay que meter m\'as texto entre medio del c\'odigo de update}
 
@@ -959,6 +966,10 @@ instance
         HCons
             (hSkewUpdate l e t)
             (hSkewUpdate l e ts)
+\end{code}
+In the |HNode| case, |hSkewUpdate| is recursively called to
+the left and right sub-trees, and also to the element of the node.
+\begin{code}
 instance
     (  HSkewUpdate l e e' e''
     ,  HSkewUpdate l e tl tl'
@@ -975,7 +986,8 @@ instance
 \noindent
 The bottom case |LVPair| uses |HCond|
 from the |HList| type-function collection to only return
-an updated field if the labels match.
+an updated field if the labels match. 
+In other case the original element is returned.
 \begin{code}
 instance
     (  HEq l l' b
@@ -1010,6 +1022,8 @@ updR = hUpdate l1 (l3 .=. "hi") myR'
 \end{code}
 %endif
 
+\subsection{Remove}
+
 Removing a field is easy based on updating.
 We overwrite the field we want gone with the first node,
 and then we remove the first node.
@@ -1040,6 +1054,18 @@ instance
     hSkewTail (HCons (HNode _ t t') ts) =
         HCons t ((HCons t') ts)
 \end{code}
+%if False
+When the spine begins with a |HNode|,
+we need to grow the spine with the subtrees, throwing away the root.
+\begin{code}
+instance
+    HSkewTail
+        (HCons (HNode e t t') ts)
+        (HCons t (HCons t' ts)) where
+    hSkewTail (HCons (HNode _ t t') ts) =
+        HCons t (HCons t' ts)
+\end{code}
+%endif
 
 \noindent
 Finally |HRemove| is done in a single instance.
@@ -1159,7 +1185,8 @@ Were we to stop the comparison there,
 it would give the impression that the structures behave qualitatively different.
 Further increase in the number of fields uncovers however
 that the difference is most likely a matter of constants.
-Others have also found performance regressions in newer ghc versions \cite{PerfLeaks} and suggest constraint reordering and striving for tail calls.
+Others have also found performance regressions in newer ghc versions \cite{PerfLeaks} 
+and suggest constraint reordering and striving for tail calls.
 It didn't work for us and it made the presentation less clear.
 As always, rembember that a compiled program is run many times,
 so long compile times are amortized.
