@@ -767,7 +767,7 @@ class HSkewExtend' b e l l' | b e l -> l' where
 \end{code}
 
 \noindent
-Here |HFalse| means that we shouldn't add up the first two trees of the spine.
+Here |HFalse| means that we should not add up the first two trees of the spine.
 Either the size of the trees are different, or the spine is empty or a singleton.
 We just use |HLeaf| to insert a new tree at the beginning of the spine.
 \begin{code}
@@ -1034,8 +1034,16 @@ First we need a helper to remove the first element of a skew list.
 class HSkewTail ts ts' | ts -> ts' where
     hSkewTail :: ts -> ts'
 \end{code}
+ \begin{figure}[htp]
+\begin{center}
+\includegraphics[scale=0.5]{tail.pdf}
+\end{center}
+\caption{Tail in a Skew} \label{fig:tail}
+\end{figure}
 
 \noindent
+In Figure~\ref{fig:tail} we show an example of the possible cases 
+we can find.
 The easy case is when the spine begins with a leaf.
 We just return the tail of the spine list.
 \begin{code}
@@ -1048,8 +1056,8 @@ The other case is when the spine begins with a tree of three or more elements.
 Since |HLeaf| is a synonym of |HNode HEmpty HEmpty|,
 we need to assert that the subtrees of the root |HNode|
 are |HNode|s themselves.
-By contruction, both subtrees have the same shape
-and pattern mathing only the first suffices
+By construction, both subtrees have the same shape
+and pattern matching only the first suffices
 to make sure this case does not overlap with the previous one.
 In this case we grow the spine with the subtrees, throwing away the root.
 \begin{code}
@@ -1058,22 +1066,10 @@ instance
         (HCons (HNode e t (HNode e' t' t'')) ts)
         (HCons t ((HCons (HNode e' t' t'')) ts)) where
     hSkewTail (HCons (HNode _ t t') ts) =
-        HCons t ((HCons t') ts)
-\end{code}
-%if False
-When the spine begins with a |HNode|,
-we need to grow the spine with the subtrees, throwing away the root.
-\begin{code}
-instance
-    HSkewTail
-        (HCons (HNode e t t') ts)
-        (HCons t (HCons t' ts)) where
-    hSkewTail (HCons (HNode _ t t') ts) =
         HCons t (HCons t' ts)
 \end{code}
-%endif
 
-\noindent
+
 Finally |HRemove| is done in a single instance.
 We take the first node and call |HSkewUpdate|
 to duplicate it where the label we want gone was.
@@ -1193,7 +1189,7 @@ Further increase in the number of fields uncovers however
 that the difference is most likely a matter of constants.
 Others have also found performance regressions in newer ghc versions \cite{PerfLeaks} 
 and suggest constraint reordering and striving for tail calls.
-It didn't work for us and it made the presentation less clear.
+It did not work for us and it made the presentation less clear.
 As always, remember that a compiled program is run many times,
 so long compile times are amortized.
 For development, when rapid turn around is key,
