@@ -1044,8 +1044,14 @@ instance HSkewTail (HCons (HLeaf e) ts) ts where
 \end{code}
 
 \noindent
-When the spine begins with a |HNode| of |HNode|s,
-we need to grow the spine with the subtrees, throwing away the root.
+The other case is when the spine begins with a tree of three or more elements.
+Since |HLeaf| is a synonym of |HNode HEmpty HEmpty|,
+we need to assert that the subtrees of the root |HNode|
+are |HNode|s themselves.
+By contruction, both subtrees have the same shape
+and pattern mathing only the first suffices
+to make sure this case does not overlap with the previous one.
+In this case we grow the spine with the subtrees, throwing away the root.
 \begin{code}
 instance
     HSkewTail
