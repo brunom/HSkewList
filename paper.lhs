@@ -1287,10 +1287,15 @@ is logarithmic time at searching and removing elements and constant time at
 inserting elements. This run time performance is achieved by moving 
 most of the effort to compile time. 
 
+This approach can be used to improve the performance of systems
+that make extensive use of extensible records, 
+like the first-class attribute grammars library AspectAG \cite{FlyFirstClass}, 
+or the OOHaskell \cite{OOHaskell} library for object-oriented functional programming.
+
 Interesting future work is to find a way to reduce compilation time.
 Experiments demonstrate that GHC memoizes class instances,
 but some particularity of our instances seem to confuse the mechanism.
-\marcos{mencionar posibles usos? AspectAG, OOHaskell, etc}
+
 
 \bibliographystyle{plainnat}
 
