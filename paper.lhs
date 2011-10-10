@@ -62,7 +62,8 @@ infixr 4 .=.
 infixr 9 #
 
 main = go (99999999::Int) where
-    go i = if i == 0 then return() else go (i - (hUpdate l2 (l3 .=. 1)  (make i) # l3))
+    go i = if i == 0 then return() else go (i - (hSum (make i)))
+--    go i = if i == 0 then return() else go (i - (hSum (hUpdate l2 (l2 .=. (1::Int)) (make i))))
 
 instance
     HUpdate l e (Record HNil) (Record HNil) where
@@ -77,6 +78,17 @@ instance
             (hSkewUpdate l e t)
             (case (hUpdate l e (Record ts)) of Record ts -> ts))
 
+class HSum r where
+  hSum :: r -> Int
+instance HSum (SkewRecord HNil) where
+  hSum r = 0
+instance HSum HEmpty where
+  hSum r = 0
+instance (HSum x, HSum (SkewRecord xs)) => HSum (SkewRecord (HCons x xs)) where
+  hSum (SkewRecord (HCons x xs)) = hSum x + hSum (SkewRecord xs)
+instance (HSum t, HSum t') => HSum (HNode (LVPair l Int) t t') where
+  hSum (HNode e t t') = valueLVPair e + hSum t + hSum t'
+
 {-# NOINLINE make #-}
 make i = list
 
@@ -84,24 +96,33 @@ make i = list
 
 
 
-
-
-
-
-
-
-
-
-
-
-
 list =
-    l1 .=. 0 .*.
-    l2 .=. 0 .*.
+    l1 .=. (0::Int) .*.
+    l1 .=. (0::Int) .*.
+    l1 .=. (0::Int) .*.
+    l1 .=. (0::Int) .*.
+    l1 .=. (0::Int) .*.
+    l1 .=. (0::Int) .*.
+    l1 .=. (0::Int) .*.
+    l1 .=. (0::Int) .*.
+    l1 .=. (0::Int) .*.
+    l1 .=. (0::Int) .*.
+    l2 .=. (1::Int) .*.
 --    emptyRecord
     emptySkewRecord
 \end{code}
 %endif
+
+%% update&sum
+%% largo:0   0.57 0.67
+%% largo:10  2.78 2.83
+%% largo:20  4.82 4.94
+%% largo:30  6.82 6.9
+%% largo:40  9.45 9.6
+%% largo:50  12.1 12.5
+%% largo:70  17.1 16.8
+%% largo:100 23.8 23.9
+%% largo:150 35.7 35.6
 
 %% update&lookup
 %% largo:0   skew:0.55 list:0.27
@@ -901,12 +922,12 @@ myR' =  l1  .=.  True     .*.
         l7  .=.  "last"   .*. 
         emptySkewRecord
 
-last = myR' # l7
+last' = myR' # l7
 \end{code}
 the resulting core code is:\marcos{explicar un poco esto}
 
 \begin{spec}
-last =
+last' =
   case myR'   of HCons  t1   _        ->
   case t1     of HNode  _   _   t12   ->
   case t12    of HNode  _   _   t121  ->
