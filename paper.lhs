@@ -189,7 +189,7 @@ that does lookup in logarithmic time
 without needing a total order on the labels,
 while preserving the fast insertion of simple linked lists.
 Through staged compilation,
-the required slow search for a field is moved to compile time. \marcos{movi esto para el final, porque me parece que tenia mas sentido asi}
+the required slow search for a field is moved to compile time. 
 \end{abstract}
 
 %\category{D.3.3}{Programming languages}{Language Constructs and Features}
@@ -210,8 +210,7 @@ but this implementation does not allow for persistency as required for functiona
 The usual strategies for record insertion in functional languages are
 copying all existing fields along with the new one to a brand new tuple,
 or using a linked list.
-The tuple strategy \marcos{primera vez que se usa ese nombre.} \bruno{eh? la oracion anterior, de las estrategias, dice que se copia a una nueva tupla} offers the fastest possible lookup, but insertion is linear time.
-\marcos{tenemos alguna referencia para darle fuerza a estos argumentos?}
+The tuple strategy offers the fastest possible lookup, but insertion is linear time.
 The linked list sits in opposite in the tradeoff curve,
 with constant time insertion but linear time lookup.
 Since a record is essentially a dictionary,
@@ -255,7 +254,7 @@ Although this paper is focused on showing a more efficient implementation of ext
 our aim is mainly to show how harnessing type level programming techniques it is possible
 to improve the run time performance of some operations by moving certain computations to compile time.
 Type level programming is commonly used to increase the expressivity and type safety of programs,
-but in this paper we show it can also be helpful for efficiency matters. \marcos{otro movimiento, me parece que queda mejor aca}
+but in this paper we show it can also be helpful for efficiency matters. 
 
 \begin{figure}[htp]
 \begin{center}
@@ -388,7 +387,7 @@ resulting in a collection of type |l'|.
 Function |(.*.)| performs the same computation at the level of values.
 
 %We removed |l' -> e l|, an additional dependency present in the original HList formulation.
-%The compiler refuses our instances implementing Skew lists because it cannot prove that the instances satisfy the %dependency. \marcos{no queda muy bien esa frase}
+%The compiler refuses our instances implementing Skew lists because it cannot prove that the instances satisfy the %dependency. 
 
 
 \subsection{Extensible Records}
@@ -436,6 +435,7 @@ a proxy only equals itself.
 By choosing a different phantom type for each label to be represented we can distinguish them.
 
 The instance of |HExtend| for records extends the list with a new field:
+\marcos{creo que aca hay que poner la definicion que restringe los labels a ser unicos, ya que cuando definimos el record con skew la incluimos}
 
 \begin{code}
 instance HExtend e (Record l) (Record (HCons e l))
@@ -595,7 +595,7 @@ an efficient structure would be needed.
 Increasing the size of GHC's context reduction stack
 makes the program compile
 but at run time the linear time lookup algorithm
-hurts performance.\marcos{queda un poco rara esta frase aca}
+hurts performance.
 The usual replacement when lookup in a linked list is slow
 is a search tree.
 In that case we would need to define a |HOrd| type-function
@@ -606,7 +606,7 @@ As unappealing as this already is,
 the real roadblock is |HOrd|.
 Without help from the compiler,
 defining such type function for
-unstructured labels is beyond (our) reach. \marcos{movi tod el parrafo para aca para darle mas ``visibilidad"}
+unstructured labels is beyond (our) reach. 
 
 The key insight is that sub-linear behavior is only needed at run time.
 We are willing to keep the work done at compile time superlinear
@@ -675,12 +675,16 @@ access to some elements.
 \subsection{SkewRecord}
 
 In this subsection we present our implementation of extensible records
-using skew lists. First, we introduce some types to model the structure:
+using (heterogeneous) skew lists. 
+First, we introduce some types to model the structure:
 
 \begin{code}
 data  HEmpty           =  HEmpty
 data  HNode  e  t  t'  =  HNode  e  t  t'
 type  HLeaf  e         =  HNode e HEmpty HEmpty
+\end{code}
+and a smart constructor for leaves:
+\begin{code}
 hLeaf        e         =  HNode e HEmpty HEmpty
 \end{code}
 
@@ -689,7 +693,7 @@ The element precedes the subtrees in |HNode|
 so all elements in expressions read in order left to right.
 The common leaf case warrants helper type |HLeaf|
 and smart constructor |hLeaf|.
-The following declarations define a list with the elements of the fourth step of Figure~\ref{fig:insert} :
+The following declarations define a list with the elements of the fourth step of Figure~\ref{fig:insert}:
 
 \begin{code}
 four =
@@ -924,7 +928,7 @@ myR' =  l1  .=.  True     .*.
 
 last' = myR' # l7
 \end{code}
-the resulting core code is:\marcos{explicar un poco esto}
+the resulting core code is:
 
 \begin{spec}
 last' =
@@ -948,7 +952,7 @@ Analogously to |HHasField| and |HExtend|,
 |HUpdate| unpacks and repacks the |SkewRecord|,
 doing |HSkewUpdate| all the real work.
 |HSkewHasField| checks that the record
-does contain a field with our label. \marcos{hay que meter m\'as texto entre medio del c\'odigo de update}
+does contain a field with our label. 
 
 \begin{code}
 class HUpdate l e r r' | l e r -> r' where
@@ -1193,7 +1197,7 @@ with an element and three child node references,
 one to the next node,
 one to the right subtree,
 and one to the node of the next tree.
-We chose the unfusioned exposition for clarity.
+We chose the unfused exposition for clarity.
 Another option is to use linked list for small records and switch to
 skew list when over 10 fields.
 Since the test is done at compile time, the adaptive structure has no
@@ -1215,7 +1219,6 @@ As always, remember that a compiled program is run many times,
 so long compile times are amortized.
 For development, when rapid turn around is key,
 |Record| can be used, as the interface is the same.
-\marcos{hay que darle un poco m\'as a este p\'arrafo. falta tambi\'en decir que ambos son exponenciales} \bruno{a ver ahi?}
 
 \begin{figure}[h]
 \begin{center}
@@ -1275,8 +1278,7 @@ For development, when rapid turn around is key,
 \end{center}
 \caption{Compile time}
 \label{compile_time}
-\end{figure}\marcos{por qu\'e la gr\'afica empieza en 30?? otra cosa, yo seguir\'ia la gr\'afica de SkewRecord y/o recortar\'ia la de Record para que se corten en el mismo lado (ej 140 s).} \bruno{retoque eso}
- 
+\end{figure}
 
 
 \section{Conclusions and Future Work}\label{sec:conclusions}
@@ -1296,7 +1298,7 @@ or the library for relational databases CoddFish \cite{SV06}.
 Interesting future work is to find a way to reduce compilation time.
 Experiments demonstrate that GHC memoizes class instances,
 but some particularity of our instances seem to confuse the mechanism.
-
+\marcos{tambien se podria decir que este es un buen ejemplo de type-level programming y que entre los trabajos futuros podría estar el probar otras tecnicas, como type families o incluso lenguages de tipos dependientes, como Agda.}
 
 \bibliographystyle{plainnat}
 
