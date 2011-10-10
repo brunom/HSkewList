@@ -1290,7 +1290,8 @@ most of the effort to compile time.
 This approach can be used to improve the performance of systems
 that make extensive use of extensible records, 
 like the first-class attribute grammars library AspectAG \cite{FlyFirstClass}, 
-or the OOHaskell \cite{OOHaskell} library for object-oriented functional programming.
+the OOHaskell \cite{OOHaskell} library for object-oriented functional programming,
+or the library for relational databases CoddFish \cite{SV06}.
 
 Interesting future work is to find a way to reduce compilation time.
 Experiments demonstrate that GHC memoizes class instances,
