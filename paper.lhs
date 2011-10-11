@@ -61,6 +61,7 @@ infixr 2 .*.
 infixr 4 .=.
 infixr 9 #
 
+
 main = go (99999999::Int) where
     go i = if i == 0 then return() else go (i - (hSum (make i)))
 --    go i = if i == 0 then return() else go (i - (hSum (hUpdate l2 (l2 .=. (1::Int)) (make i))))
@@ -110,6 +111,7 @@ list =
     l2 .=. (1::Int) .*.
 --    emptyRecord
     emptySkewRecord
+
 \end{code}
 %endif
 
@@ -1052,6 +1054,7 @@ updR = hUpdate l1 (l3 .=. "hi") myR'
 Removing a field is easy based on updating.
 We overwrite the field we want gone with the first node,
 and then we remove the first node.
+Thus, we remove elements in logarithmic time while keeping the tree balanced.
 
 \noindent
 First we need a helper to remove the first element of a skew list.
