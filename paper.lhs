@@ -435,7 +435,7 @@ a proxy only equals itself.
 By choosing a different phantom type for each label to be represented we can distinguish them.
 
 The instance of |HExtend| for records extends the list with a new field:
-\marcos{creo que aca hay que poner la definicion que restringe los labels a ser unicos, ya que cuando definimos el record con skew la incluimos}
+\marcos{creo que aca hay que poner la definicion que restringe los labels a ser unicos, ya que cuando definimos el record con skew la incluimos} \bruno{No podes exigir que no haya instancia de HHasFieldList. Para HHasFieldSkew si, pq devuelve HMaybe.}
 
 \begin{code}
 instance HExtend e (Record l) (Record (HCons e l))
