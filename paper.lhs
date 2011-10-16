@@ -198,6 +198,10 @@ the required slow search for a field is moved to compile time.
 %\category{D.1.1}{Programming techniques}{Applicative (Functional) Programming}
 %\terms Design, Languages, Performance, Standardization
 
+\category{D.3.3}{Programming languages}{Language Constructs and Features}
+\category{D.1.1}{Programming techniques}{Applicative (Functional) Programming}
+\terms Design, Languages, Performance
+
 \keywords
  Extensible Records, Type-level programming, Staged Computation, Haskell, HList, Balanced Trees 
 
