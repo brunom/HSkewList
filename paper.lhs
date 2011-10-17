@@ -179,6 +179,7 @@ list =
 \maketitle
 
 \begin{abstract}
+\bruno{acordarse de sacar estos comentarios antes de mandar}
 The library for strongly typed heterogeneous collections HList
 provides an implementation of extensible records in Haskell
 that needs only a few common extensions of the language.
@@ -193,10 +194,6 @@ while preserving the fast insertion of simple linked lists.
 Through staged compilation,
 the required slow search for a field is moved to compile time. 
 \end{abstract}
-
-%\category{D.3.3}{Programming languages}{Language Constructs and Features}
-%\category{D.1.1}{Programming techniques}{Applicative (Functional) Programming}
-%\terms Design, Languages, Performance, Standardization
 
 \category{D.3.3}{Programming languages}{Language Constructs and Features}
 \category{D.1.1}{Programming techniques}{Applicative (Functional) Programming}
