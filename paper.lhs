@@ -49,6 +49,7 @@
 {-# LANGUAGE FunctionalDependencies #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE OverlappingInstances #-}
 
 module Main where
 
@@ -56,15 +57,19 @@ import Data.HList.FakePrelude(HEq, hEq, HTrue, HFalse, HOr, hOr, Proxy, HSucc, H
 import Data.HList.Label4
 import Data.HList.TypeEqGeneric1
 import Data.HList.TypeCastGeneric1
+import Data.Array
+import GHC.Exts
+import Unsafe.Coerce
 
 infixr 2 .*.
 infixr 4 .=.
 infixr 9 #
 
 
-main = go (99999999::Int) where
-    go i = if i == 0 then return() else go (i - (hSum (make i)))
+main = go (99999::Int) where
+--    go i = if i == 0 then return() else go (i - (hSum (make i)))
 --    go i = if i == 0 then return() else go (i - (hSum (hUpdate l2 (l2 .=. (1::Int)) (make i))))
+    go i = if i == 0 then return() else go (i - (make i # l2))
 
 instance
     HUpdate l e (Record HNil) (Record HNil) where
@@ -99,19 +104,44 @@ make i = list
 
 list =
     l1 .=. (0::Int) .*.
-    l1 .=. (0::Int) .*.
-    l1 .=. (0::Int) .*.
-    l1 .=. (0::Int) .*.
-    l1 .=. (0::Int) .*.
-    l1 .=. (0::Int) .*.
-    l1 .=. (0::Int) .*.
-    l1 .=. (0::Int) .*.
-    l1 .=. (0::Int) .*.
-    l1 .=. (0::Int) .*.
     l2 .=. (1::Int) .*.
 --    emptyRecord
-    emptySkewRecord
+--    emptySkewRecord
+    emptyArrayRecord
 
+newtype ArrayRecord r = ArrayRecord (Array Int Any)
+arrayRow :: ArrayRecord r -> r
+arrayRow = undefined
+data RowNil
+data RowCons field tail
+rowField :: RowCons field tail -> field
+rowField = undefined
+rowTail :: RowCons field tail -> tail
+rowTail = undefined
+
+emptyArrayRecord :: ArrayRecord RowNil
+emptyArrayRecord = ArrayRecord (listArray (0, 0) [])
+
+instance
+    HExtend e (ArrayRecord r) (ArrayRecord (RowCons e r))
+    where
+    e .*. (ArrayRecord a) =
+      ArrayRecord (listArray (0, 1 + snd (bounds a)) (unsafeCoerce e:elems a))
+
+class ArrayRank r l v | r l -> v where
+  arrayRank :: r -> l -> Int
+instance ArrayRank (RowCons (LVPair l v) r) l v where
+  arrayRank _ _ = 0
+instance
+    ArrayRank r l v =>
+    ArrayRank (RowCons (LVPair l2 v) r) l v where
+    arrayRank r l = 1 + arrayRank (rowTail r) l
+
+instance
+    ArrayRank r l v =>
+    HHasField l (ArrayRecord r) v
+    where
+    r@(ArrayRecord a) # l = unsafeCoerce (a ! arrayRank (arrayRow r) l)
 \end{code}
 %endif
 
