@@ -1138,11 +1138,14 @@ at the start of the list.
 class HRemove l r r' | l r -> r' where
     hRemove :: l -> r -> r'
 instance
-    (  HSkewUpdate l e (HCons (HNode e t t') ts) r'
-    ,  HSkewTail r' r'') =>
+    (  HSkewUpdate l e e e'
+    ,  HSkewUpdate l e lt lt'
+    ,  HSkewUpdate l e rt rt'
+    ,  HSkewUpdate l e ts ts'
+    ,  HSkewTail (HCons (HNode e' lt' rt') ts') r'') =>
        HRemove
         l
-        (SkewRecord (HCons (HNode e t t') ts))
+        (SkewRecord (HCons (HNode e lt rt) ts))
         (SkewRecord r'') where
     hRemove l (SkewRecord (HCons (HNode e t t') ts)) =
         SkewRecord $
