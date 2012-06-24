@@ -12,3 +12,4 @@ paper.pdf
 *.tex
 paper.hs
 dump.txt
+bench/
