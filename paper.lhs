@@ -51,7 +51,7 @@
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE OverlappingInstances #-}
 
-module Main where
+module Paper where
 
 import Data.HList.FakePrelude(HEq, hEq, HTrue, HFalse, HOr, hOr, Proxy, HSucc, HZero, HCond, hCond)
 import Data.HList.Label4
@@ -64,12 +64,6 @@ import Unsafe.Coerce
 infixr 2 .*.
 infixr 4 .=.
 infixr 9 #
-
-
-main = go (99999::Int) where
---    go i = if i == 0 then return() else go (i - (hSum (make i)))
---    go i = if i == 0 then return() else go (i - (hSum (hUpdate l2 (l2 .=. (1::Int)) (make i))))
-    go i = if i == 0 then return() else go (i - (make i # l2))
 
 instance
     HUpdate l e (Record HNil) (Record HNil) where
@@ -94,20 +88,6 @@ instance (HSum x, HSum (SkewRecord xs)) => HSum (SkewRecord (HCons x xs)) where
   hSum (SkewRecord (HCons x xs)) = hSum x + hSum (SkewRecord xs)
 instance (HSum t, HSum t') => HSum (HNode (LVPair l Int) t t') where
   hSum (HNode e t t') = valueLVPair e + hSum t + hSum t'
-
-{-# NOINLINE make #-}
-make i = list
-
-
-
-
-
-list =
-    l1 .=. (0::Int) .*.
-    l2 .=. (1::Int) .*.
---    emptyRecord
---    emptySkewRecord
-    emptyArrayRecord
 
 newtype ArrayRecord r = ArrayRecord (Array Int Any)
 arrayRow :: ArrayRecord r -> r
@@ -266,7 +246,7 @@ the element is first searched at compile time in order to determine whether it
 belongs to the list and raise an error when it does not.
 This search generates the path the program follows at run time to obtain the element.
 In Figure~\ref{fig:search-hlist} we represent with a dashed arrow the compile time search, 
-and with a continued arrow the generated path followed at run time. 
+and with a solid arrow the generated path followed at run time. 
 Since the structure is linear, the search and the path have the same length.
 
 \begin{figure}[tp]
@@ -651,7 +631,7 @@ So we just store our field unordered in a structure
 that allows fast random access and depend on the compiler to
 hardcode the path to our fields.
 
-Following \cite{OkaThesis} we leaned on Skew Binary Random-Access Lists.
+Following \cite{OkaThesis} we chose Skew Binary Random-Access Lists.
 Other, perhaps simpler, data structures
 such as Braun trees \cite{brauntrees}
 do not offer constant time insertion
@@ -699,7 +679,7 @@ two previous sub-trees.
 \caption{Insertion in a Skew} \label{fig:insert}
 \end{figure}
 
-Skew list is not optimal for merging records.  In the view of tree
+Skew lists are not optimal for merging records.  In the view of tree
 instances as numbers, merging is equivalent to number addition.  Some
 priority queue structures do support fast merging (or melding), but
 usually the resulting trees are very deep and do not support efficient
@@ -724,7 +704,7 @@ hLeaf        e         =  HNode e HEmpty HEmpty
 \noindent
 The element precedes the subtrees in |HNode|
 so all elements in expressions read in order left to right.
-The common leaf case warrants helper type |HLeaf|
+The common leaf case warrants the helper type |HLeaf|
 and smart constructor |hLeaf|.
 The following declarations define a list with the elements of the fourth step of Figure~\ref{fig:insert}:
 
@@ -752,7 +732,8 @@ emptySkewRecord = SkewRecord HNil
 
 instance
     (  HSkewExtend (LVPair l v) ts ts'
-    ,  HSkewHasField l ts HNothing) =>
+--    ,  HSkewHasField l ts HNothing) =>
+    ) =>
        HExtend
          (LVPair l v)
          (SkewRecord ts)
@@ -766,7 +747,7 @@ we restrict the extending record |(SkewRecord ts)| to not
 include a field with label |l|.
 
 \noindent
-|HComplete| below checks that all root to leaf paths have the same length
+|HComplete| below checks that all root-to-leaf paths have the same length
 and returns it.  We will use it to detect the case of two leading equal height trees in the spine.
 \begin{code}
 class HComplete t h | t -> h
@@ -784,7 +765,8 @@ instance defined for this case.
 |HSkewCarry| finds out if we need to take two existing trees
 and put them below a new |HNode|,
 or just insert a new |HLeaf|.
-The name evokes the carry possible when adding two numbers.
+In the numerical representation of data structures,
+adding an item is incrementing the number.
 If each top level tree is a digit,
 building a new taller tree is a form of carry,
 so |HSkewCarry| returns |HTrue|.
@@ -936,7 +918,7 @@ and |HNothing| or |HJust| is returned as appropriate.
 
 Finally, |HHasField| requires
 top level |HSkewHasField| to return |HJust|,
-so compilation fails when looking for a non existent field,
+so compilation fails when looking for a non existent field.
 At run time, |(#)| unwraps the input |SkewRecord|
 and the intermediate |HJust| from |HSkewHasField|.
 \begin{code}
@@ -1061,7 +1043,7 @@ instance
 Of course, we want |HUpdate| to run as fast as possible.
 Rebuilding only the path to the field suffices,
 keeping all other subtrees intact,
-so the operation runs in logarithm time to the size of the record.
+so the operation runs in time logarithmic in the size of the record.
 But we do not make any effort to reuse untouched parts of our original structure.
 In particular, the |HNode| case calls |hSkewUpdate| for the children
 and reassembles a new |HNode| with the result,
@@ -1321,8 +1303,8 @@ For development, when rapid turn around is key,
 \section{Conclusions and Future Work}\label{sec:conclusions}
 
 Using type level programming techniques we have developed 
-an implementation of extensible records for Haskell that at run time 
-is logarithmic time at searching and removing elements and constant time at
+an implementation of extensible records for Haskell that, during run-time, 
+takes logarithmic time for searching and removing elements and constant time for
 inserting elements. This run time performance is achieved by moving 
 most of the effort to compile time. 
 
