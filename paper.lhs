@@ -44,50 +44,22 @@
 \begin{code}
 {-# LANGUAGE EmptyDataDecls #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE FunctionalDependencies #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE UndecidableInstances #-}
-{-# LANGUAGE OverlappingInstances #-}
 
 module Paper where
 
-import Data.HList.FakePrelude(HEq, hEq, HTrue, HFalse, HOr, hOr, Proxy, HSucc, HZero, HCond, hCond)
+import Data.HList.FakePrelude(HEq, hEq, HTrue, HFalse, HOr, hOr, Proxy, HCond, hCond, HSucc, HZero)
 import Data.HList.Label4
 import Data.HList.TypeEqGeneric1
 import Data.HList.TypeCastGeneric1
 import Data.Array
 import GHC.Exts
 import Unsafe.Coerce
-
-infixr 2 .*.
-infixr 4 .=.
-infixr 9 #
-
-instance
-    HUpdate l e (Record HNil) (Record HNil) where
-    hUpdate _ _ = id
-
-instance
-    (  HSkewUpdate l e t t'
-    ,  HUpdate l e (Record ts) (Record ts')) =>
-       HUpdate l e (Record (HCons t ts)) (Record (HCons t' ts')) where
-    hUpdate l e (Record (HCons t ts)) =
-        Record (HCons
-            (hSkewUpdate l e t)
-            (case (hUpdate l e (Record ts)) of Record ts -> ts))
-
-class HSum r where
-  hSum :: r -> Int
-instance HSum (SkewRecord HNil) where
-  hSum r = 0
-instance HSum HEmpty where
-  hSum r = 0
-instance (HSum x, HSum (SkewRecord xs)) => HSum (SkewRecord (HCons x xs)) where
-  hSum (SkewRecord (HCons x xs)) = hSum x + hSum (SkewRecord xs)
-instance (HSum t, HSum t') => HSum (HNode (LVPair l Int) t t') where
-  hSum (HNode e t t') = valueLVPair e + hSum t + hSum t'
 
 newtype ArrayRecord r = ArrayRecord (Array Int Any)
 arrayRow :: ArrayRecord r -> r
@@ -102,80 +74,41 @@ rowTail = undefined
 emptyArrayRecord :: ArrayRecord RowNil
 emptyArrayRecord = ArrayRecord (listArray (0, 0) [])
 
-instance
-    HExtend e (ArrayRecord r) (ArrayRecord (RowCons e r))
-    where
-    e .*. (ArrayRecord a) =
-      ArrayRecord (listArray (0, 1 + snd (bounds a)) (unsafeCoerce e:elems a))
+--instance
+--    HExtend e (ArrayRecord r) (ArrayRecord (RowCons e r))
+--    where
+--    e .*. (ArrayRecord a) =
+--      ArrayRecord (listArray (0, 1 + snd (bounds a)) (unsafeCoerce e:elems a))
 
 class ArrayRank r l v | r l -> v where
   arrayRank :: r -> l -> Int
-instance ArrayRank (RowCons (LVPair l v) r) l v where
+instance ArrayRank (RowCons (Field l v) r) l v where
   arrayRank _ _ = 0
 instance
     ArrayRank r l v =>
-    ArrayRank (RowCons (LVPair l2 v) r) l v where
+    ArrayRank (RowCons (Field l2 v) r) l v where
     arrayRank r l = 1 + arrayRank (rowTail r) l
 
-instance
-    ArrayRank r l v =>
-    HHasField l (ArrayRecord r) v
-    where
-    r@(ArrayRecord a) # l = unsafeCoerce (a ! arrayRank (arrayRow r) l)
+--instance
+--    ArrayRank r l v =>
+--    HHasField l (ArrayRecord r) v
+--    where
+--    r@(ArrayRecord a) # l = unsafeCoerce (a ! arrayRank (arrayRow r) l)
 \end{code}
 %endif
-
-%% update&sum
-%% largo:0   0.57 0.67
-%% largo:10  2.78 2.83
-%% largo:20  4.82 4.94
-%% largo:30  6.82 6.9
-%% largo:40  9.45 9.6
-%% largo:50  12.1 12.5
-%% largo:70  17.1 16.8
-%% largo:100 23.8 23.9
-%% largo:150 35.7 35.6
-
-%% update&lookup
-%% largo:0   skew:0.55 list:0.27
-%% largo:10  skew:0.87 list:1.21
-%% largo:20  skew:1.00 list:2.09
-%% largo:40  skew:1.10 list:14.39
-%% largo:100 skew:1.18 list:63.4
-
-
-
-%% lookup
-%% largo:10  skew:     list:0.783
-%% largo:20  skew:0.961 list:0.872
-%% largo:30  skew:1.31 list:1.02
-%% largo:40  skew:1.90 list:1.18
-%% largo:50  skew:2.64 list:1.42
-%% largo:60  skew:3.59 list:1.68
-%% largo:70  skew:5.07 list:2.04
-%% largo:100 skew:10.7 list:3.30
-%% largo:150 skew:31.9 list:8.48
-%% largo:200 skew:70.7 list:16.9
-%% largo:250 skew:136  list:27.2
-%% largo:300 skew:     list:45.9
-%% largo:350 skew:     list:79.5
-%% largo:400 skew:     list:103
-%% largo:450 skew:     list:165
-
 
 %\setlength{\parindent}{0in}
 
 \begin{document}
 
-\conferenceinfo{Workshop on Partial Evaluation and Program Manipulation,} {Mon-Tue, January 23-24, 2012, Philadelphia, Pennsylvania, USA }
-\CopyrightYear{2011}
+\conferenceinfo{Partial Evaluation and Program Manipulation,} {January 20-21, 2013, Rome, Italy}
+\CopyrightYear{2013}
 %\copyrightdata{978-1-60558-332-7/09/08}
 
 %\titlebanner{submitted to Haskell Symposium 2011}         % These are ignored unless
-\preprintfooter{version of Oct 6, 2011}     % 'preprint' option specified.
+\preprintfooter{version of Jul 21, 2012}     % 'preprint' option specified.
 
-\title{Just Do It While Compiling!}
-\subtitle{Fast Extensible Records In Haskell}
+\title{Fast Extensible Records In Haskell}
 
 \authorinfo{Bruno Martinez Aguerre}
            {Instituto de Computaci\'{o}n \\ Universidad de la  Rep\'{u}blica\\ Montevideo, Uruguay}
@@ -290,7 +223,7 @@ such as heterogeneous lists or records, using extensions of Haskell for multi-pa
 classes \cite{PJM97} and functional dependencies \cite{Jon00}.
 HList strongly relies on \emph{type-level programming} techniques by means of which
 types are used to represent type-level values, and classes are used to represent 
-type-level types and functions.
+type-level functions.
 
 We illustrate the use of type-level programming by means of two simple examples that
 will be used later in the paper. We start with a type-level representation of booleans values. 
@@ -334,7 +267,7 @@ In this case we are interested in manipulating a value-level value associated wi
 
 \begin{code}
 data HNothing  = HNothing
-data HJust e   = HJust e
+data HJust e   = HJust e deriving Show
 \end{code}
 
 We aim to construct a type-level value of the maybe type from a boolean. For this purpose
@@ -370,93 +303,40 @@ which model the structure of lists both at the value and type level:
 \begin{code}
 data HNil       = HNil
 data HCons e l  = HCons e l
+infixr 2 `HCons`
 \end{code}
 
 For example, the value |HCons True (HCons 'a' HNil)| is a heterogeneous list of type |HCons Bool (HCons Char HNil)|.
-
-To prevent the formation of incorrect heterogeneous lists, such as |HCons True False|, 
-it is possible to introduce a class |HList| whose instances specify the type of 
-well-formed heterogeneous lists. 
-
-\begin{spec}
-class     HList l
-instance  HList HNil
-instance  HList l => HList (HCons e l)
-\end{spec}
-
-To improve readability, we will not include this well-formedness condition for 
-heterogeneous lists or other type-level types, like naturals or booleans.
-
-The following class describes the extension of heterogeneous collections. 
-
-\begin{code}
-class HExtend e l l' | e l -> l'
-    where (.*.) :: e -> l -> l'
-\end{code}
-
-The functional dependency |e l -> l'| makes |HExtend| a type-level function.
-It specifies the extension of a collection of type |l| with an element of type |e|,
-resulting in a collection of type |l'|.
-Function |(.*.)| performs the same computation at the level of values.
-
-%We removed |l' -> e l|, an additional dependency present in the original HList formulation.
-%The compiler refuses our instances implementing Skew lists because it cannot prove that the instances satisfy the %dependency. 
-
 
 \subsection{Extensible Records}
 \label{sec:extensiblerecords}
 
 Records are mappings from labels to values.
 They are modeled by an |HList| containing a heterogeneous list of fields.
-
-\begin{code}
-newtype Record r = Record r
-\end{code}
-
-\noindent 
-An empty record is a |Record| containing an empty heterogeneous list:
-
-\begin{code}
-emptyRecord :: Record HNil
-emptyRecord = Record HNil
-\end{code}
-
 A field with label |l| and value of type |v| is represented by the type:
 
 \begin{code}
-newtype LVPair l v  =   LVPair { valueLVPair :: v }
-(.=.)               ::  l -> v -> LVPair l v
-_  .=.  v           =   LVPair v
+newtype Field l v   =   Field { value :: v }
+(.=.)               ::  l -> v -> Field l v
+_  .=.  v           =   Field v
 \end{code}
 
 \noindent 
 Notice that the label is a phantom type \cite{Hin03}. 
-We can retrieve the label value by using the function |labelLVPair|, which exposes 
+We can retrieve the label value by using the function |label|, which exposes 
 the phantom type parameter:
 
 \begin{code}
-labelLVPair :: LVPair l v -> l
-labelLVPair = undefined
+label  ::  Field l v -> l
+label  =   undefined
 \end{code}
 
-\noindent
-
-\noindent 
 Labels are represented by |HList|'s |Proxy| type constructor.
 |HList| defines the key typeclass |HEq| so that
 a proxy only equals itself.
 By choosing a different phantom type for each label to be represented we can distinguish them.
 
-The instance of |HExtend| for records extends the list with a new field:
-\marcos{creo que aca hay que poner la definicion que restringe los labels a ser unicos, ya que cuando definimos el record con skew la incluimos} \bruno{No podes exigir que no haya instancia de HHasFieldList. Para HHasFieldSkew si, pq devuelve HMaybe.}
-
-\begin{code}
-instance HExtend e (Record l) (Record (HCons e l))
-    where e .*. Record l = Record (HCons e l)
-\end{code}
-
-\noindent 
-Thus, the following defines a record (|myR|) with seven fields:
+Thus, the following defines a record (|rList|) with seven fields:
 
 \begin{code}
 data L1; l1 = undefined :: Proxy L1
@@ -467,108 +347,67 @@ data L5; l5 = undefined :: Proxy L5
 data L6; l6 = undefined :: Proxy L6
 data L7; l7 = undefined :: Proxy L7
 
-myR =  l1  .=.  True     .*. 
-       l2  .=.  9        .*. 
-       l3  .=.  "bla"    .*. 
-       l4  .=.  'c'      .*. 
-       l5  .=.  Nothing  .*. 
-       l6  .=.  [4,5]    .*.
-       l7  .=.  "last"   .*. 
-       emptyRecord
+rList =  (l1  .=.  True     )  `HCons` 
+         (l2  .=.  9        )  `HCons` 
+         (l3  .=.  "bla"    )  `HCons`
+         (l4  .=.  'c'      )  `HCons`
+         (l5  .=.  Nothing  )  `HCons` 
+         (l6  .=.  [4,5]    )  `HCons`
+         (l7  .=.  "last"   )  `HCons`
+         HNil
 \end{code}
 
-%% $
-
-%% \noindent Since our lists will represent collections of attributes
-%% we want to express statically that we do not have more than a single definition for each attribute occurrence
-%% and so the labels in a record should be all different.
-%% This constraint is represented by requiring an instance of the class |HRLabelSet| to be available when defining extendibility for records:
-
-%% \begin{code}
-%% instance HRLabelSet (HCons (LVPair l v) r)
-%%     => HExtend  (LVPair l v) (Record r)
-%%                 (Record (HCons (LVPair l v) r))
-%%   where hExtend f (Record r) = Record (HCons f r)
-%% \end{code}
-
-The class |HHasField| is used to retrieve from a record the value part
+The class |HListGet| retrieves from a record the value part
 corresponding to a specific label:
 
 \begin{code}
-class HHasField l r v | l r -> v where
-    (#) :: r -> l -> v
+class HListGet r l v | r l -> v where
+    hListGet :: r -> l -> v
 \end{code}
 
 \noindent 
 At the type-level it is statically checked that the record |r| indeed has
 a field with label |l| associated with a value of the type |v|.
-At value-level the operator |(#)| returns the value of type |v|.
+At value-level |(hListGet)| returns the value of type |v|.
 For example, the following expression returns the string |"last"|:
 
 \begin{code}
-last = myR # l7
+lastList = hListGet rList l7
 \end{code}
 
-\noindent
-The |HHasField| instance for |Record| just unpacks the list
-and delegates the job to |HHasFieldList|.
-
-\begin{code}
-instance
-    HHasFieldList l r v =>
-    HHasField l (Record r) v where
-    Record r # l = hListGet l r
-
-class HHasFieldList l r v | l r -> v where
-    hListGet :: l -> r -> v
-\end{code}
-
-\noindent
-We use a different class to avoid a clash with
-the |HHasField| instance for |SkewRecord| to be shown later,
-which also uses |HCons| and |HNil| internally.
-
-\begin{code}
-instance
-    (  HEq l l' b
-    ,  HHasFieldList' b l (HCons (LVPair l' v') r) v) =>
-       HHasFieldList l (HCons (LVPair l' v') r) v where
-    hListGet l r@(HCons f' _) =
-        hListGet' (hEq l (labelLVPair f')) l r
-\end{code}
-
-\noindent
-HList provides |HEq| to avoid overlapping instances everywhere.
-Here |HHasFieldList| uses |HEq| to discriminate the two possible cases.
+HList provides |HEq| to avoid overlapping instances everywhere else.
+Here |HListGet| uses |HEq| to discriminate the two possible cases.
 Either the label of the current field matches |l|,
 or the search must continue to the next node.
 
 \begin{code}
-class HHasFieldList' b l r v | b l r -> v where
-    hListGet':: b -> l -> r -> v
+instance
+    (  HEq l l' b
+    ,  HListGet' b v' r' l v) =>
+       HListGet (HCons (Field l' v') r') l v where
+    hListGet (HCons f'@(Field v') r') l =
+        hListGet' (hEq l (label f')) v' r' l
 \end{code}
-
-\noindent
-|HHasFieldList'| receives the |b| from |HEq|, with two cases.
+ 
+|HListGet'| has two instances, for the cases |HTrue| and |HFalse|.
 
 \begin{code}
+class HListGet' b v' r' l v | b v' r' l -> v where
+    hListGet':: b -> v' -> r' -> l -> v
+
 instance
-    HHasFieldList' HTrue l (HCons (LVPair l v) r) v
+    HListGet' HTrue v r' l v
     where
-    hListGet' _ _ (HCons (LVPair v) _) = v
+    hListGet' _ v _ _ = v
+
+instance
+    HListGet r' l v =>
+    HListGet' HFalse v' r' l v where
+    hListGet' _ _ r' l = hListGet r' l
 \end{code}
 
 \noindent
 If the labels match, the corresponding value is returned, both at the value and type levels.
-
-\begin{code}
-instance
-    HHasFieldList l r v =>
-    HHasFieldList' HFalse l (HCons fld r) v where
-    hListGet' _ l (HCons _ r) = hListGet l r
-\end{code}
-
-\noindent
 Otherwise, |HHasFieldList'| calls back to |HHasFieldList| to continue the search.  
 The two type-functions are mutually recursive.  
 There's no case for the empty list; lookup fails.
@@ -576,13 +415,13 @@ There's no case for the empty list; lookup fails.
 At the value level, the functions |hListGet| and |hListGet'| are trivial,
 devoid of logic and conditions.
 For this reason,
-GHC is smart enough to elide the dictionary objects and indirect jumps for |(#)|.
+GHC is smart enough to elide the dictionary objects and indirect jumps for |hListGet|.
 The code is inlined to a case cascade, but the program must traverse the linked list.
 For example, this is the GHC core of the example:
 
 \begin{spec}
-last =
-  case myR  of 
+lastList =
+  case rList  of 
   HCons  _  rs1  ->  case rs1  of 
   HCons  _  rs2  ->  case rs2  of 
   HCons  _  rs3  ->  case rs3  of 
@@ -592,14 +431,12 @@ last =
   HCons  e  _    -> e
 \end{spec}
 
-
 \section{Faster Extensible Records}\label{sec:faster}
 
 Extensible records can double as
 "static type-safe" dictionaries, that is,
 collections that guarantee at compile time
-that no label is duplicated
-and that all labels searched for are available.
+that all labels searched for are available.
 For example, \cite{FlyFirstClass}, a library for first-class attribute
 grammars, uses extensible records to encode the collection of
 attributes associated to each non-terminal. If we wanted to use it to
@@ -624,7 +461,7 @@ unstructured labels is beyond (our) reach.
 The key insight is that sub-linear behavior is only needed at run time.
 We are willing to keep the work done at compile time superlinear
 if it helps us to speed up our programs at run time.
-|HHasField| already looks for our label at compile time
+|HListGet| already looks for our label at compile time
 to fail compilation if we require a field for a record
 without such label.
 So we just store our field unordered in a structure
@@ -641,6 +478,7 @@ applications heavy on record modification.
 That aside, the key property
 of searching at compile time while retrieving at run time
 works unchanged in other balanced tree structures.
+
 \subsection{Skew Binary Random-Access List}\label{sec:skew}
 
 We will describe Skew Binary Random-Access List \cite{Mye83} in a less principled
@@ -664,7 +502,7 @@ we remove them and insert a new node built
 of the new element and the two trees removed.
 Else (\emph{case 2}), we just insert a new leaf.
 In Figure~\ref{fig:insert} we show a graphic representation of
-the construction of a skew list with the elements of |myR| from section \ref{sec:extensiblerecords}.
+the construction of a skew list with the elements of |rList| from section \ref{sec:extensiblerecords}.
 Nodes connected by arrows represent linked-lists and nodes connected by lines represent trees.
 The first two steps (adding elements with label |l6| and |l5|) are in case 2, 
 thus two leaves are inserted into the spine. 
@@ -719,49 +557,18 @@ four =
 
 %% $ fix emacs color highlighting
 
-
-We define a new tag |SkewRecord|
-and the corresponding |HExtend| instance
-to be able to use |(.*.)|,
-as we did for |Record|.
-
-\begin{code}
-newtype SkewRecord r = SkewRecord r
-emptySkewRecord :: SkewRecord HNil
-emptySkewRecord = SkewRecord HNil
-
-instance
-    (  HSkewExtend (LVPair l v) ts ts'
---    ,  HSkewHasField l ts HNothing) =>
-    ) =>
-       HExtend
-         (LVPair l v)
-         (SkewRecord ts)
-         (SkewRecord ts') where
-    e .*. SkewRecord ts =
-        SkewRecord (hSkewExtend e ts)
-\end{code}
-The class |HSkewExtend| does the actual work.
-With the constraint |(HSkewHasField l ts HNothing)| 
-we restrict the extending record |(SkewRecord ts)| to not
-include a field with label |l|.
-
 \noindent
-|HComplete| below checks that all root-to-leaf paths have the same length
-and returns it.  We will use it to detect the case of two leading equal height trees in the spine.
+|HHeight| returns the height of a tree.
+We will use it to detect the case of two leading equal height trees in the spine.
 \begin{code}
-class HComplete t h | t -> h
-instance HComplete HEmpty HZero
+class HHeight t h | t -> h
+instance HHeight HEmpty HZero
 instance
-    (  HComplete t h
-    ,  HComplete t' h) =>
-       HComplete (HNode e t t') (HSucc h)
+    (  HHeight t h) =>
+       HHeight (HNode e t t') (HSucc h)
 \end{code}
-For a node |(HNode e t t')|, if |t| and |t'| have different lengths
-a compile-time error will be produced since there is no 
-instance defined for this case.
-
 \noindent
+
 |HSkewCarry| finds out if we need to take two existing trees
 and put them below a new |HNode|,
 or just insert a new |HLeaf|.
@@ -775,38 +582,37 @@ class HSkewCarry l b | l -> b
 instance HSkewCarry HNil HFalse
 instance HSkewCarry (HCons t HNil) HFalse
 instance
-    (  HComplete t h
-    ,  HComplete t' h'
+    (  HHeight t h
+    ,  HHeight t' h'
     ,  HEq h h' b) =>
        HSkewCarry (HCons t (HCons t' ts)) b
 hSkewCarry :: HSkewCarry l b => l -> b
 hSkewCarry = undefined
 \end{code}
 
+All these pieces allow us to define |HSkewExtend|,
+which resembles the |HCons| constructor.
+\begin{code}
+class HSkewExtend f r r' | f r -> r'
+    where hSkewExtend :: f -> r -> r'
+infixr 2 `hSkewExtend`
+instance
+    (  HSkewCarry r b
+    ,  HSkewExtend' b  f r r') =>
+       HSkewExtend     f r r' where
+    hSkewExtend f r =
+        hSkewExtend' (hSkewCarry r) f r
+
+class HSkewExtend' b f r r' | b f r -> r' where
+    hSkewExtend' :: b -> f -> r -> r'
+\end{code}
 \noindent
-|HSkewExtend| looks like |HHasFieldList| earlier.
+|HSkewExtend| looks like |HListGet| earlier.
 In this case, |HSkewCarry| is responsible for discriminating
 the current case,
-while |HHasFieldList| used |HEq| on the two labels.
-Because pattern matching in type classes is more limited than
-run time value pattern matching
-and as-patterns are missing,
-a smart test type-function saves on repetition.
-\begin{code}
-class HSkewExtend e l l' | e l -> l'
-    where hSkewExtend :: e -> l -> l'
-instance
-    (  HSkewCarry l b
-    ,  HSkewExtend' b e l l') =>
-       HSkewExtend e l l' where
-    hSkewExtend e l =
-        hSkewExtend' (hSkewCarry l) e l
+while |HListGet| used |HEq| on the two labels.
+A smart test type-function saves on repetition.
 
-class HSkewExtend' b e l l' | b e l -> l' where
-    hSkewExtend' :: b -> e -> l -> l'
-\end{code}
-
-\noindent
 Here |HFalse| means that we should not add up the first two trees of the spine.
 Either the size of the trees are different, or the spine is empty or a singleton.
 We just use |HLeaf| to insert a new tree at the beginning of the spine.
@@ -814,139 +620,117 @@ We just use |HLeaf| to insert a new tree at the beginning of the spine.
 instance
     HSkewExtend'
         HFalse
-        e
-        l
-        (HCons (HLeaf e) l) where
-    hSkewExtend' _ e l = HCons (hLeaf e) l
+        f
+        r
+        (HCons (HLeaf f) r) where
+    hSkewExtend' _ f r = HCons (hLeaf f) r
 \end{code}
 
-\noindent
 When |HSkewCarry| returns |HTrue|, however, we build a new tree reusing the two old trees at the start of the spine.
 The length of the spine is reduced in one, since we take two elements but only add one.
 \begin{code}
 instance
     HSkewExtend'
         HTrue
-        e
-        (HCons t (HCons t' l))
-        (HCons (HNode e t t') l) where
-    hSkewExtend' _ e (HCons t (HCons t' l)) =
-        (HCons (HNode e t t') l)
+        f
+        (HCons t (HCons t' r))
+        (HCons (HNode f t t') r) where
+    hSkewExtend' _ f (HCons t (HCons t' r)) =
+        (HCons (HNode f t t') r)
 \end{code}
 
-The missing piece is |HHasField| for |SkewRecord|.
-As already mentioned,
-we explore all paths at compile time
-but follow only the right one at run time.
-
-Mirroring the definitions for linked list records,
-we need a |HHasField| instance for |SkewRecord|
-and an auxiliary type class |HSkewHasField|.
-However, deciding on the path to the desired field
-is now much more involved.
+The missing piece is |HSkewGet|,
+which explores all paths at compile time
+but follows only the right one at run time.
+Deciding on the path to the desired field
+is now more involved.
 The cases that both the test function and the work function must consider
 are more numerous and long.
 Thus, we merge both functions.
-|HSkewHasField| returns a type level and value level Maybe,
+|HSkewGet| returns a type level and value level Maybe,
 that is,
 |HNothing| when no field with the label is found,
 and |HJust| of the field's type/value otherwise.
 For branching constructors |HCons| and |HNode|,
 |HPlus| chooses the correct path for us.
 
-\begin{code}
-class HSkewHasField l ts v | l ts -> v where
-    hSkewGet :: l -> ts -> v
-instance HSkewHasField l HNil HNothing where
-    hSkewGet _ _ = HNothing
-instance HSkewHasField l HEmpty HNothing where
-    hSkewGet _ _ = HNothing
-\end{code}
-\noindent
 We will run |HSkewHasField| on both the spine and each tree, so we have two base cases.
 |HNil| is encountered at the end of the spine, and |HEmpty| at the bottom of trees.
 In both cases, the field was not found, so we return |HNothing|.
-
 \begin{code}
-instance
-    (  HSkewHasField l t vt
-    ,  HSkewHasField l ts vts
-    ,  HPlus vt vts v) =>
-       HSkewHasField l (HCons t ts) v where
-    hSkewGet l (HCons t ts) =
-        hSkewGet l t `hPlus` hSkewGet l ts
+class HSkewGet r l v | r l -> v where
+    hSkewGet :: r -> l -> v
+instance HSkewGet HNil l HNothing where
+    hSkewGet _ _ = HNothing
+instance HSkewGet HEmpty l HNothing where
+    hSkewGet _ _ = HNothing
 \end{code}
-\noindent
+
 The |HCons| case must consider that the field may be found on the current tree or further down the spine.
-A recursive call is made for each sub case, and the results combined with |HPlus|, implemented earlier.  If the field is found in the current tree, |HPlus| returns it, otherwise, it returns what the search down the spine did.
-That |HPlus| gives priority to the current tree has no consequence.  Records do not contain duplicate fields, as enforces by |HExtend|.
-
+A recursive call is made for each sub case, and the results combined with |HPlus|, implemented earlier.
+If the field is found in the current tree,
+|HPlus| returns it, otherwise, it returns what the search down the spine did.
 \begin{code}
 instance
-    (  HSkewHasField l e et
-    ,  HSkewHasField l t vt
-    ,  HSkewHasField l t' vt'
-    ,  HPlus et vt evt
-    ,  HPlus evt vt' v) =>
-       HSkewHasField l (HNode e t t') v where
-    hSkewGet l (HNode e t t') =
-        hSkewGet l e 
-            `hPlus` hSkewGet l t 
-               `hPlus` hSkewGet l t'
+    (  HSkewGet r   l vr
+    ,  HSkewGet r'  l vr'
+    ,  HPlus vr vr' v) =>
+       HSkewGet (HCons r r') l v where
+    hSkewGet (HCons r r') l =
+        hSkewGet r l `hPlus` hSkewGet r' l
 \end{code}
-\noindent
+
 The |HNode| case is a bigger version of the |HCons| case.
 Here three recursive calls are made,
 for the current field, the left tree, and the right tree.
 Thus two |HPlus| calls are needed to combine the result.
-
 \begin{code}
 instance
-    (  HEq l l' b
-    ,  HMakeMaybe b v m) =>
-       HSkewHasField l (LVPair l' v) m where
-    hSkewGet l f =
-        hMakeMaybe
-            (hEq l (labelLVPair f))
-            (valueLVPair f)
+    (  HSkewGet f   l vf
+    ,  HSkewGet r   l vr
+    ,  HSkewGet r'  l vr'
+    ,  HPlus vf   vr     vfr
+    ,  HPlus vfr  vr'  v) =>
+       HSkewGet (HNode f r r') l v where
+    hSkewGet (HNode f r r') l =
+        hSkewGet f l 
+            `hPlus` hSkewGet r l 
+               `hPlus` hSkewGet r' l
 \end{code}
-\noindent
+
 And this is the case that may actually build a |HJust| result.
 As in |HHasFieldList| for linked lists, |HEq| compares both labels.
 We call |HMakeMaybe| with the result of the comparison,
 and |HNothing| or |HJust| is returned as appropriate.
-
-Finally, |HHasField| requires
-top level |HSkewHasField| to return |HJust|,
-so compilation fails when looking for a non existent field.
-At run time, |(#)| unwraps the input |SkewRecord|
-and the intermediate |HJust| from |HSkewHasField|.
 \begin{code}
 instance
-    HSkewHasField l ts (HJust v) =>
-    HHasField l (SkewRecord ts) v where
-    SkewRecord ts # l =
-        case hSkewGet l ts of HJust e -> e
+    (  HEq l l' b
+    ,  HMakeMaybe b v m) =>
+       HSkewGet (Field l' v) l m where
+    hSkewGet f l =
+        hMakeMaybe
+            (hEq l (label f))
+            (value f)
 \end{code}
 
 When we repeat the experiment at the end of subsection \ref{sec:extensiblerecords}, 
 but using |emptySkewRecord| to construct a |SkewRecord|:
 \begin{code}
-myR' =  l1  .=.  True     .*. 
-        l2  .=.  9        .*. 
-        l3  .=.  "bla"    .*. 
-        l4  .=.  'c'      .*. 
-        l5  .=.  Nothing  .*. 
-        l6  .=.  [4,5]    .*.
-        l7  .=.  "last"   .*. 
-        emptySkewRecord
+rSkew =  (l1  .=.  True     )  `hSkewExtend` 
+         (l2  .=.  9        )  `hSkewExtend` 
+         (l3  .=.  "bla"    )  `hSkewExtend` 
+         (l4  .=.  'c'      )  `hSkewExtend` 
+         (l5  .=.  Nothing  )  `hSkewExtend` 
+         (l6  .=.  [4,5]    )  `hSkewExtend` 
+         (l7  .=.  "last"   )  `hSkewExtend` 
+         HNil
 
-last' = myR' # l7
+lastSkew = hSkewGet rSkew l7
 \end{code}
 the resulting core code is:
 
 \begin{spec}
-last' =
+lastSkew =
   case myR'   of HCons  t1   _        ->
   case t1     of HNode  _   _   t12   ->
   case t12    of HNode  _   _   t121  ->
@@ -956,184 +740,6 @@ last' =
 Thus, getting to |l7| at run time only traverses a (logarithmic length) fraction of the elements,
 as we have seen in Figure~\ref{fig:search-skew}.
 Later we'll examine runtime benchmarks.
-
-
-\subsection{Update}\label{sec:update}
-
-We can define a type-function |HUpdate| to change
-a field of some label
-with a new field with possibly new label and value.
-Analogously to |HHasField| and |HExtend|,
-|HUpdate| unpacks and repacks the |SkewRecord|,
-doing |HSkewUpdate| all the real work.
-|HSkewHasField| checks that the record
-does contain a field with our label. 
-
-\begin{code}
-class HUpdate l e r r' | l e r -> r' where
-    hUpdate :: l -> e -> r -> r'
-instance
-    (  HSkewHasField l r (HJust v)
-    ,  HSkewUpdate l e r r') =>
-       HUpdate l e (SkewRecord r) (SkewRecord r') where
-    hUpdate l e (SkewRecord r) =
-        SkewRecord (hSkewUpdate l e r)
-
-class HSkewUpdate l e r r' | l e r -> r' where
-    hSkewUpdate :: l -> e -> r -> r'
-\end{code}
-
-\noindent
-The base cases just return their argument using |id|.
-With no field, there's nothing to change.
-\begin{code}
-instance HSkewUpdate l e HNil HNil where
-    hSkewUpdate _ _ = id
-instance HSkewUpdate l e HEmpty HEmpty where
-    hSkewUpdate _ _ = id
-\end{code}
-
-\noindent
-|HSkewUpdate| is simpler than |HHasField|.
-We do not have to decide which subtree has the field to change.
-Instead, we just call |hSkewUpdate| recursively for all parts.
-\begin{code}
-instance
-    (  HSkewUpdate l e t t'
-    ,  HSkewUpdate l e ts ts') =>
-       HSkewUpdate l e (HCons t ts) (HCons t' ts') where
-    hSkewUpdate l e (HCons t ts) =
-        HCons
-            (hSkewUpdate l e t)
-            (hSkewUpdate l e ts)
-\end{code}
-In the |HNode| case, |hSkewUpdate| is recursively called to
-the left and right sub-trees, and also to the element of the node.
-\begin{code}
-instance
-    (  HSkewUpdate l e e' e''
-    ,  HSkewUpdate l e tl tl'
-    ,  HSkewUpdate l e tr tr') =>
-       HSkewUpdate l e (HNode e' tl tr) (HNode e'' tl' tr')
-       where
-    hSkewUpdate l e (HNode e' tl tr) =
-        HNode
-            (hSkewUpdate l e e')
-            (hSkewUpdate l e tl)
-            (hSkewUpdate l e tr)
-\end{code}
-
-\noindent
-The bottom case |LVPair| uses |HCond|
-from the |HList| type-function collection to only return
-an updated field if the labels match. 
-In other case the original element is returned.
-\begin{code}
-instance
-    (  HEq l l' b
-    ,  HCond b e (LVPair l' v') p) =>
-       HSkewUpdate l e (LVPair l' v') p where
-    hSkewUpdate l e e' =
-        hCond
-            (hEq l (labelLVPair e'))
-            e
-            e'
-\end{code}
-
-Of course, we want |HUpdate| to run as fast as possible.
-Rebuilding only the path to the field suffices,
-keeping all other subtrees intact,
-so the operation runs in time logarithmic in the size of the record.
-But we do not make any effort to reuse untouched parts of our original structure.
-In particular, the |HNode| case calls |hSkewUpdate| for the children
-and reassembles a new |HNode| with the result,
-even when no matching field exists below the current node.
-Executed literally, this program touches all nodes
-and runs in linear time,
-not what we want.
-However, GHC with optimizations enabled is smart enough
-to recognize that we are constructing values already available
-and changes our naive program to the smart, logarithm-time, version.
-
-%if style==newcode
-\begin{code}
-{-# NOINLINE myR' #-}
-updR = hUpdate l1 (l3 .=. "hi") myR'
-\end{code}
-%endif
-
-\subsection{Remove}
-
-Removing a field is easy based on updating.
-We overwrite the field we want gone with the first node,
-and then we remove the first node.
-Thus, we remove elements in logarithmic time while keeping the tree balanced.
-
-\noindent
-First we need a helper to remove the first element of a skew list.
-\begin{code}
-class HSkewTail ts ts' | ts -> ts' where
-    hSkewTail :: ts -> ts'
-\end{code}
- \begin{figure}[htp]
-\begin{center}
-\includegraphics[scale=0.5]{tail.pdf}
-\end{center}
-\caption{Tail in a Skew} \label{fig:tail}
-\end{figure}
-
-\noindent
-In Figure~\ref{fig:tail} we show an example of the possible cases 
-we can find.
-The easy case is when the spine begins with a leaf.
-We just return the tail of the spine list.
-\begin{code}
-instance HSkewTail (HCons (HLeaf e) ts) ts where
-    hSkewTail (HCons _ ts) = ts
-\end{code}
-
-\noindent
-The other case is when the spine begins with a tree of three or more elements.
-Since |HLeaf| is a synonym of |HNode HEmpty HEmpty|,
-we need to assert that the subtrees of the root |HNode|
-are |HNode|s themselves.
-By construction, both subtrees have the same shape
-and pattern matching only the first suffices
-to make sure this case does not overlap with the previous one.
-In this case we grow the spine with the subtrees, throwing away the root.
-\begin{code}
-instance
-    HSkewTail
-        (HCons (HNode e t (HNode e' t' t'')) ts)
-        (HCons t ((HCons (HNode e' t' t'')) ts)) where
-    hSkewTail (HCons (HNode _ t t') ts) =
-        HCons t (HCons t' ts)
-\end{code}
-
-
-Finally |HRemove| is done in a single instance.
-We take the first node and call |HSkewUpdate|
-to duplicate it where the label we want gone was.
-Then |HSkewTail| removes the original occurrence,
-at the start of the list.
-\begin{code}
-class HRemove l r r' | l r -> r' where
-    hRemove :: l -> r -> r'
-instance
-    (  HSkewUpdate l e e e'
-    ,  HSkewUpdate l e lt lt'
-    ,  HSkewUpdate l e rt rt'
-    ,  HSkewUpdate l e ts ts'
-    ,  HSkewTail (HCons (HNode e' lt' rt') ts') r'') =>
-       HRemove
-        l
-        (SkewRecord (HCons (HNode e lt rt) ts))
-        (SkewRecord r'') where
-    hRemove l (SkewRecord (HCons (HNode e t t') ts)) =
-        SkewRecord $
-        hSkewTail $
-        hSkewUpdate l e (HCons (HNode e t t') ts)
-\end{code}
 
 
 \section{Efficiency}\label{sec:efficiency}
