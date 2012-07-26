@@ -50,16 +50,23 @@
 {-# LANGUAGE FunctionalDependencies #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE UndecidableInstances #-}
+{-# LANGUAGE OverlappingInstances #-}
 
 module Paper where
 
-import Data.HList.FakePrelude(HEq, hEq, HTrue, HFalse, HOr, hOr, Proxy, HCond, hCond, HSucc, HZero)
-import Data.HList.Label4
-import Data.HList.TypeEqGeneric1
-import Data.HList.TypeCastGeneric1
 import Data.Array
 import GHC.Exts
 import Unsafe.Coerce
+
+data HZero
+data HSucc n
+class TypeCast x y | x -> y, y -> x
+instance TypeCast x x
+class HEq x y b | x y -> b
+instance TypeCast b HFalse => HEq x y b
+instance TypeCast b HTrue => HEq x x b
+hEq :: HEq x y b => x -> y -> b
+hEq = undefined
 
 newtype ArrayRecord r = ArrayRecord (Array Int Any)
 arrayRow :: ArrayRecord r -> r
@@ -230,10 +237,10 @@ will be used later in the paper. We start with a type-level representation of bo
 Since we are only interested in type-level computations, we define empty 
 types |HTrue| and |HFalse| corresponding to each boolean value.
 
-\begin{spec}
+\begin{code}
 data   HTrue   ; hTrue   = undefined :: HTrue
 data   HFalse  ; hFalse  = undefined :: HFalse
-\end{spec}
+\end{code}
 
 The inhabitants |hTrue| and |hFalse| of those types are defined solely
 to be used in value-level expressions to construct type-level values by 
@@ -241,10 +248,10 @@ referring to the types of such expressions.
 
 Type-level functions can be described using multi-parameter classes with functional dependencies. 
 For example, we can encode type-level negation by defining the following class:
-\begin{spec}
+\begin{code}
 class HNot t t' | t -> t' where
   hNot :: t -> t' 
-\end{spec}
+\end{code}
 The functional dependency |t -> t'| expresses that the parameter |t|
 uniquely determines the parameter |t'|. 
 Therefore, once |t| is instantiated,
@@ -253,10 +260,10 @@ In other words, the relation between |t| and |t'| is actually a function.
 Whereas the class definition describes the type signature of the type-level function, 
 the function itself is defined by the following instance declarations:
 
-\begin{spec}
+\begin{code}
 instance HNot  HFalse  HTrue   where hNot _ = hTrue
 instance HNot  HTrue   HFalse  where hNot _ = hFalse
-\end{spec}
+\end{code}
 If we write the expression |(hNot hFalse)|, then we know that |t| is |HFalse|. 
 So, the first instance of |hNot| is selected and thus |t'| is inferred to be |HTrue|.
 Observe that the computation is completely at the type-level; 
@@ -331,30 +338,31 @@ label  ::  Field l v -> l
 label  =   undefined
 \end{code}
 
-Labels are represented by |HList|'s |Proxy| type constructor.
+We define separate types and constructors for labels.
 |HList| defines the key typeclass |HEq| so that
 a proxy only equals itself.
-By choosing a different phantom type for each label to be represented we can distinguish them.
+
 
 Thus, the following defines a record (|rList|) with seven fields:
 
 \begin{code}
-data L1; l1 = undefined :: Proxy L1
-data L2; l2 = undefined :: Proxy L2
-data L3; l3 = undefined :: Proxy L3
-data L4; l4 = undefined :: Proxy L4
-data L5; l5 = undefined :: Proxy L5
-data L6; l6 = undefined :: Proxy L6
-data L7; l7 = undefined :: Proxy L7
+data L1 = L1
+data L2 = L2
+data L3 = L3
+data L4 = L4
+data L5 = L5
+data L6 = L6
+data L7 = L7
 
-rList =  (l1  .=.  True     )  `HCons` 
-         (l2  .=.  9        )  `HCons` 
-         (l3  .=.  "bla"    )  `HCons`
-         (l4  .=.  'c'      )  `HCons`
-         (l5  .=.  Nothing  )  `HCons` 
-         (l6  .=.  [4,5]    )  `HCons`
-         (l7  .=.  "last"   )  `HCons`
-         HNil
+rList =
+  (L1  .=.  True     )  `HCons` 
+  (L2  .=.  9        )  `HCons` 
+  (L3  .=.  "bla"    )  `HCons`
+  (L4  .=.  'c'      )  `HCons`
+  (L5  .=.  Nothing  )  `HCons` 
+  (L6  .=.  [4,5]    )  `HCons`
+  (L7  .=.  "last"   )  `HCons`
+  HNil
 \end{code}
 
 The class |HListGet| retrieves from a record the value part
@@ -372,7 +380,7 @@ At value-level |(hListGet)| returns the value of type |v|.
 For example, the following expression returns the string |"last"|:
 
 \begin{code}
-lastList = hListGet rList l7
+lastList = hListGet rList L7
 \end{code}
 
 HList provides |HEq| to avoid overlapping instances everywhere else.
@@ -419,17 +427,16 @@ GHC is smart enough to elide the dictionary objects and indirect jumps for |hLis
 The code is inlined to a case cascade, but the program must traverse the linked list.
 For example, this is the GHC core of the example:
 
-\begin{spec}
-lastList =
-  case rList  of 
-  HCons  _  rs1  ->  case rs1  of 
-  HCons  _  rs2  ->  case rs2  of 
-  HCons  _  rs3  ->  case rs3  of 
-  HCons  _  rs4  ->  case rs4  of 
-  HCons  _  rs5  ->  case rs5  of 
-  HCons  _  rs6  ->  case rs6  of 
-  HCons  e  _    -> e
-\end{spec}
+\begin{code}
+lastListCore = case rList of
+  HCons _ rs1 -> case rs1 of
+    HCons _  rs2 -> case rs2 of
+      HCons _  rs3 -> case rs3 of
+        HCons _ rs4 -> case rs4 of
+          HCons _ rs5 -> case rs5 of
+            HCons _ rs6 -> case rs6 of
+              HCons e _ -> e
+\end{code}
 
 \section{Faster Extensible Records}\label{sec:faster}
 
@@ -548,10 +555,10 @@ The following declarations define a list with the elements of the fourth step of
 
 \begin{code}
 four =
-    HCons  (hLeaf  (l4  .=.  'c')) $
-    HCons  (HNode  (l5  .=.  Nothing) 
-                   (hLeaf (l6  .=.  [4,5])) 
-                   (hLeaf (l7  .=.  "last"))) $
+    HCons  (hLeaf  (L4  .=.  'c')) $
+    HCons  (HNode  (L5  .=.  Nothing) 
+                   (hLeaf (L6  .=.  [4,5])) 
+                   (hLeaf (L7  .=.  "last"))) $
     HNil
 \end{code}
 
@@ -716,27 +723,27 @@ instance
 When we repeat the experiment at the end of subsection \ref{sec:extensiblerecords}, 
 but using |emptySkewRecord| to construct a |SkewRecord|:
 \begin{code}
-rSkew =  (l1  .=.  True     )  `hSkewExtend` 
-         (l2  .=.  9        )  `hSkewExtend` 
-         (l3  .=.  "bla"    )  `hSkewExtend` 
-         (l4  .=.  'c'      )  `hSkewExtend` 
-         (l5  .=.  Nothing  )  `hSkewExtend` 
-         (l6  .=.  [4,5]    )  `hSkewExtend` 
-         (l7  .=.  "last"   )  `hSkewExtend` 
-         HNil
+rSkew =
+  (L1  .=.  True     )  `hSkewExtend` 
+  (L2  .=.  9        )  `hSkewExtend` 
+  (L3  .=.  "bla"    )  `hSkewExtend` 
+  (L4  .=.  'c'      )  `hSkewExtend` 
+  (L5  .=.  Nothing  )  `hSkewExtend` 
+  (L6  .=.  [4,5]    )  `hSkewExtend` 
+  (L7  .=.  "last"   )  `hSkewExtend` 
+  HNil
 
-lastSkew = hSkewGet rSkew l7
+lastSkew = hSkewGet rSkew L7
 \end{code}
 the resulting core code is:
 
-\begin{spec}
-lastSkew =
-  case myR'   of HCons  t1   _        ->
-  case t1     of HNode  _   _   t12   ->
-  case t12    of HNode  _   _   t121  ->
-  case t121   of HNode  e   _   _     ->
-  e
-\end{spec}
+\begin{code}
+lastSkewCore = case rSkew of
+  HCons t1 _ -> case t1 of
+    HNode _ _ t12 -> case t12 of
+      HNode _ _ t121 ->case t121 of
+        HNode e _ _ -> e
+\end{code}
 Thus, getting to |l7| at run time only traverses a (logarithmic length) fraction of the elements,
 as we have seen in Figure~\ref{fig:search-skew}.
 Later we'll examine runtime benchmarks.
