@@ -3,10 +3,8 @@ all: paper.pdf paper.exe
 run : paper.exe
 	time ./paper.exe
 
-GHC=ghc-7.5.20120526
-%GHC=ghc-7.4.1
-%GHC=ghc-7.3.20111118
-%GHC=ghc-7.0.4
+GHC=ghc-7.6.1
+%GHC=ghc-7.4.2
 
 paper.exe : paper.hs
 	time $(GHC) -O -fcontext-stack=999 --make paper.hs -o paper.exe 2>&1

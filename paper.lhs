@@ -60,47 +60,7 @@ import Unsafe.Coerce
 
 data HZero
 data HSucc n
-class TypeCast x y | x -> y, y -> x
-instance TypeCast x x
-class HEq x y b | x y -> b
-instance TypeCast b HFalse => HEq x y b
-instance TypeCast b HTrue => HEq x x b
-hEq :: HEq x y b => x -> y -> b
-hEq = undefined
 
-newtype ArrayRecord r = ArrayRecord (Array Int Any)
-arrayRow :: ArrayRecord r -> r
-arrayRow = undefined
-data RowNil
-data RowCons field tail
-rowField :: RowCons field tail -> field
-rowField = undefined
-rowTail :: RowCons field tail -> tail
-rowTail = undefined
-
-emptyArrayRecord :: ArrayRecord RowNil
-emptyArrayRecord = ArrayRecord (listArray (0, 0) [])
-
---instance
---    HExtend e (ArrayRecord r) (ArrayRecord (RowCons e r))
---    where
---    e .*. (ArrayRecord a) =
---      ArrayRecord (listArray (0, 1 + snd (bounds a)) (unsafeCoerce e:elems a))
-
-class ArrayRank r l v | r l -> v where
-  arrayRank :: r -> l -> Int
-instance ArrayRank (RowCons (Field l v) r) l v where
-  arrayRank _ _ = 0
-instance
-    ArrayRank r l v =>
-    ArrayRank (RowCons (Field l2 v) r) l v where
-    arrayRank r l = 1 + arrayRank (rowTail r) l
-
---instance
---    ArrayRank r l v =>
---    HHasField l (ArrayRecord r) v
---    where
---    r@(ArrayRecord a) # l = unsafeCoerce (a ! arrayRank (arrayRow r) l)
 \end{code}
 %endif
 
@@ -158,19 +118,34 @@ Although there have been many different proposals for Extensible Records in Hask
 \cite{Gaster96apolymorphic, Jones99lightweightextensible, LabeledFunctions, Leijen:fclabels, Leijen:scopedlabels},
 it is still an open problem to find an implementation that manipulates records with satisfactory efficiency.
 Imperative dynamic languages use hash tables for objects,
-achieving constant time insertion and lookup,
-but this implementation does not allow for persistency as required for functional languages.
+achieving constant time insertion and lookup.
+Inserting a field changes the table in place,
+destructing the old version of the object,
+not allowing for persistency as required in functional languages.
+Copying the underlying array of the hash table
+to preserve the old version makes insertion slower.
+
+Clojure \cite{Hickey:2008:CPL:1408681.1408682} implements vectors with trees of small contiguous arrays,
+so insertion is logarithmic due to structural sharing. 
+Clojure's hash map, built on top of vectors,
+then achieves logarithmic time insertion and look-up.
+
 The usual strategies for record insertion in functional languages are
 copying all existing fields along with the new one to a brand new tuple,
 or using a linked list.
 The tuple strategy offers the fastest possible lookup, but insertion is linear time.
 The linked list sits in opposite in the tradeoff curve,
 with constant time insertion but linear time lookup.
+
 Since a record is essentially a dictionary,
 the obvious strategy to bridge this gap is a search tree.
 While lookup is much improved to logarithmic time,
 insertion is also hit and rendered logarithmic.
-A bigger turnoff is that we would need to devise an order for the field labels.
+
+Hash maps and ordered trees need hashing and compare functions.
+This ends up being the biggest turnoff for these techniques in our setting.
+Types, standing as field labels, don't have natural, readily accessible implementations
+for these functions.
 
 This paper aims to contribute a solution in that direction. 
 Our starting point is the library for strongly typed heterogeneous collections HList \cite{KLS04}
@@ -339,11 +314,6 @@ label  =   undefined
 \end{code}
 
 We define separate types and constructors for labels.
-|HList| defines the key typeclass |HEq| so that
-a proxy only equals itself.
-
-
-Thus, the following defines a record (|rList|) with seven fields:
 
 \begin{code}
 data L1 = L1
@@ -353,7 +323,11 @@ data L4 = L4
 data L5 = L5
 data L6 = L6
 data L7 = L7
+\end{code}
 
+Thus, the following defines a record (|rList|) with seven fields:
+
+\begin{code}
 rList =
   (L1  .=.  True     )  `HCons` 
   (L2  .=.  9        )  `HCons` 
@@ -383,8 +357,27 @@ For example, the following expression returns the string |"last"|:
 lastList = hListGet rList L7
 \end{code}
 
-HList provides |HEq| to avoid overlapping instances everywhere else.
-Here |HListGet| uses |HEq| to discriminate the two possible cases.
+Instead of polluting the definitions of type-level functions
+with the overlapping instance extension,
+HList encapsulates type comparison in |HEq|.
+
+\begin{code}
+class HEq x y b | x y -> b
+hEq :: HEq x y b => x -> y -> b
+hEq = undefined
+\end{code}
+
+We'll not delve into the different possible definitions for |HEq|.
+For completeness, here's one that suffices for our purposes.
+
+\begin{code}
+class TypeCast x y | x -> y, y -> x
+instance TypeCast x x
+instance TypeCast b HFalse => HEq x y b
+instance TypeCast b HTrue => HEq x x b
+\end{code}
+
+|HListGet| uses |HEq| to discriminate the two possible cases.
 Either the label of the current field matches |l|,
 or the search must continue to the next node.
 
@@ -475,6 +468,19 @@ So we just store our field unordered in a structure
 that allows fast random access and depend on the compiler to
 hardcode the path to our fields.
 
+We'll present two variants of faster records.
+The first follows the conventional approach of
+storing the record as a tuple.
+But because ghc doesn't offer
+genericity over the length of tuples as in \cite{Tullsen00thezip},
+we'll use an array instead,
+converting field values to |Any| via |unsafeCoerce|,
+since array elements must be of the same type.
+Apart from these breach of type safety,
+the implementation supports linear time insertions
+and constant time look-ups.
+
+The second variant is tree like.
 Following \cite{OkaThesis} we chose Skew Binary Random-Access Lists.
 Other, perhaps simpler, data structures
 such as Braun trees \cite{brauntrees}
@@ -485,6 +491,87 @@ applications heavy on record modification.
 That aside, the key property
 of searching at compile time while retrieving at run time
 works unchanged in other balanced tree structures.
+
+\subsection{Array Records}\label{sec:array}
+
+An Array Record has two fields:
+the array itself and an |HList| to find a field's rank
+for look-up.
+The array type is |Any| and items are |unsafeCoerce|d
+on the way in and out.
+A proper implementation would hide the data constructor
+in a separate module to ensure type safety.
+\begin{code}
+data ArrayRecord r =
+  ArrayRecord r (Array Int Any)
+arrayEmptyRecord =
+  ArrayRecord HNil (listArray (0, 0) [])
+\end{code}
+
+|hArrayExtend| adds a field to an array record.
+The new field is added to the |HList| of the old record,
+which is then converted to a plain Haskell list with |HMapAny|
+and turned into the array of the new record with |listArray|.
+Note that the array of the old record is not used.
+In this way, if several fields are added to a record
+but look-up is not done on the intermediate records,
+the intermediate arrays are not ever created by virtue of the language laziness.
+Adding n fields is then a linear time operation instead of quadratic.
+This optimization is the reason an |ArrayRecord| contains the actual corresponding |HList|
+instead of just the field value type relation as a phantom parameter.
+\begin{code}
+class HMapAny r where
+  hMapAny :: r -> [Any]
+instance HMapAny HNil where
+  hMapAny _ = []
+instance
+  HMapAny r =>
+  HMapAny (HCons (Field l v) r)
+  where
+  hMapAny (HCons (Field v) r) =
+    unsafeCoerce v : hMapAny r
+
+infixr 2 `hArrayExtend`
+hArrayExtend f (ArrayRecord r _) =
+  let r' = HCons f r in
+  let list = hMapAny r' in
+  ArrayRecord r' (listArray (0, length list) list)
+\end{code}
+
+Finally, look-up is done as a two step operation.
+First the rank or position of a certain label is found with |ArrayRank|.
+The function returns both the type of the field value
+and the index of the field in the record.
+|ArrayRank| follows the pattern of |HListGet| earlier.
+Second the index obtained is used
+to retrieve the correct element from the array.
+\begin{code}
+class ArrayRank r l v | r l -> v where
+  arrayRank :: r -> l -> Int
+instance
+    (  HEq l l' b
+    ,  ArrayRank' b v' r' l v) =>
+       ArrayRank (HCons (Field l' v') r') l v where
+    arrayRank (HCons f'@(Field v') r') l =
+        arrayRank' (hEq l (label f')) v' r' l
+ 
+class ArrayRank' b v' r l v | b v' r l -> v where
+    arrayRank':: b -> v' -> r -> l -> Int
+instance
+    ArrayRank' HTrue v r l v
+    where
+    arrayRank' _ _ _ _ = 0
+instance
+    ArrayRank r l v =>
+    ArrayRank' HFalse v' r l v where
+    arrayRank' _ _ r l = arrayRank r l
+
+hArrayGet :: ArrayRank r l v =>
+  ArrayRecord r -> l -> v
+hArrayGet (ArrayRecord r a) l = 
+  unsafeCoerce (a ! arrayRank r l)
+
+\end{code}
 
 \subsection{Skew Binary Random-Access List}\label{sec:skew}
 
