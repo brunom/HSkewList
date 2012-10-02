@@ -447,7 +447,7 @@ that all labels searched for are available.
 For example, \cite{FlyFirstClass}, a library for first-class attribute
 grammars, uses extensible records to encode the collection of
 attributes associated to each non-terminal. If we wanted to use it to
-implement a system with a big number of attributes (i.e. a compiler)
+implement a system with a big number of attributes (e.g. a compiler)
 an efficient structure would be needed.
 Increasing the size of GHC's context reduction stack
 makes the program compile
@@ -858,6 +858,7 @@ Later we will examine runtime benchmarks.
 
 \section{Efficiency}\label{sec:efficiency}
 
+\marcos{Actualizar graficas, agregar caso ArrayRecord. Agregar una mini-intro, incluyendo computadora usada y version de GHC.}
 We time accessing the last of an increasing number of fields.
 The program constructs the list once
 and runs a 100.000.000 iteration |(#)| loop.
@@ -1027,6 +1028,8 @@ an implementation of extensible records for Haskell that, during run-time,
 takes logarithmic time for searching and removing elements and constant time for
 inserting elements. This run time performance is achieved by moving 
 most of the effort to compile time. 
+
+\marcos{se podria decir en que casos es mejor usar Skew y en cuales Array}
 
 This approach can be used to improve the performance of systems
 that make extensive use of extensible records, 
