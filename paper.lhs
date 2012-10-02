@@ -100,7 +100,7 @@ to develop a more efficient representation of extensible records for HList.
 We propose an internal encoding for extensible records
 that does lookup in logarithmic time
 without needing a total order on the labels,
-while preserving the fast insertion of simple linked lists.
+while preserving the fast insertion of simple linked lists.\marcos{no se habla de la version Array}
 Through staged compilation,
 the required slow search for a field is moved to compile time. 
 \end{abstract}
@@ -153,7 +153,7 @@ which provides an example implementation of extensible records.
 A drawback of HList is that lookup, the most used operation on records,
 is linear time.
 We propose an alternative implementation for extensible records, using the same techniques as HList,
-with a lookup operation that runs in logarithmic time.  
+with a lookup operation that runs in logarithmic time. \marcos{no se habla de la version Array} 
 
 Another contribution of this paper is the trick we use to reduce the run time work.
 We have observed that, when looking-up an element in a HList,
@@ -176,7 +176,7 @@ we propose the use of an alternative structure for the representation of heterog
 is based on balanced trees.
 Such a structure better profits 
 from the information given by the compile time search, leading to logarithmic length paths in the run time traversal
-(see Figure~\ref{fig:search-skew}).
+(see Figure~\ref{fig:search-skew}). \marcos{no se habla de la version Array}
 
 Although this paper is focused on showing a more efficient implementation of extensible records,
 our aim is mainly to show how harnessing type level programming techniques it is possible
@@ -200,7 +200,7 @@ but in this paper we show it can also be helpful for efficiency matters.
 
 
 In the rest of this paper we review the type-level techniques used to implement extensible records by HList (Section~\ref{sec:hlist}) and how we use these techniques to provide an alternative implementation, based on so called skew lists \cite{Mye83,OkaThesis},
-which turns out to be faster at run time (Section~\ref{sec:faster}). 
+which turns out to be faster at run time (Section~\ref{sec:faster}).\marcos{no se habla de la version Array} 
 In Section~\ref{sec:efficiency} we show some results about the efficiency of our approach compared to HList.
 Finally, in Section~\ref{sec:conclusions} we present some conclusions and possible directions for future work.
 
@@ -441,7 +441,7 @@ lastListCore = case rList of
 \section{Faster Extensible Records}\label{sec:faster}
 
 Extensible records can double as
-"static type-safe" dictionaries, that is,
+``static type-safe" dictionaries, that is,
 collections that guarantee at compile time
 that all labels searched for are available.
 For example, \cite{FlyFirstClass}, a library for first-class attribute
@@ -452,7 +452,7 @@ an efficient structure would be needed.
 Increasing the size of GHC's context reduction stack
 makes the program compile
 but at run time the linear time lookup algorithm
-hurts performance.
+hurts performance.\marcos{queda medio raro esto}
 The usual replacement when lookup in a linked list is slow
 is a search tree.
 In that case we would need to define a |HOrd| type-function
@@ -515,9 +515,18 @@ arrayEmptyRecord =
   ArrayRecord HNil (listArray (0, 0) [])
 \end{code}
 
-|hArrayExtend| adds a field to an array record.
+%if False
+> infixr 2 `hArrayExtend`
+%endif
+We defined the function |hArrayExtend| to add a field to an array record.
+\begin{code}
+hArrayExtend f (ArrayRecord r _) =
+  let  r'    = HCons f r 
+       list  = hMapAny r' 
+  in   ArrayRecord r' (listArray (0, length list) list)
+\end{code}
 The new field is added to the |HList| of the old record,
-which is then converted to a plain Haskell list with |HMapAny|
+which is then converted to a plain Haskell list with |hMapAny|
 and turned into the array of the new record with |listArray|.
 Note that the array of the old record is not used.
 In this way, if several fields are added to a record
@@ -526,6 +535,8 @@ the intermediate arrays are not ever created by virtue of the language laziness.
 Adding n fields is then a linear time operation instead of quadratic.
 This optimization is the reason an |ArrayRecord| contains the actual corresponding |HList|
 instead of just the field value type relation as a phantom parameter.
+The function |hMapAny| iterates over the |HList| \emph{coercing} its elements to values
+of type |Any|.
 \begin{code}
 class HMapAny r where
   hMapAny :: r -> [Any]
@@ -537,21 +548,16 @@ instance
   where
   hMapAny (HCons (Field v) r) =
     unsafeCoerce v : hMapAny r
-
-infixr 2 `hArrayExtend`
-hArrayExtend f (ArrayRecord r _) =
-  let r' = HCons f r in
-  let list = hMapAny r' in
-  ArrayRecord r' (listArray (0, length list) list)
 \end{code}
 
 Finally, look-up is done as a two step operation.
 First the rank or position of a certain label is found with |ArrayRank|.
-The function returns both the type of the field value
-and the index of the field in the record.
-|ArrayRank| follows the pattern of |HListGet| earlier.
 Second the index obtained is used
 to retrieve the correct element from the array.
+
+\noindent |ArrayRank| follows the pattern of |HListGet| earlier, 
+using |hEq| to discriminate the cases of 
+the label of the current field matching or not the searched one. 
 \begin{code}
 class ArrayRank r l v | r l -> v where
   arrayRank :: r -> l -> Int
@@ -561,7 +567,10 @@ instance
        ArrayRank (HCons (Field l' v') r') l v where
     arrayRank (HCons f'@(Field v') r') l =
         arrayRank' (hEq l (label f')) v' r' l
- 
+\end{code}
+If we found the label, then the index 0 is returned.
+In other case, we increase the index by one and continue searching.
+\begin{code}
 class ArrayRank' b v' r l v | b v' r l -> v where
     arrayRank':: b -> v' -> r -> l -> Int
 instance
@@ -571,13 +580,17 @@ instance
 instance
     ArrayRank r l v =>
     ArrayRank' HFalse v' r l v where
-    arrayRank' _ _ r l = arrayRank r l
-
+    arrayRank' _ _ r l = 1 + arrayRank r l
+\end{code}
+The function |ArrayRank| returns both the type of the field value (at type-level)
+and the index of the field in the record (at value-level).
+In |hArrayGet|, we use the index to obtain the element from the array and the
+type (|v|) to coerce the element to its correct type.
+\begin{code}
 hArrayGet :: ArrayRank r l v =>
   ArrayRecord r -> l -> v
 hArrayGet (ArrayRecord r a) l = 
   unsafeCoerce (a ! arrayRank r l)
-
 \end{code}
 
 \subsection{Skew Binary Random-Access List}\label{sec:skew}
