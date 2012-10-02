@@ -183,6 +183,13 @@ our aim is mainly to show how harnessing type level programming techniques it is
 to improve the run time performance of some operations by moving certain computations to compile time.
 Type level programming is commonly used to increase the expressivity and type safety of programs,
 but in this paper we show it can also be helpful for efficiency matters. 
+\begin{figure}[htp]
+\begin{center}
+\includegraphics[scale=0.5]{search-array.pdf}
+\end{center}
+\caption{Search |l7| in Array} \label{fig:search-array}
+\end{figure}
+
 
 \begin{figure}[htp]
 \begin{center}
@@ -367,8 +374,8 @@ hEq :: HEq x y b => x -> y -> b
 hEq = undefined
 \end{code}
 
-We'll not delve into the different possible definitions for |HEq|.
-For completeness, here's one that suffices for our purposes.
+We will not delve into the different possible definitions for |HEq|.
+For completeness, here is one that suffices for our purposes.
 
 \begin{code}
 class TypeCast x y | x -> y, y -> x
@@ -411,7 +418,7 @@ instance
 If the labels match, the corresponding value is returned, both at the value and type levels.
 Otherwise, |HHasFieldList'| calls back to |HHasFieldList| to continue the search.  
 The two type-functions are mutually recursive.  
-There's no case for the empty list; lookup fails.
+There is no case for the empty list; lookup fails.
 
 At the value level, the functions |hListGet| and |hListGet'| are trivial,
 devoid of logic and conditions.
@@ -468,12 +475,12 @@ So we just store our field unordered in a structure
 that allows fast random access and depend on the compiler to
 hardcode the path to our fields.
 
-We'll present two variants of faster records.
+We will present two variants of faster records.
 The first follows the conventional approach of
 storing the record as a tuple.
-But because ghc doesn't offer
+But because ghc does not offer
 genericity over the length of tuples as in \cite{Tullsen00thezip},
-we'll use an array instead,
+we will use an array instead,
 converting field values to |Any| via |unsafeCoerce|,
 since array elements must be of the same type.
 Apart from these breach of type safety,
@@ -833,7 +840,7 @@ lastSkewCore = case rSkew of
 \end{code}
 Thus, getting to |l7| at run time only traverses a (logarithmic length) fraction of the elements,
 as we have seen in Figure~\ref{fig:search-skew}.
-Later we'll examine runtime benchmarks.
+Later we will examine runtime benchmarks.
 
 
 \section{Efficiency}\label{sec:efficiency}
