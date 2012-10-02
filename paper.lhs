@@ -504,8 +504,8 @@ works unchanged in other balanced tree structures.
 An Array Record has two fields:
 the array itself and an |HList| to find a field's rank
 for look-up.
-The array type is |Any| and items are |unsafeCoerce|d
-on the way in and out.
+The array type is |Any|\footnote{A special type that can be used as a safe placeholder for any value.} 
+and items are |unsafeCoerce|d on the way in and out.
 A proper implementation would hide the data constructor
 in a separate module to ensure type safety.
 \begin{code}
@@ -534,7 +534,7 @@ but look-up is not done on the intermediate records,
 the intermediate arrays are not ever created by virtue of the language laziness.
 Adding n fields is then a linear time operation instead of quadratic.
 This optimization is the reason an |ArrayRecord| contains the actual corresponding |HList|
-instead of just the field value type relation as a phantom parameter.
+instead of just the field value type relation as a phantom parameter (i.e. only at type-level).
 The function |hMapAny| iterates over the |HList| \emph{coercing} its elements to values
 of type |Any|.
 \begin{code}
