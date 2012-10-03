@@ -509,11 +509,10 @@ works unchanged in other balanced tree structures.
 
 \subsection{Array Records}\label{sec:array}
 
-An Array Record has two fields:
-the array itself and an |HList| to find a field's rank
-for look-up.
-The array type is |Any|\footnote{A special type that can be used as a safe placeholder for any value.} 
-and items are |unsafeCoerce|d on the way in and out.
+An Array Record has two components:
+an array containing the values of the fields, and an heterogeneous list used to find a field's ordinal for look-up in the array.
+To allow the storage of elements of different types in the array, we use |Any|\footnote{A special type that can be used as a safe placeholder for any value.} as the array. 
+Items are then |unsafeCoerce|d on the way in and out.
 A proper implementation would hide the data constructor
 in a separate module to ensure type safety.
 \alberto{type safety o type abstraction?}
@@ -524,29 +523,40 @@ data ArrayRecord r =
 arrayEmptyRecord =
   ArrayRecord HNil (listArray (0, 0) [])
 \end{code}
+\alberto{no me gusta mucho el uso del Any, pero parece medio inevitable. una alternativa es usar un tipo existencial, pero se termina en algo similar.}
 
+\alberto{el caso para HNil deberia ser |array (1,0) []| que define un array vacio. |listArray (0, 0) []| define un array de un elemento valiendo bottom.}
 
-We defined the function |hArrayExtend| to add a field to an array record.
+\alberto{le llamaria |emptyArrayRecord|}
+
+Function |hArrayExtend| adds a field to an array record.
+%
 \begin{code}
 hArrayExtend f (ArrayRecord r _) =
-  let  r'    = HCons f r 
-       list  = hMapAny r' 
-  in   ArrayRecord r' (listArray (0, length list) list)
+  let  r'  = HCons f r 
+       fs  = hMapAny r' 
+  in   ArrayRecord r' (listArray (0, length fs) fs)
 infixr 2 `hArrayExtend`
 \end{code}
 \bruno{hArrayExtend tb quiere ser infix}
-The new field is added to the |HList| of the old record,
+
+\alberto{yo sacaria la declaracion de infixr, no es relevante.}
+
+\alberto{se esta asignado un lugar de mas al array. deberia ser |listArray (1, length list) list| o |listArray (0, length list - 1) list|, dependiendo de como se obtiene el indice en |arrayRank|, me parece que es el ultimo.}
+
+The new field is added to the heterogeneous list of the old record,
 which is then converted to a plain Haskell list with |hMapAny|
 and turned into the array of the new record with |listArray|.
 Note that the array of the old record is not used.
 In this way, if several fields are added to a record
 but look-up is not done on the intermediate records,
-the intermediate arrays are not ever created by virtue of the language laziness.
-Adding n fields is then a linear time operation instead of quadratic.
-This optimization is the reason an |ArrayRecord| contains the actual corresponding |HList|
-instead of just the field value type relation as a phantom parameter (i.e. only at type-level).
-The function |hMapAny| iterates over the |HList| \emph{coercing} its elements to values
+the intermediate arrays are not ever created by virtue of Haskell's laziness.
+Adding $n$ fields is then a linear time operation instead of quadratic.
+This optimization is the reason why an |ArrayRecord| contains the actual corresponding |HList|
+instead of just the field value type relation as a phantom parameter (i.e. only at the type-level).
+The function |hMapAny| iterates over the heterogeneous list \emph{coercing} its elements to values
 of type |Any|.
+%
 \begin{code}
 class HMapAny r where
   hMapAny :: r -> [Any]
@@ -561,13 +571,13 @@ instance
 \end{code}
 
 Finally, look-up is done as a two step operation.
-First the rank or position of a certain label is found with |ArrayRank|.
+First the ordinal of a certain label in the record is found with |ArrayRank|.
 Second the index obtained is used
 to retrieve the correct element from the array.
-
-\noindent |ArrayRank| follows the pattern of |HListGet| earlier, 
-using |hEq| to discriminate the cases of 
-the label of the current field matching or not the searched one. 
+|ArrayRank| follows the same pattern as |HListGet| shown earlier, 
+using |HEq| to discriminate the cases of 
+the label of the current field, which may match or not the searched one. 
+%
 \begin{code}
 class ArrayRank r l v | r l -> v where
   arrayRank :: r -> l -> Int
@@ -578,27 +588,30 @@ instance
     arrayRank (HCons f'@(Field v') r') l =
         arrayRank' (hEq l (label f')) v' r' l
 \end{code}
-If we found the label, then the index 0 is returned.
-In other case, we increase the index by one and continue searching.
+%
+If the label is found, then the index 0 is returned.
+Otherwise, we increase the index by one and continue searching.
+%
 \begin{code}
 class ArrayRank' b v' r l v | b v' r l -> v where
     arrayRank':: b -> v' -> r -> l -> Int
-instance
-    ArrayRank' HTrue v r l v
+instance 
+    ArrayRank' HTrue v r l v 
     where
-    arrayRank' _ _ _ _ = 0
+      arrayRank' _ _ _ _ = 0
 instance
-    ArrayRank r l v =>
-    ArrayRank' HFalse v' r l v where
-    arrayRank' _ _ r l = 1 + arrayRank r l
+    ArrayRank r l v => ArrayRank' HFalse v' r l v 
+    where
+      arrayRank' _ _ r l = 1 + arrayRank r l
 \end{code}
-The function |ArrayRank| returns both the type of the field value (at type-level)
+%
+The function |arrayRank| returns both the type of the field value (at type-level)
 and the index of the field in the record (at value-level).
 In |hArrayGet|, we use the index to obtain the element from the array and the
 type (|v|) to coerce the element to its correct type.
+%
 \begin{code}
-hArrayGet :: ArrayRank r l v =>
-  ArrayRecord r -> l -> v
+hArrayGet :: ArrayRank r l v => ArrayRecord r -> l -> v
 hArrayGet (ArrayRecord r a) l = 
   unsafeCoerce (a ! arrayRank r l)
 \end{code}
