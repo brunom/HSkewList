@@ -515,16 +515,16 @@ arrayEmptyRecord =
   ArrayRecord HNil (listArray (0, 0) [])
 \end{code}
 
-%if False
-> infixr 2 `hArrayExtend`
-%endif
+
 We defined the function |hArrayExtend| to add a field to an array record.
 \begin{code}
 hArrayExtend f (ArrayRecord r _) =
   let  r'    = HCons f r 
        list  = hMapAny r' 
   in   ArrayRecord r' (listArray (0, length list) list)
+infixr 2 `hArrayExtend`
 \end{code}
+\bruno{hArrayExtend tb quiere ser infix}
 The new field is added to the |HList| of the old record,
 which is then converted to a plain Haskell list with |hMapAny|
 and turned into the array of the new record with |listArray|.
