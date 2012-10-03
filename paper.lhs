@@ -75,7 +75,10 @@ data HSucc n
 %\titlebanner{submitted to Haskell Symposium 2011}         % These are ignored unless
 \preprintfooter{version of Jul 21, 2012}     % 'preprint' option specified.
 
-\title{Fast Extensible Records In Haskell}
+%\title{Fast Extensible Records In Haskell}
+\title{Just Do It While Compiling!}
+\subtitle{Fast Extensible Records In Haskell}
+
 
 \authorinfo{Bruno Martinez Aguerre}
            {Instituto de Computaci\'{o}n \\ Universidad de la  Rep\'{u}blica\\ Montevideo, Uruguay}
@@ -91,18 +94,19 @@ data HSucc n
 \begin{abstract}
 \bruno{acordarse de sacar estos comentarios antes de mandar}
 The library for strongly typed heterogeneous collections HList
-provides an implementation of extensible records in Haskell
-that needs only a few common extensions of the language.
-In HList, records are represented as linked lists of label-value pairs
-with a look-up operation that is linear-time in the number of fields.
-In this paper, we use type-level programming techniques
-to develop a more efficient representation of extensible records for HList.
-We propose an internal encoding for extensible records
-that does lookup in logarithmic time
-without needing a total order on the labels,
-while preserving the fast insertion of simple linked lists.\marcos{no se habla de la version Array}
-Through staged compilation,
-the required slow search for a field is moved to compile time. 
+provides an implementation of extensible records in Haskell that needs
+only a few common extensions of the language. In HList, records are
+represented as linked lists of label-value pairs with a look-up
+operation that is linear-time in the number of fields. In this paper,
+we use type-level programming techniques to develop a more efficient
+representation of extensible records for HList. We propose two
+internal encodings for extensible records that improve lookup at
+runtime without needing a total order on the labels. One of the
+encodings performs lookup in constant time but at a cost of linear
+time insertion. The other one performs lookup in logarithmic time
+while preserving the fast insertion of simple linked lists. Through
+staged compilation, the required slow search for a field is moved to
+compile time in both cases.
 \end{abstract}
 
 \category{D.3.3}{Programming languages}{Language Constructs and Features}
@@ -684,8 +688,8 @@ instance
 \noindent
 
 |HSkewCarry| finds out if we need to take two existing trees
-and put them below a new |HNode|,
-or just insert a new |HLeaf|.
+and put them below a new |HNode| (i.e. we are in \emph{case 1}),
+or just insert a new |HLeaf| (\emph{case 2}).
 In the numerical representation of data structures,
 adding an item is incrementing the number.
 If each top level tree is a digit,
@@ -693,15 +697,24 @@ building a new taller tree is a form of carry,
 so |HSkewCarry| returns |HTrue|.
 \begin{code}
 class HSkewCarry l b | l -> b
+
+hSkewCarry :: HSkewCarry l b => l -> b
+hSkewCarry = undefined
+\end{code}
+If the spine has none or one tree we return |HFalse|.
+\begin{code}
 instance HSkewCarry HNil HFalse
 instance HSkewCarry (HCons t HNil) HFalse
+\end{code}
+In case of the spine having more than one tree, 
+we return |HTrue| if the first two trees are of equal size and
+|HFalse| otherwise.
+\begin{code}
 instance
     (  HHeight t h
     ,  HHeight t' h'
     ,  HEq h h' b) =>
        HSkewCarry (HCons t (HCons t' ts)) b
-hSkewCarry :: HSkewCarry l b => l -> b
-hSkewCarry = undefined
 \end{code}
 
 All these pieces allow us to define |HSkewExtend|,
@@ -710,6 +723,14 @@ which resembles the |HCons| constructor.
 class HSkewExtend f r r' | f r -> r'
     where hSkewExtend :: f -> r -> r'
 infixr 2 `hSkewExtend`
+\end{code}
+|HSkewExtend| looks like |HListGet| earlier.
+In this case, |HSkewCarry| is responsible for discriminating
+the current case,
+while |HListGet| used |HEq| on the two labels.
+A smart test type-function saves on repetition.
+
+\begin{code}
 instance
     (  HSkewCarry r b
     ,  HSkewExtend' b  f r r') =>
@@ -721,12 +742,6 @@ class HSkewExtend' b f r r' | b f r -> r' where
     hSkewExtend' :: b -> f -> r -> r'
 \end{code}
 \noindent
-|HSkewExtend| looks like |HListGet| earlier.
-In this case, |HSkewCarry| is responsible for discriminating
-the current case,
-while |HListGet| used |HEq| on the two labels.
-A smart test type-function saves on repetition.
-
 Here |HFalse| means that we should not add up the first two trees of the spine.
 Either the size of the trees are different, or the spine is empty or a singleton.
 We just use |HLeaf| to insert a new tree at the beginning of the spine.
@@ -739,7 +754,6 @@ instance
         (HCons (HLeaf f) r) where
     hSkewExtend' _ f r = HCons (hLeaf f) r
 \end{code}
-
 When |HSkewCarry| returns |HTrue|, however, we build a new tree reusing the two old trees at the start of the spine.
 The length of the spine is reduced in one, since we take two elements but only add one.
 \begin{code}
@@ -756,6 +770,11 @@ instance
 The missing piece is |HSkewGet|,
 which explores all paths at compile time
 but follows only the right one at run time.
+
+\begin{code}
+class HSkewGet r l v | r l -> v where
+    hSkewGet :: r -> l -> v
+\end{code}
 Deciding on the path to the desired field
 is now more involved.
 The cases that both the test function and the work function must consider
@@ -768,18 +787,15 @@ and |HJust| of the field's type/value otherwise.
 For branching constructors |HCons| and |HNode|,
 |HPlus| chooses the correct path for us.
 
-We will run |HSkewHasField| on both the spine and each tree, so we have two base cases.
+We will run |HSkewGet| on both the spine and each tree, so we have two base cases.
 |HNil| is encountered at the end of the spine, and |HEmpty| at the bottom of trees.
 In both cases, the field was not found, so we return |HNothing|.
 \begin{code}
-class HSkewGet r l v | r l -> v where
-    hSkewGet :: r -> l -> v
 instance HSkewGet HNil l HNothing where
     hSkewGet _ _ = HNothing
 instance HSkewGet HEmpty l HNothing where
     hSkewGet _ _ = HNothing
 \end{code}
-
 The |HCons| case must consider that the field may be found on the current tree or further down the spine.
 A recursive call is made for each sub case, and the results combined with |HPlus|, implemented earlier.
 If the field is found in the current tree,
@@ -793,7 +809,6 @@ instance
     hSkewGet (HCons r r') l =
         hSkewGet r l `hPlus` hSkewGet r' l
 \end{code}
-
 The |HNode| case is a bigger version of the |HCons| case.
 Here three recursive calls are made,
 for the current field, the left tree, and the right tree.
@@ -811,7 +826,6 @@ instance
             `hPlus` hSkewGet r l 
                `hPlus` hSkewGet r' l
 \end{code}
-
 And this is the case that may actually build a |HJust| result.
 As in |HHasFieldList| for linked lists, |HEq| compares both labels.
 We call |HMakeMaybe| with the result of the comparison,
