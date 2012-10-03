@@ -12,7 +12,8 @@
  \textcolor{blue}{\mbox{$^\ast$}}\marginpar{\raggedright
  \hspace{0pt}\sffamily\tiny{\sc \textcolor{blue}{todo:}}\\ \textcolor{blue}{#1}}}
 \newcommand{\bruno}[1]{\textcolor{red}{\textbf{Bruno:}#1}}
-\newcommand{\alberto}[1]{\textcolor{red}{\textbf{Alerto:}#1}}
+\newcommand{\alberto}[1]{\textcolor{red}{\textbf{Alberto: }#1}}
+\newcommand{\btext}[1]{\textcolor{blue}{#1}}
 \newcommand{\marcos}[1]{\textcolor{red}{\textbf{Marcos:}#1}}
 %\renewcommand{\bruno}[1]{}
 %\renewcommand{\alberto}[1]{}
@@ -466,24 +467,26 @@ defining such type function for
 unstructured labels is beyond (our) reach. 
 
 The key insight is that sub-linear behavior is only needed at run time.
-We are willing to keep the work done at compile time superlinear
+We are willing \alberto{yo mejor diria} \btext{We do not worry} to keep the work done at compile time superlinear
 if it helps us to speed up our programs at run time.
 |HListGet| already looks for our label at compile time
 to fail compilation if we require a field for a record
 without such label.
-So we just store our field unordered in a structure
-that allows fast random access and depend on the compiler to
+So \btext{our idea is to maintain the fields stored unordered, but} 
+%we just store our field unordered 
+in a structure that allows fast random access and depends on the compiler to
 hardcode the path to our fields.
 
 We will present two variants of faster records.
 The first follows the conventional approach of
 storing the record as a tuple.
-But because ghc does not offer
+But because GHC does not offer
 genericity over the length of tuples as in \cite{Tullsen00thezip},
+\alberto{aca lo que queres decir es que no tenes tuplas arbitrarias de largo |n| con sus correspondientes proycciones, no? si armaramos con tuplas un estructura telescopica con pares anidados, acceder un field nos quedaria un camino |fst . snd . ...| y eso es orden |n|. Este problema de las tuplas de largo |n| es una de las motivaciones de staged programming, y en particular de Template Haskell (TH). No se podra combinar lo de type-level programming con TH para en lugar de generar un array, generar una tupla de largo |n| y acceder al i-esimo elemento? tiene pinta de ser equivalente a generar el array, pero es otra alternativa.}
 we will use an array instead,
 converting field values to |Any| via |unsafeCoerce|,
 since array elements must be of the same type.
-Apart from these breach of type safety,
+Apart from this breach of type safety,
 the implementation supports linear time insertions
 and constant time look-ups.
 
@@ -498,6 +501,7 @@ applications heavy on record modification.
 That aside, the key property
 of searching at compile time while retrieving at run time
 works unchanged in other balanced tree structures.
+\alberto{no entendi bien que quisiste decir en esta ultima frase}
 
 \subsection{Array Records}\label{sec:array}
 
@@ -508,6 +512,8 @@ The array type is |Any|\footnote{A special type that can be used as a safe place
 and items are |unsafeCoerce|d on the way in and out.
 A proper implementation would hide the data constructor
 in a separate module to ensure type safety.
+\alberto{type safety o type abstraction?}
+
 \begin{code}
 data ArrayRecord r =
   ArrayRecord r (Array Int Any)
