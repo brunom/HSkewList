@@ -16,21 +16,14 @@ compile_prefix = "\
 \\n\
 \list =\n"
 
-insert_prefix = "\
-\import Paper\n\
-\\n\
-\main = go nil (iters::Int) where\n\
-\    go r i = if i == 0 then return() else let r' = (L1 .=. 1 `cons` r) in go r' (i - (r' # L1))\n\
-\ "
-
 main = bench_insert
 --ghcs = ["ghc-7.4.2", "ghc-7.6.1"]
 ghcs = ["ghc-7.6.1"]
-iters = [0, 50..0]
+iters = [5]
 data Record = Record { name :: String, cons :: String, nil :: String, get :: String }
-records = [Record "Record" "`HCons`" "HNil" "hListGet"
---          ,Record "SkewRecord" "`hSkewExtend`" "HNil" "\\r f -> case hSkewGet r f of HJust b -> b"
---          ,Record "ArrayRecord" "`hArrayExtend`" "arrayEmptyRecord" "hArrayGet"           
+records = [Record "Record" "HCons" "HNil" "hListGet"
+          ,Record "SkewRecord" "hSkewExtend" "HNil" "\\r f -> case hSkewGet r f of HJust b -> b"
+          ,Record "ArrayRecord" "hArrayExtend" "arrayEmptyRecord" "hArrayGet"           
           ] 
 dir = "bench/"
 
@@ -71,7 +64,6 @@ bench_compile = do
       hFlush stdout
     putChar '\n'
 
-
 bench_insert = do
   system "make paper.hs >&2"
   system $ "rm -rf " ++ dir
@@ -92,7 +84,22 @@ bench_insert = do
     putStr $ show iter ++ ", "
     forM_  ghcs $ \ghc -> forM_ records $ \record -> do
       let run = dir ++ "insert_" ++ show iter ++ "_" ++ ghc ++ "_" ++ name record ++ ".hs"
-      writeFile run $ insert_prefix ++ "\niters = " ++ show iter ++ "\ncons a b = a " ++ cons record ++ "b \nnil = " ++ nil record ++ "\n(#) = " ++ get record
+      writeFile run $ "\ 
+\{-# LANGUAGE NoMonomorphismRestriction #-}\n\
+\import Paper\n\
+\\n\
+\main = go (99999::Int) where\n\
+\    go i = if i == 0 then return() else go (i - (get (make i) L1) + i - 1)\n\
+\\n\
+\step r = (L1 .=. (get r L1)) `cons` r\n\
+\\n\
+\{-# NOINLINE make #-}\n\
+\make i =\n" ++
+        concat (replicate iter " step $\n") ++
+        "  (L1 .=. i `cons` nil)" ++
+        "\ncons = " ++ cons record ++
+        "\nnil = " ++ nil record ++
+        "\nget = " ++ get record ++ "\n"
       system $ "rm " ++ dir ++ ghc ++ "_dir/Main.*" -- workaround http://hackage.haskell.org/trac/ghc/ticket/7038
       call ghc run
       start <- getCurrentTime
