@@ -494,8 +494,8 @@ Apart from this breach of type safety,
 the implementation supports linear time insertions
 and constant time look-ups.
 
-The second variant is tree like.
-Following \cite{OkaThesis} we chose Skew Binary Random-Access Lists.
+The second variant is tree-like, being
+based on Skew Binary Random-Access Lists~\cite{OkaThesis}.
 Other, perhaps simpler, data structures
 such as Braun trees \cite{brauntrees}
 do not offer constant time insertion
@@ -618,9 +618,8 @@ hArrayGet (ArrayRecord r a) l =
 
 \subsection{Skew Binary Random-Access List}\label{sec:skew}
 
-We will describe Skew Binary Random-Access List \cite{Mye83} in a less principled
-but easier and more direct fashion
-than \cite{OkaThesis}, which is founded on numerical representations.
+We start with a description of Skew Binary Random-Access List \cite{Mye83} in a less principled
+but easier and more direct fashion than \cite{OkaThesis}, which is founded on numerical representations.
 A skew list is a linked list spine of complete binary trees.
 
 The invariant of skew lists is that the height of trees
@@ -630,29 +629,28 @@ Because of the size restriction,
 the spine is bounded by the logarithm of the element count,
 as is each tree.
 Hence, we can get to any element in logarithmic effort.
+This is a fundamental property of skew lists we will take advantage of. 
 
-Insertion maintaining the invariant is constant time
-and considers two cases.
-When the spine has at least two trees
-and the first two trees are of equal size (\emph{case 1}),
-we remove them and insert a new node built
-of the new element and the two trees removed.
-Else (\emph{case 2}), we just insert a new leaf.
-In Figure~\ref{fig:insert} we show a graphic representation of
-the construction of a skew list with the elements of |rList| from section \ref{sec:extensiblerecords}.
-Nodes connected by arrows represent linked-lists and nodes connected by lines represent trees.
-The first two steps (adding elements with label |l6| and |l5|) are in case 2, 
-thus two leaves are inserted into the spine. 
-On the other hand, the third step is in case 1, so a node has to be made with the new element and the 
-two previous sub-trees.
-
-
-\begin{figure}[htp]
+\begin{figure}[thp]
 \begin{center}
 \includegraphics[scale=0.5]{insert.pdf}
 \end{center}
 \caption{Insertion in a Skew} \label{fig:insert}
 \end{figure}
+
+Insertion maintaining the invariant is constant time
+and considers two cases: 
+(1) when the spine has at least two trees
+and the first two trees are of equal size,
+we remove them and insert a new node built
+of the new element and the two trees removed; and
+(2) we just insert a new leaf.
+In Figure~\ref{fig:insert} we show a graphic representation of
+the successive skew lists that arise in the process of construction of a skew list with the elements of |rList| from section \ref{sec:extensiblerecords}.
+Nodes connected by arrows represent linked-lists and nodes connected by lines represent trees.
+The first two steps (adding elements with label |l7| and |l6|) are in case (2), 
+thus two leaves are inserted into the spine. 
+On the other hand, the third step (adding an element with label |l5|) is in case (1), so a node has to be built with the new element as root and the two previous trees as subtrees.
 
 Skew lists are not optimal for merging records.  In the view of tree
 instances as numbers, merging is equivalent to number addition.  Some
@@ -664,7 +662,7 @@ access to some elements.
 
 In this subsection we present our implementation of extensible records
 using (heterogeneous) skew lists. 
-First, we introduce some types to model the structure:
+First, we introduce some types to model heterogeneous binary trees:
 
 \begin{code}
 data  HEmpty           =  HEmpty
@@ -680,8 +678,10 @@ hLeaf        e         =  HNode e HEmpty HEmpty
 The element precedes the subtrees in |HNode|
 so all elements in expressions read in order left to right.
 The common leaf case warrants the helper type |HLeaf|
-and smart constructor |hLeaf|.
-The following declarations define a list with the elements of the fourth step of Figure~\ref{fig:insert}:
+and the smart constructor |hLeaf|. 
+
+A (heterogeneous) skew list is then defined as a heterogeneous list of (heterogeneous) binary trees. 
+The following declarations define a skew list with the elements of the fourth step of Figure~\ref{fig:insert}:
 
 \begin{code}
 four =
@@ -697,6 +697,7 @@ four =
 \noindent
 |HHeight| returns the height of a tree.
 We will use it to detect the case of two leading equal height trees in the spine.
+%
 \begin{code}
 class HHeight t h | t -> h
 instance HHeight HEmpty HZero
@@ -706,28 +707,35 @@ instance
 \end{code}
 \noindent
 
-|HSkewCarry| finds out if we need to take two existing trees
-and put them below a new |HNode| (i.e. we are in \emph{case 1}),
-or just insert a new |HLeaf| (\emph{case 2}).
+\alberto{cuidado que |HZero| y |HSucc| no estan definidos en el paper. habria que agregarlos en la seccion de |HList|.}
+
+|HSkewCarry| finds out if a skew list |l| is in case (1) or (2). This will be used for insertion to decide whether we need to take the two leading existing trees
+and put them below a new |HNode| (case 1),
+or just insert a new |HLeaf| (case 2).
 In the numerical representation of data structures,
 adding an item is incrementing the number.
 If each top level tree is a digit,
 building a new taller tree is a form of carry,
 so |HSkewCarry| returns |HTrue|.
+%
 \begin{code}
 class HSkewCarry l b | l -> b
 
 hSkewCarry :: HSkewCarry l b => l -> b
 hSkewCarry = undefined
 \end{code}
-If the spine has none or one tree we return |HFalse|.
+%
+\alberto{no quedaria mejor definir |hSkewCarry| como metodo de |HSkewCarry|?}
+If the spine has none or one single tree we return |HFalse|.
 \begin{code}
 instance HSkewCarry HNil HFalse
 instance HSkewCarry (HCons t HNil) HFalse
 \end{code}
-In case of the spine having more than one tree, 
+%
+In case the spine has more than one tree, 
 we return |HTrue| if the first two trees are of equal size and
 |HFalse| otherwise.
+%
 \begin{code}
 instance
     (  HHeight t h
@@ -743,11 +751,12 @@ class HSkewExtend f r r' | f r -> r'
     where hSkewExtend :: f -> r -> r'
 infixr 2 `hSkewExtend`
 \end{code}
-|HSkewExtend| looks like |HListGet| earlier.
-In this case, |HSkewCarry| is responsible for discriminating
+|HSkewExtend| looks like |HListGet| shown earlier.
+|HSkewCarry| is now responsible for discriminating
 the current case,
 while |HListGet| used |HEq| on the two labels.
 A smart test type-function saves on repetition.
+\alberto{quien es esa \emph{smart test type-function}? es |hSkewExtend'|? decir explicitamente a cual se refiere.} 
 
 \begin{code}
 instance
@@ -762,7 +771,7 @@ class HSkewExtend' b f r r' | b f r -> r' where
 \end{code}
 \noindent
 Here |HFalse| means that we should not add up the first two trees of the spine.
-Either the size of the trees are different, or the spine is empty or a singleton.
+Either the size of the two leading trees are different, or the spine is empty or a singleton.
 We just use |HLeaf| to insert a new tree at the beginning of the spine.
 \begin{code}
 instance
@@ -773,8 +782,10 @@ instance
         (HCons (HLeaf f) r) where
     hSkewExtend' _ f r = HCons (hLeaf f) r
 \end{code}
-When |HSkewCarry| returns |HTrue|, however, we build a new tree reusing the two old trees at the start of the spine.
+%
+When |HSkewCarry| returns |HTrue|, however, we build a new tree reusing the two trees that were at the start of the spine.
 The length of the spine is reduced in one, since we take two elements but only add one.
+%
 \begin{code}
 instance
     HSkewExtend'
@@ -786,7 +797,8 @@ instance
         (HCons (HNode f t t') r)
 \end{code}
 
-The missing piece is |HSkewGet|,
+%The missing piece is
+Now, we turn to the introduction of |HSkewGet|,
 which explores all paths at compile time
 but follows only the right one at run time.
 
@@ -798,13 +810,14 @@ Deciding on the path to the desired field
 is now more involved.
 The cases that both the test function and the work function must consider
 are more numerous and long.
+\alberto{no me queda claro quienes serian la test function y la work function. ademas, no seria worker function?}
 Thus, we merge both functions.
 |HSkewGet| returns a type level and value level Maybe,
 that is,
 |HNothing| when no field with the label is found,
 and |HJust| of the field's type/value otherwise.
 For branching constructors |HCons| and |HNode|,
-|HPlus| chooses the correct path for us.
+|HPlus| (presented in subsection~\ref{sec:hlist}) chooses the correct path for us.
 
 We will run |HSkewGet| on both the spine and each tree, so we have two base cases.
 |HNil| is encountered at the end of the spine, and |HEmpty| at the bottom of trees.
@@ -816,9 +829,10 @@ instance HSkewGet HEmpty l HNothing where
     hSkewGet _ _ = HNothing
 \end{code}
 The |HCons| case must consider that the field may be found on the current tree or further down the spine.
-A recursive call is made for each sub case, and the results combined with |HPlus|, implemented earlier.
+A recursive call is made for each sub-case, and the results are combined with |HPlus|.
 If the field is found in the current tree,
 |HPlus| returns it, otherwise, it returns what the search down the spine did.
+%
 \begin{code}
 instance
     (  HSkewGet r   l vr
@@ -828,10 +842,12 @@ instance
     hSkewGet (HCons r r') l =
         hSkewGet r l `hPlus` hSkewGet r' l
 \end{code}
+%
 The |HNode| case is a bigger version of the |HCons| case.
 Here three recursive calls are made,
 for the current field, the left tree, and the right tree.
 Thus two |HPlus| calls are needed to combine the result.
+%
 \begin{code}
 instance
     (  HSkewGet f   l vf
@@ -845,10 +861,12 @@ instance
             `hPlus` hSkewGet r l 
                `hPlus` hSkewGet r' l
 \end{code}
-And this is the case that may actually build a |HJust| result.
+%
+And this is the case \alberto{cual, la que sigue o la anterior? no queda bien arrancar la orcion con And.....} that may actually build a |HJust| result.
 As in |HHasFieldList| for linked lists, |HEq| compares both labels.
 We call |HMakeMaybe| with the result of the comparison,
 and |HNothing| or |HJust| is returned as appropriate.
+%
 \begin{code}
 instance
     (  HEq l l' b
@@ -861,7 +879,10 @@ instance
 \end{code}
 
 When we repeat the experiment at the end of subsection \ref{sec:extensiblerecords}, 
-but using |emptySkewRecord| to construct a |SkewRecord|:
+but using |emptySkewRecord| to construct a |SkewRecord|: \alberto{quien es |emptySkewRecord|?} 
+
+\alberto{yo capaz definiria un smart constructor que se llamara |hSkewEmpty| o por el estilo y lo pondria en lugar de HNil en la expresion de |rSkew|.}
+%
 \begin{code}
 rSkew =
   (L1  .=.  True     )  `hSkewExtend` 
