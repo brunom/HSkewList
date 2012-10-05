@@ -521,7 +521,7 @@ in a separate module to ensure type safety.
 data ArrayRecord r =
   ArrayRecord r (Array Int Any)
 arrayEmptyRecord =
-  ArrayRecord HNil (listArray (0, 0) [])
+  ArrayRecord HNil (listArray (0, -1) [])
 \end{code}
 \alberto{no me gusta mucho el uso del Any, pero parece medio inevitable. una alternativa es usar un tipo existencial, pero se termina en algo similar.}
 
@@ -535,7 +535,7 @@ Function |hArrayExtend| adds a field to an array record.
 hArrayExtend f (ArrayRecord r _) =
   let  r'  = HCons f r 
        fs  = hMapAny r' 
-  in   ArrayRecord r' (listArray (0, length fs) fs)
+  in   ArrayRecord r' (listArray (0, length fs - 1) fs)
 infixr 2 `hArrayExtend`
 \end{code}
 \bruno{hArrayExtend tb quiere ser infix}
@@ -543,6 +543,7 @@ infixr 2 `hArrayExtend`
 \alberto{yo sacaria la declaracion de infixr, no es relevante.}
 
 \alberto{se esta asignado un lugar de mas al array. deberia ser |listArray (1, length list) list| o |listArray (0, length list - 1) list|, dependiendo de como se obtiene el indice en |arrayRank|, me parece que es el ultimo.}
+\bruno{cierto, puse el -1, porque arrayRank devuelve 0 para el primero. parece que el que disenio los arreglos de haskell no leyo su dijkstra}
 
 The new field is added to the heterogeneous list of the old record,
 which is then converted to a plain Haskell list with |hMapAny|
@@ -585,9 +586,10 @@ instance
     (  HEq l l' b
     ,  ArrayRank' b v' r' l v) =>
        ArrayRank (HCons (Field l' v') r') l v where
-    arrayRank (HCons f'@(Field v') r') l =
+    arrayRank ~(HCons f'@(Field v') r') l =
         arrayRank' (hEq l (label f')) v' r' l
 \end{code}
+\bruno{atenti el lazy pattern para que ghc no haga el pattern matching al pedo. TODO explicarlo}
 %
 If the label is found, then the index 0 is returned.
 Otherwise, we increase the index by one and continue searching.
