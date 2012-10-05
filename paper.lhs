@@ -27,6 +27,7 @@
 
 %format forall = "\forall"
 %format exists = "\exists"
+%format ^ = "\;"
 
 %format ~         = "\mathbin{\;\sim\!}"
 %format .*.       = "\mathbin{.\!\!*\!\!.}"
@@ -97,7 +98,7 @@ data HSucc n
 The library for strongly typed heterogeneous collections HList
 provides an implementation of extensible records in Haskell that needs
 only a few common extensions of the language. In HList, records are
-represented as linked lists of label-value pairs with a look-up
+represented as linked lists of label-value pairs with a lookup
 operation that is linear-time in the number of fields. In this paper,
 we use type-level programming techniques to develop a more efficient
 representation of extensible records for HList. We propose two
@@ -133,7 +134,7 @@ to preserve the old version makes insertion slower.
 Clojure \cite{Hickey:2008:CPL:1408681.1408682} implements vectors with trees of small contiguous arrays,
 so insertion is logarithmic due to structural sharing. 
 Clojure's hash map, built on top of vectors,
-then achieves logarithmic time insertion and look-up.
+then achieves logarithmic time insertion and lookup.
 
 The usual strategies for record insertion in functional languages are
 copying all existing fields along with the new one to a brand new tuple,
@@ -188,12 +189,6 @@ our aim is mainly to show how harnessing type level programming techniques it is
 to improve the run time performance of some operations by moving certain computations to compile time.
 Type level programming is commonly used to increase the expressivity and type safety of programs,
 but in this paper we show it can also be helpful for efficiency matters. 
-\begin{figure}[htp]
-\begin{center}
-\includegraphics[scale=0.5]{search-array.pdf}
-\end{center}
-\caption{Search |l7| in Array} \label{fig:search-array}
-\end{figure}
 
 
 \begin{figure}[htp]
@@ -378,16 +373,26 @@ class HEq x y b | x y -> b
 hEq :: HEq x y b => x -> y -> b
 hEq = undefined
 \end{code}
-
+%
 We will not delve into the different possible definitions for |HEq|.
 For completeness, here is one that suffices for our purposes.
-
+\begin{code}
+instance                HEq x x HTrue
+instance b ~ HFalse =>  HEq x y b
+\end{code}
+%if False
 \begin{code}
 class TypeCast x y | x -> y, y -> x
 instance TypeCast x x
 instance TypeCast b HFalse => HEq x y b
 instance TypeCast b HTrue => HEq x x b
 \end{code}
+%endif
+At this point we can see that the use of overlapping instances is unavoidable. This explains why 
+the implementation of HList is based on type classes and functional dependencies instead of \emph{type families} \cite{ref-type-families} (which do not support overlapping instances). 
+\alberto{el siguiente texto se podria usar en las conclusiones. 
+\emph{This is the main reason why we base our development on functional dependencies. 
+Case further investigation on type families solve this problem we would be able to rephrase our implementation in terms of type families with a trivial translation, achieving a more functional style implementation.}}
 
 |HListGet| uses |HEq| to discriminate the two possible cases.
 Either the label of the current field matches |l|,
@@ -471,12 +476,12 @@ defining such type function for
 unstructured labels is beyond (our) reach. 
 
 The key insight is that sub-linear behavior is only needed at run time.
-We are willing \alberto{yo mejor diria} \btext{We do not worry} to keep the work done at compile time superlinear
+We do not worry to keep the work done at compile time superlinear
 if it helps us to speed up our programs at run time.
 |HListGet| already looks for our label at compile time
 to fail compilation if we require a field for a record
 without such label.
-So \btext{our idea is to maintain the fields stored unordered, but} 
+So our idea is to maintain the fields stored unordered, but
 %we just store our field unordered 
 in a structure that allows fast random access and depends on the compiler to
 hardcode the path to our fields.
@@ -484,97 +489,60 @@ hardcode the path to our fields.
 We will present two variants of faster records.
 The first follows the conventional approach of
 storing the record as a tuple.
-But because GHC does not offer
-genericity over the length of tuples as in \cite{Tullsen00thezip},
+However, because Haskell does not offer
+genericity over the length of tuples as in \cite{Tullsen00thezip}, i.e. efficient access to the $i$-th element of an arbitrary length tuple,
+%if False
 \alberto{aca lo que queres decir es que no tenes tuplas arbitrarias de largo |n| con sus correspondientes proycciones, no? si armaramos con tuplas un estructura telescopica con pares anidados, acceder un field nos quedaria un camino |fst . snd . ...| y eso es orden |n|. Este problema de las tuplas de largo |n| es una de las motivaciones de staged programming, y en particular de Template Haskell (TH). No se podra combinar lo de type-level programming con TH para en lugar de generar un array, generar una tupla de largo |n| y acceder al i-esimo elemento? tiene pinta de ser equivalente a generar el array, pero es otra alternativa.}
-we will use an array instead,
-converting field values to |Any| via |unsafeCoerce|,
-since array elements must be of the same type.
-Apart from this breach of type safety,
-the implementation supports linear time insertions
-and constant time look-ups.
+%endif
+we will use an array instead, converting field values to a common type.
+%|Any| via |unsafeCoerce|,
+%since array elements must be of the same type.
+%Apart from this breach of type safety,
+This implementation supports linear time insertions
+and constant time lookups.
 
 The second variant is tree-like, being
-based on Skew Binary Random-Access Lists~\cite{OkaThesis}.
+based on Skew Binary Random-Access Lists~\cite{OkaThesis}, a structure that guarantees constant time  insertions and logarithmic time access to any element. 
 Other, perhaps simpler, data structures
-such as Braun trees \cite{brauntrees}
-do not offer constant time insertion
+such as Braun trees \cite{brauntrees} could have been chosen, since
+the key property
+of searching at compile time while retrieving at run time
+works unchanged in any balanced tree structure.
+However, those structures do not offer constant time insertion
 and are not drop-in replacements for simple linear lists.
 A structure with logarithmic insertion slows down
 applications heavy on record modification.
-That aside, the key property
-of searching at compile time while retrieving at run time
-works unchanged in other balanced tree structures.
-\alberto{no entendi bien que quisiste decir en esta ultima frase}
 
 \subsection{Array Records}\label{sec:array}
 
 An Array Record has two components:
-an array containing the values of the fields, and an heterogeneous list used to find a field's ordinal for look-up in the array.
-To allow the storage of elements of different types in the array, we use |Any|\footnote{A special type that can be used as a safe placeholder for any value.} as the array. 
-Items are then |unsafeCoerce|d on the way in and out.
-A proper implementation would hide the data constructor
-in a separate module to ensure type safety.
-\alberto{type safety o type abstraction?}
-
+an array containing the values of the fields, and an heterogeneous list used to find a field's ordinal for lookup in the array.
+To allow the storage of elements of different types in the array, we use the type |Any|\footnote{A special type that can be used as a safe placeholder for any value.}. 
+Items are then |unsafeCoerce|d on the way in and out based on the type information we keep in the heterogeneous list.
+%A proper implementation would hide the data constructor
+%in a separate module to ensure type safety.
+%\alberto{type safety o type abstraction?}
+%
+%
 \begin{code}
 data ArrayRecord r =
   ArrayRecord r (Array Int Any)
-arrayEmptyRecord =
-  ArrayRecord HNil (listArray (0, -1) [])
-\end{code}
-\alberto{no me gusta mucho el uso del Any, pero parece medio inevitable. una alternativa es usar un tipo existencial, pero se termina en algo similar.}
-
-\alberto{el caso para HNil deberia ser |array (1,0) []| que define un array vacio. |listArray (0, 0) []| define un array de un elemento valiendo bottom.}
-
-\alberto{le llamaria |emptyArrayRecord|}
-
-Function |hArrayExtend| adds a field to an array record.
-%
-\begin{code}
-hArrayExtend f (ArrayRecord r _) =
-  let  r'  = HCons f r 
-       fs  = hMapAny r' 
-  in   ArrayRecord r' (listArray (0, length fs - 1) fs)
-infixr 2 `hArrayExtend`
-\end{code}
-\bruno{hArrayExtend tb quiere ser infix}
-
-\alberto{yo sacaria la declaracion de infixr, no es relevante.}
-
-\alberto{se esta asignado un lugar de mas al array. deberia ser |listArray (1, length list) list| o |listArray (0, length list - 1) list|, dependiendo de como se obtiene el indice en |arrayRank|, me parece que es el ultimo.}
-\bruno{cierto, puse el -1, porque arrayRank devuelve 0 para el primero. parece que el que disenio los arreglos de haskell no leyo su dijkstra}
-
-The new field is added to the heterogeneous list of the old record,
-which is then converted to a plain Haskell list with |hMapAny|
-and turned into the array of the new record with |listArray|.
-Note that the array of the old record is not used.
-In this way, if several fields are added to a record
-but look-up is not done on the intermediate records,
-the intermediate arrays are not ever created by virtue of Haskell's laziness.
-Adding $n$ fields is then a linear time operation instead of quadratic.
-This optimization is the reason why an |ArrayRecord| contains the actual corresponding |HList|
-instead of just the field value type relation as a phantom parameter (i.e. only at the type-level).
-The function |hMapAny| iterates over the heterogeneous list \emph{coercing} its elements to values
-of type |Any|.
-%
-\begin{code}
-class HMapAny r where
-  hMapAny :: r -> [Any]
-instance HMapAny HNil where
-  hMapAny _ = []
-instance
-  HMapAny r =>
-  HMapAny (HCons (Field l v) r)
-  where
-  hMapAny (HCons (Field v) r) =
-    unsafeCoerce v : hMapAny r
 \end{code}
 
-Finally, look-up is done as a two step operation.
+Lookup is done as a two step operation.
 First the ordinal of a certain label in the record is found with |ArrayRank|.
 Second the index obtained is used
-to retrieve the correct element from the array.
+to retrieve the correct element from the array. 
+Figure~\ref{fig:search-array} shows a graphical representation of this process. 
+Dashed arrow represents the compile time search of the field in the heterogeneous list which results in the index of the element in the array. Using this index the element is retrieved from the array in constant time at run time (solid arrow).
+
+\begin{figure}[htp]
+\begin{center}
+\includegraphics[scale=0.5]{search-array.pdf}
+\end{center}
+\caption{Search |l7| in Array} \label{fig:search-array}
+\end{figure}
+
 |ArrayRank| follows the same pattern as |HListGet| shown earlier, 
 using |HEq| to discriminate the cases of 
 the label of the current field, which may match or not the searched one. 
@@ -617,6 +585,54 @@ hArrayGet :: ArrayRank r l v => ArrayRecord r -> l -> v
 hArrayGet (ArrayRecord r a) l = 
   unsafeCoerce (a ! arrayRank r l)
 \end{code}
+
+An empty |ArrayRecord| consists of an empty heterogeneous list and an empty array.
+%
+\begin{code}
+emptyArrayRecord =
+  ArrayRecord HNil (array (0, -1) [])
+\end{code}
+%
+Function |hArrayExtend| adds a field to an array record.
+%
+\begin{code}
+hArrayExtend f (ArrayRecord r _) =
+  let  r'  = HCons f r 
+       fs  = hMapAny r' 
+  in   ArrayRecord r' (listArray (0, length fs - 1) fs)
+\end{code}
+%
+%if False
+> infixr 2 `hArrayExtend`
+%endif
+%
+The new field (which includes the type information of the element) is added to the heterogeneous list of the old record. The extended heterogeneous list
+is then converted to a plain Haskell list with |hMapAny|
+and turned into the array of the new record with |listArray|.
+Note that the array of the old record is not used.
+In this way, if several fields are added to a record
+but lookup is not done on the intermediate records,
+the intermediate arrays are not ever created by virtue of Haskell's laziness.
+Adding $n$ fields is then a linear time operation instead of quadratic.
+This optimization is the reason why an |ArrayRecord| contains the actual corresponding |HList|
+instead of just the field value type relation as a phantom parameter (i.e. only at the type-level).
+The function |hMapAny| iterates over the heterogeneous list \emph{coercing} its elements to values
+of type |Any|.
+%
+\begin{code}
+class HMapAny r where
+  hMapAny :: r -> [Any]
+instance HMapAny HNil where
+  hMapAny _ = []
+instance
+  HMapAny r =>
+  HMapAny (HCons (Field l v) r)
+  where
+  hMapAny (HCons (Field v) r) =
+    unsafeCoerce v : hMapAny r
+\end{code}
+
+
 
 \subsection{Skew Binary Random-Access List}\label{sec:skew}
 
@@ -697,20 +713,20 @@ four =
 %% $ fix emacs color highlighting
 
 \noindent
-|HHeight| returns the height of a tree.
+|HHeight| returns the height of a tree, where |HZero| and |HSucc| implement naturals at type-level.
 We will use it to detect the case of two leading equal height trees in the spine.
 %
 \begin{code}
+data HZero
+data HSucc n
+^
 class HHeight t h | t -> h
-instance HHeight HEmpty HZero
-instance
-    (  HHeight t h) =>
-       HHeight (HNode e t t') (HSucc h)
+instance  HHeight HEmpty HZero
+instance  HHeight t h =>
+          HHeight (HNode e t t') (HSucc h)
 \end{code}
+
 \noindent
-
-\alberto{cuidado que |HZero| y |HSucc| no estan definidos en el paper. habria que agregarlos en la seccion de |HList|.}
-
 |HSkewCarry| finds out if a skew list |l| is in case (1) or (2). This will be used for insertion to decide whether we need to take the two leading existing trees
 and put them below a new |HNode| (case 1),
 or just insert a new |HLeaf| (case 2).
