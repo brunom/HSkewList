@@ -120,11 +120,12 @@ compile time in both cases.
 
 \section{Introduction} \label{sec:intro}
 
+\marcos{la intro quedo medio rara ahora que tenemos dos implementaciones y una de ellas usa array}
 Although there have been many different proposals for Extensible Records in Haskell 
 \cite{Gaster96apolymorphic, Jones99lightweightextensible, LabeledFunctions, Leijen:fclabels, Leijen:scopedlabels},
 it is still an open problem to find an implementation that manipulates records with satisfactory efficiency.
 Imperative dynamic languages use hash tables for objects,
-achieving constant time insertion and lookup.
+achieving constant time insertion and lookup.\marcos{esto es algo que sabemos o sospechamos? hay referencias para dar?}
 Inserting a field changes the table in place,
 destructing the old version of the object,
 not allowing for persistency as required in functional languages.
@@ -138,7 +139,7 @@ then achieves logarithmic time insertion and lookup.
 
 The usual strategies for record insertion in functional languages are
 copying all existing fields along with the new one to a brand new tuple,
-or using a linked list.
+or using a linked list. \marcos{esto es algo que sabemos o sospechamos? hay referencias para dar?}
 The tuple strategy offers the fastest possible lookup, but insertion is linear time.
 The linked list sits in opposite in the tradeoff curve,
 with constant time insertion but linear time lookup.
@@ -712,8 +713,11 @@ four =
 \end{code}
 
 %% $ fix emacs color highlighting
+We define a smart constructor |emptySkewRecord| for empty skew lists, i.e. an empty list of trees.
 
-\noindent
+> emptySkewRecord = HNil
+
+%\noindent
 |HHeight| returns the height of a tree, where |HZero| and |HSucc| implement naturals at type-level.
 We will use it to detect the case of two leading equal height trees in the spine.
 %
@@ -728,7 +732,8 @@ instance  HHeight t h =>
 \end{code}
 
 \noindent
-|HSkewCarry| finds out if a skew list |l| is in case (1) or (2). This will be used for insertion to decide whether we need to take the two leading existing trees
+|HSkewCarry| finds out if a skew list |l| is in case (1) or (2). 
+This will be used for insertion to decide whether we need to take the two leading existing trees
 and put them below a new |HNode| (case 1),
 or just insert a new |HLeaf| (case 2).
 In the numerical representation of data structures,
@@ -745,6 +750,7 @@ hSkewCarry = undefined
 \end{code}
 %
 \alberto{no quedaria mejor definir |hSkewCarry| como metodo de |HSkewCarry|?}
+\marcos{creo que esta bien como esta ahora, dado que todo se hace a type-level}
 If the spine has none or one single tree we return |HFalse|.
 \begin{code}
 instance HSkewCarry HNil HFalse
@@ -881,7 +887,9 @@ instance
                `hPlus` hSkewGet r' l
 \end{code}
 %
-And this is the case \alberto{cual, la que sigue o la anterior? no queda bien arrancar la orcion con And.....} that may actually build a |HJust| result.
+Finally, the |Field| case, when a field is found, is the case 
+%\alberto{cual, la que sigue o la anterior? no queda bien arrancar la orcion con And.....} 
+that may actually build a |HJust| result.
 As in |HHasFieldList| for linked lists, |HEq| compares both labels.
 We call |HMakeMaybe| with the result of the comparison,
 and |HNothing| or |HJust| is returned as appropriate.
@@ -898,9 +906,10 @@ instance
 \end{code}
 
 When we repeat the experiment at the end of subsection \ref{sec:extensiblerecords}, 
-but using |emptySkewRecord| to construct a |SkewRecord|: \alberto{quien es |emptySkewRecord|?} 
+but constructing a |SkewRecord| instead of an |HList|:
+% using |emptySkewRecord| to construct a |SkewRecord|: \alberto{quien es |emptySkewRecord|?} 
 
-\alberto{yo capaz definiria un smart constructor que se llamara |hSkewEmpty| o por el estilo y lo pondria en lugar de HNil en la expresion de |rSkew|.}
+%\alberto{yo capaz definiria un smart constructor que se llamara |hSkewEmpty| o por el estilo y lo pondria en lugar de HNil en la expresion de |rSkew|.}
 %
 \begin{code}
 rSkew =
@@ -911,7 +920,7 @@ rSkew =
   (L5  .=.  Nothing  )  `hSkewExtend` 
   (L6  .=.  [4,5]    )  `hSkewExtend` 
   (L7  .=.  "last"   )  `hSkewExtend` 
-  HNil
+  emptySkewRecord
 
 lastSkew = hSkewGet rSkew L7
 \end{code}
@@ -928,6 +937,7 @@ Thus, getting to |l7| at run time only traverses a (logarithmic length) fraction
 as we have seen in Figure~\ref{fig:search-skew}.
 Later we will examine runtime benchmarks.
 
+\marcos{me parece que aqui habria que insistir que esto se debe al mecanimso de resolucion de instancias y no a algo especifico de GHC}
 
 \section{Efficiency}\label{sec:efficiency}
 
