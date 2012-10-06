@@ -365,9 +365,11 @@ lastList = hListGet rList L7
 \end{code}
 
 Instead of polluting the definitions of type-level functions
-with the overlapping instance extension,
+with the overlapping instance extension when comparing two types to be equal (e.g. labels),
 HList encapsulates type comparison in |HEq|.
-
+The type equality predicate |HEq| results in |HTrue| in case the compared types are equal and |HFalse| otherwise.
+Thus, when comparing two types in other type-level functions (like |HListGet| below), 
+these two cases can be discriminated without using overlapping instances.
 \begin{code}
 class HEq x y b | x y -> b
 hEq :: HEq x y b => x -> y -> b
@@ -376,6 +378,8 @@ hEq = undefined
 %
 We will not delve into the different possible definitions for |HEq|.
 For completeness, here is one that suffices for our purposes.
+For a more complete discussion about type equality in Haskell
+we refer to \cite{type-eq}.
 \begin{code}
 instance                HEq x x HTrue
 instance b ~ HFalse =>  HEq x y b
@@ -389,10 +393,7 @@ instance TypeCast b HTrue => HEq x x b
 \end{code}
 %endif
 At this point we can see that the use of overlapping instances is unavoidable. This explains why 
-the implementation of HList is based on type classes and functional dependencies instead of \emph{type families} \cite{ref-type-families} (which do not support overlapping instances). 
-\alberto{el siguiente texto se podria usar en las conclusiones. 
-\emph{This is the main reason why we base our development on functional dependencies. 
-Case further investigation on type families solve this problem we would be able to rephrase our implementation in terms of type families with a trivial translation, achieving a more functional style implementation.}}
+the implementation of HList is based on type classes and functional dependencies instead of \emph{type families} \cite{Chak05,1086397,Schrijvers2008} (which do not support overlapping instances). 
 
 |HListGet| uses |HEq| to discriminate the two possible cases.
 Either the label of the current field matches |l|,
@@ -1113,6 +1114,10 @@ Interesting future work is to find a way to reduce compilation time.
 Experiments demonstrate that GHC memoizes class instances,
 but some particularity of our instances seem to confuse the mechanism.
 \marcos{tambien se podria decir que este es un buen ejemplo de type-level programming y que entre los trabajos futuros podría estar el probar otras tecnicas, como type families o incluso lenguages de tipos dependientes, como Agda.}
+
+\alberto{el siguiente texto se podria usar en las conclusiones. refiriendo a overlapping 
+\emph{This is the main reason why we base our development on functional dependencies. 
+Case further investigation on type families solve this problem we would be able to rephrase our implementation in terms of type families with a trivial translation, achieving a more functional style implementation.}}
 
 \bibliographystyle{plainnat}
 
