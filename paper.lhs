@@ -1115,10 +1115,10 @@ most of the effort to compile time.
 \marcos{se podria decir en que casos es mejor usar Skew y en cuales Array}
 
 This approach can be used to improve the performance of systems
-that make extensive use of extensible records, 
-like the first-class attribute grammars library AspectAG \cite{FlyFirstClass}, 
+that make extensive use of extensible records. 
+Some examples of such systems are the first-class attribute grammars library AspectAG \cite{FlyFirstClass}, 
 the OOHaskell \cite{OOHaskell} library for object-oriented functional programming,
-or the library for relational databases CoddFish \cite{SV06}.
+or libraries for relational databases such as CoddFish \cite{SV06} and HaskellDB \cite{haskelldb}.
 
 Interesting future work is to find a way to reduce compilation time.
 Experiments demonstrate that GHC memoizes class instances,
