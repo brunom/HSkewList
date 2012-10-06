@@ -532,7 +532,7 @@ data ArrayRecord r =
 \end{code}
 
 Lookup is done as a two step operation.
-First the ordinal of a certain label in the record is found with |ArrayRank|.
+First the ordinal of a certain label in the record is found with |HFind|.
 Second the index obtained is used
 to retrieve the correct element from the array. 
 Figure~\ref{fig:search-array} shows a graphical representation of this process. 
@@ -545,48 +545,52 @@ Dashed arrow represents the compile time search of the field in the heterogeneou
 \caption{Search |l7| in Array} \label{fig:search-array}
 \end{figure}
 
-|ArrayRank| follows the same pattern as |HListGet| shown earlier, 
+|HFind| follows the same pattern as |HListGet| shown earlier, 
 using |HEq| to discriminate the cases of 
 the label of the current field, which may match or not the searched one. 
 %
 \begin{code}
-class ArrayRank r l v | r l -> v where
-  arrayRank :: r -> l -> Int
+class HFind r l v | r l -> v where
+  hFind :: r -> l -> Int
 instance
     (  HEq l l' b
-    ,  ArrayRank' b v' r' l v) =>
-       ArrayRank (HCons (Field l' v') r') l v where
-    arrayRank ~(HCons f'@(Field v') r') l =
-        arrayRank' (hEq l (label f')) v' r' l
+    ,  HFind' b v' r' l v) =>
+       HFind (HCons (Field l' v') r') l v where
+    hFind ~(HCons f'@(Field v') r') l =
+        hFind' (hEq l (label f')) v' r' l
 \end{code}
-\bruno{atenti el lazy pattern para que ghc no haga el pattern matching al pedo. TODO explicarlo}
 %
 If the label is found, then the index 0 is returned.
 Otherwise, we increase the index by one and continue searching.
 %
 \begin{code}
-class ArrayRank' b v' r l v | b v' r l -> v where
-    arrayRank':: b -> v' -> r -> l -> Int
+class HFind' b v' r l v | b v' r l -> v where
+    hFind':: b -> v' -> r -> l -> Int
 instance 
-    ArrayRank' HTrue v r l v 
+    HFind' HTrue v r l v 
     where
-      arrayRank' _ _ _ _ = 0
+      hFind' _ _ _ _ = 0
 instance
-    ArrayRank r l v => ArrayRank' HFalse v' r l v 
+    HFind r l v => HFind' HFalse v' r l v 
     where
-      arrayRank' _ _ r l = 1 + arrayRank r l
+      hFind' _ _ r l = 1 + hFind r l
 \end{code}
 %
-The function |arrayRank| returns both the type of the field value (at type-level)
+The function |hFind| returns both the type of the field value (at type-level)
 and the index of the field in the record (at value-level).
+Note that the input is not examined at the value level.
+GHC reduces each invocation of hFind to a simple integer constant via inlining and constant folding,
+as any competent compiler is expected to do.
+For this to work, the |HCons| pattern must be lazy, or code needs to be generated to test the data for undefined values.
+
 In |hArrayGet|, we use the index to obtain the element from the array and the
 type (|v|) to coerce the element to its correct type.
 %
 \begin{code}
-hArrayGet :: ArrayRank r l v =>
+hArrayGet :: HFind r l v =>
   ArrayRecord r -> l -> v
 hArrayGet (ArrayRecord r a) l = 
-  unsafeCoerce (a ! arrayRank r l)
+  unsafeCoerce (a ! hFind r l)
 \end{code}
 
 An empty |ArrayRecord| consists of an empty heterogeneous list and an empty array.
