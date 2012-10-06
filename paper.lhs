@@ -583,7 +583,8 @@ In |hArrayGet|, we use the index to obtain the element from the array and the
 type (|v|) to coerce the element to its correct type.
 %
 \begin{code}
-hArrayGet :: ArrayRank r l v => ArrayRecord r -> l -> v
+hArrayGet :: ArrayRank r l v =>
+  ArrayRecord r -> l -> v
 hArrayGet (ArrayRecord r a) l = 
   unsafeCoerce (a ! arrayRank r l)
 \end{code}
