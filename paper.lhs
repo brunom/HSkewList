@@ -123,6 +123,7 @@ Although there have been many different proposals for Extensible Records in Hask
 it is still an open problem to find an implementation that manipulates records with satisfactory efficiency.
 Imperative dynamic languages use hash tables for objects,
 achieving constant time insertion and lookup.\marcos{esto es algo que sabemos o sospechamos? hay referencias para dar?}
+\bruno{sabemos pero no encuentro mejor referencia que http://en.wikipedia.org/wiki/Hashtable}
 Inserting a field changes the table in place,
 destructing the old version of the object,
 not allowing for persistency as required in functional languages.
@@ -137,6 +138,7 @@ then achieves logarithmic time insertion and lookup.
 The usual strategies for record insertion in functional languages are
 copying all existing fields along with the new one to a brand new tuple,
 or using a linked list. \marcos{esto es algo que sabemos o sospechamos? hay referencias para dar?}
+\bruno{sospechamos}
 The tuple strategy offers the fastest possible lookup, but insertion is linear time.
 The linked list sits in opposite in the tradeoff curve,
 with constant time insertion but linear time lookup.
@@ -156,8 +158,9 @@ Our starting point is the library for strongly typed heterogeneous collections H
 which provides an example implementation of extensible records. 
 A drawback of HList is that lookup, the most used operation on records,
 is linear time.
-We propose an alternative implementation for extensible records, using the same techniques as HList,
-with a lookup operation that runs in logarithmic time. \marcos{no se habla de la version Array} 
+We propose two alternative implementations for extensible records, using the same techniques as HList.
+|ArrayRecord| uses an array to hold the fields, achieving constant time lookup but linear time insertion.
+|SkewRecord| on the other hand maintains constant time insertions but lowers lookup to logarithmic time.\marcos{no se habla de la version Array} \bruno{ahora si}
 
 Another contribution of this paper is the trick we use to reduce the run time work.
 We have observed that, when looking-up an element in a HList,
@@ -944,7 +947,29 @@ Later we will examine runtime benchmarks.
 \marcos{Actualizar graficas, agregar caso ArrayRecord. Agregar una mini-intro, incluyendo computadora usada y version de GHC.}
 We time accessing the last of an increasing number of fields.
 The program constructs the list once
-and runs a 100.000.000 iteration |(#)| loop.
+and runs a 10.000.000 iteration lookup loop.
+We compile and run the program in a 4 core 2.2 Ghz Intel i7 MacBook Pro Notebook with 8 GB of RAM.
+We use GHC version 7.6.1 64 bits under OS X 10.8 Mountain Lion.
+The code is like this:
+
+\begin{code}
+main = go (9999999::Int) where
+    go i = if i == 0 then return() else go (i - hListGet (make i) L2)
+
+{-# NOINLINE make #-}
+make i = list
+
+list =
+ HCons (L1 .=. (0::Int)) $
+ HCons (L1 .=. (0::Int)) $
+ HCons (L1 .=. (0::Int)) $
+ HCons (L1 .=. (0::Int)) $
+ HCons (L2 .=. (1::Int)) HNil
+\end{code}
+
+A certain convolution is needed to ensure that Haskell's lazy nature
+does not optimize away the benchmark.
+
 Run time comparisons are shown in Figure~\ref{run_time}.
 
 \begin{figure}[h]
@@ -1022,8 +1047,8 @@ Run time comparisons are shown in Figure~\ref{run_time}.
 \label{run_time}
 \end{figure}
 
-Note how the |SkewRecord| version barely increases the run time at a logarithm rate.
-Actually, sometimes larger records run faster.
+Note how in practice |ArrayRecord| and |SkewRecord| take the same time no matter the length of the record.
+Actually, sometimes larger records run faster than smaller for |SkewRecord|.
 For example, a 31 size skew list contains a single tree,
 so elements are at most 5 hops away.
 But a 28 size skew lists contains trees sized
@@ -1046,20 +1071,17 @@ run time overhead
 above having to copy the 10 fields from the linked list to the tree
 when the limit is surpassed.
 
-Figure~\ref{compile_time} shows that compile time for both implementations grows super linearly and rapidly accelerating.
-Already at two hundred fields |SkewRecord| is unwieldy,
-while plain |Record| is still usable.
-Were we to stop the comparison there,
-it would give the impression that the structures behave qualitatively different.
-Further increase in the number of fields uncovers however
-that the difference is most likely a matter of constants.
-Others have also found performance regressions in newer ghc versions \cite{PerfLeaks} 
-and suggest constraint reordering and striving for tail calls.
-It did not work for us and it made the presentation less clear.
-As always, remember that a compiled program is run many times,
-so long compile times are amortized.
-For development, when rapid turn around is key,
-|Record| can be used, as the interface is the same.
+Figure~\ref{compile_time} shows how compile time for the three implementations grows.
+|SkewRecord| is twice as slow as |HList| records, and |ArrayRecord| falls in between.
+In previous versions of this paper that run the benchmarks with GHC version 7.4,
+|SkewRecord| was comparatively much slower and we had to advise against it for
+debugging and development, which require rapid turn around.
+When insertion is rare, we prefer |ArrayRecord| because of the compile time speed.
+Otherwise, |SkewRecord| is the best choice
+
+To improve performance, the code can be rewritten with type families. \cite{PerfLeaks} suggest constraint reordering and striving for tail calls to improve
+performance.
+It did not work for us and it made the presentation less clear, so we went with the straightforward version.
 
 \begin{figure}[h]
 \begin{center}
@@ -1162,6 +1184,7 @@ inserting elements. This run time performance is achieved by moving
 most of the effort to compile time. 
 
 \marcos{se podria decir en que casos es mejor usar Skew y en cuales Array}
+\bruno{hecho}
 
 This approach can be used to improve the performance of systems
 that make extensive use of extensible records. 
