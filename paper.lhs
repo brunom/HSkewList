@@ -60,9 +60,6 @@ import Data.Array
 import GHC.Exts
 import Unsafe.Coerce
 
-data HZero
-data HSucc n
-
 \end{code}
 %endif
 
@@ -716,7 +713,9 @@ four =
 %% $ fix emacs color highlighting
 We define a smart constructor |emptySkewRecord| for empty skew lists, i.e. an empty list of trees.
 
-> emptySkewRecord = HNil
+\begin{code}
+emptySkewRecord = HNil
+\end{code}
 
 %\noindent
 |HHeight| returns the height of a tree, where |HZero| and |HSucc| implement naturals at type-level.
@@ -725,7 +724,7 @@ We will use it to detect the case of two leading equal height trees in the spine
 \begin{code}
 data HZero
 data HSucc n
-^
+
 class HHeight t h | t -> h
 instance  HHeight HEmpty HZero
 instance  HHeight t h =>
@@ -950,15 +949,15 @@ Run time comparisons are shown in Figure~\ref{run_time}.
 
 \begin{figure}[h]
 \begin{center}
-\begin{tikzpicture}[x=0.03cm,y=0.12cm]
+\begin{tikzpicture}[x=0.03cm,y=0.15cm]
 
   \def\xmin{0}
-  \def\xmax{150}
+  \def\xmax{200}
   \def\ymin{0}
-  \def\ymax{35}
+  \def\ymax{25}
 
   % grid
-  \draw[style=help lines, xstep=10, ystep=2.5] (\xmin,\ymin) grid
+  \draw[style=help lines, xstep=12.5, ystep=2.5] (\xmin,\ymin) grid
   (\xmax,\ymax);
 
   % axes
@@ -966,39 +965,57 @@ Run time comparisons are shown in Figure~\ref{run_time}.
   \draw[->] (\xmin,\ymin) -- (\xmin,\ymax) node[above] {time (s)};
 
   % xticks and yticks
-  \foreach \x in {20,40,...,\xmax}
+  \foreach \x in {25,50,...,\xmax}
   \node at (\x, \ymin) [below] {\x};
   \foreach \y in {5,10,...,\ymax}
   \node at (\xmin,\y) [left] {\y};
 
-  \draw[blue] plot coordinates {
-    (0,  1.2)
-    (10, 3.7)
-    (20, 5.8)
-    (30, 8.0)
-    (40,  11)
-    (50,  13)
-    (60,  15)
-    (70,  17)
-    (100, 24)
-    (150, 35)
-  };
-  \node[right,blue] at (150, 35) {Record};
-
-
   \draw[red] plot coordinates {
-    (0,  1.6)
-    (10, 2.5)
-    (20, 2.7)
-    (30, 2.6)
-    (40, 2.9)
-    (50, 3.4)
-    (60, 2.9)
-    (70, 3.3)
-    (100,3.2)
-    (150,3.7)
+    (0,  0.8)
+    (10, 1.5)
+    (20, 2.4)
+    (30, 3.4)
+    (40, 4.3)
+    (50, 5.2)
+    (60, 6.5)
+    (70, 7.8)
+    (100,11.3)
+    (150,18.3)
+    (200,24.9)
   };
-  \node[right,red] at (150, 3.7) {SkewRecord};
+  \node[right,red] at (150, 25) {Record};
+
+
+  \draw[green] plot coordinates {
+    (0,  1.9)
+    (10, 1.8)
+    (20, 1.7)
+    (30, 1.8)
+    (40, 1.8)
+    (50, 1.8)
+    (60, 1.8)
+    (70, 1.8)
+    (100,1.8)
+    (150,1.8)
+    (200,1.8)
+  };
+  \node[right,green] at (150, 10) {ArrayRecord};
+
+  \draw[blue] plot coordinates {
+    (0,  0.7)
+    (10, 1.1)
+    (20, 1.2)
+    (30, 1.1)
+    (40, 1.2)
+    (50, 1.5)
+    (60, 1.2)
+    (70, 1.4)
+    (100,1.4)
+    (150,1.6)
+    (200,1.5)
+  };
+  \node[right,blue] at (150, 5) {SkewRecord};
+
 \end{tikzpicture}
 \end{center}
 \caption{Running time}
@@ -1046,15 +1063,15 @@ For development, when rapid turn around is key,
 
 \begin{figure}[h]
 \begin{center}
-\begin{tikzpicture}[x=0.012cm,y=0.030cm]
+\begin{tikzpicture}[x=0.015cm,y=0.15cm]
 
   \def\xmin{0}
-  \def\xmax{425}
+  \def\xmax{400}
   \def\ymin{0}
-  \def\ymax{140}
+  \def\ymax{35}
 
   % grid
-  \draw[style=help lines, xstep=25, ystep=10] (\xmin,\ymin) grid
+  \draw[style=help lines, xstep=25, ystep=2.5] (\xmin,\ymin) grid
   (\xmax,\ymax);
 
   % axes
@@ -1064,40 +1081,71 @@ For development, when rapid turn around is key,
   % xticks and yticks
   \foreach \x in {50,100,...,\xmax}
   \node at (\x, \ymin) [below] {\x};
-  \foreach \y in {20,40,...,\ymax}
+  \foreach \y in {5,10,...,\ymax}
   \node at (\xmin,\y) [left] {\y};
 
-  \draw[blue] plot coordinates {
-    (0, 0)
-    (30, 1.02)
-    (40, 1.18)
-    (50, 1.42)
-    (60, 1.68)
-    (70, 2.04)
-    (100, 3.30)
-    (150, 8.48)
-    (200, 16.9)
-    (250, 27.2)
-    (300, 45.9)
-    (350, 79.5)
-    (400, 103)
-    (425, 140)
-   };
-  \node[right,blue] at (150, 24) {Record};
-
   \draw[red] plot coordinates {
-    (0, 0)
-    (30, 1.31)
-    (40, 1.90)
-    (50, 2.64)
-    (60, 3.59)
-    (70, 5.07)
-    (100, 10.7)
-    (150, 31.9)
-    (200, 70.7)
-    (250, 140)
+    (0  ,0.35)
+    (25 ,0.47)
+    (50 ,0.63)
+    (75 ,0.89)
+    (100,1.15)
+    (125,1.46)
+    (150,1.87)
+    (175,2.32)
+    (200,2.88)
+    (225,3.42)
+    (250,4.11)
+    (275,4.85)
+    (300,6.12)
+    (325,6.26)
+    (350,7.53)
+    (375,8.61)
+    (400,9.64)
+   };
+  \node[right,red] at (400, 10) {Record};
+
+  \draw[green] plot coordinates {
+    (0  ,0.54)
+    (25 ,0.55)
+    (50 ,0.84)
+    (75 ,1.27)
+    (100,1.83)
+    (125,2.54)
+    (150,3.53)
+    (175,4.86)
+    (200,6.17)
+    (225,7.81)
+    (250,9.72)
+    (275,13.20)
+    (300,15.80)
+    (325,19.07)
+    (350,21.94)
+    (375,27.50)
+    (400,31.29)
   };
-  \node[right,red] at (150,110) {SkewRecord};
+  \node[right,green] at (400,30) {SkewRecord};
+
+  \draw[blue] plot coordinates {
+    (0  ,0.36)
+    (25 ,0.56)
+    (50 ,0.86)
+    (75 ,1.12)
+    (100,1.52)
+    (125,1.97)
+    (150,2.56)
+    (175,3.30)
+    (200,4.11)
+    (225,4.84)
+    (250,5.93)
+    (275,6.76)
+    (300,8.31)
+    (325,9.57)
+    (350,11.56)
+    (375,13.18)
+    (400,15.58)
+  };
+  \node[right,blue] at (400,15) {ArrayRecord};
 \end{tikzpicture}
 \end{center}
 \caption{Compile time}
