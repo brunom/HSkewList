@@ -91,7 +91,6 @@ import Unsafe.Coerce
 \maketitle
 
 \begin{abstract}
-\bruno{acordarse de sacar estos comentarios antes de mandar}
 The library for strongly typed heterogeneous collections HList
 provides an implementation of extensible records in Haskell that needs
 only a few common extensions of the language. In HList, records are
@@ -117,15 +116,15 @@ compile time in both cases.
 
 \section{Introduction} \label{sec:intro}
 
-\marcos{la intro quedo medio rara ahora que tenemos dos implementaciones y una de ellas usa array}
 Although there have been many different proposals for Extensible Records in Haskell 
 \cite{Gaster96apolymorphic, Jones99lightweightextensible, LabeledFunctions, Leijen:fclabels, Leijen:scopedlabels, Jel10},
 it is still an open problem to find an implementation that manipulates records with satisfactory efficiency.
 Imperative dynamic languages use hash tables for objects,
-achieving constant time insertion and lookup.\marcos{esto es algo que sabemos o sospechamos? hay referencias para dar?}
-\bruno{sabemos pero no encuentro mejor referencia que http://en.wikipedia.org/wiki/Hashtable}
-\marcos{hash tables heterogeneas?}
-\bruno{heterogeneas, si, porque son lenguajes dinamicos}
+achieving constant time insertion and lookup.
+%\marcos{esto es algo que sabemos o sospechamos? hay referencias para dar?}
+%\bruno{sabemos pero no encuentro mejor referencia que http://en.wikipedia.org/wiki/Hashtable}
+%\marcos{hash tables heterogeneas?}
+%\bruno{heterogeneas, si, porque son lenguajes dinamicos}
 Inserting a field changes the table in place,
 destructing the old version of the object,
 not allowing for persistency as required in functional languages.
@@ -159,8 +158,8 @@ Our starting point is the Haskell library for strongly typed heterogeneous colle
 which provides an example implementation of extensible records. 
 A drawback of HList is that lookup, the most used operation on records, is linear time.
 We propose two alternative implementations for extensible records as a Haskell library, using the same techniques as HList.
-|ArrayRecord| uses an array to hold the fields, achieving constant time lookup but linear time insertion.
-|SkewRecord| on the other hand maintains constant time insertions but lowers lookup to logarithmic time.
+One is called |ArrayRecord| since it uses an array to hold the fields, achieving constant time lookup but linear time insertion.
+The other, |SkewRecord|, is based on a balanced tree structure and maintains constant time insertions but lowers lookup to logarithmic time.
 %\marcos{no se habla de la version Array} \bruno{ahora si}
 
 Another contribution of this paper is the trick we use to reduce the run time work.
@@ -179,26 +178,30 @@ Since the structure is linear, the search and the path have the same length.
 \caption{Search |l7| in HList} \label{fig:search-hlist}
 \end{figure}
 
-Thus, the key idea is very simple. Instead of a linear structure as used by HList, 
+Thus, the key idea is very simple. When in Haskell we do |"foo" == "baar"|, the entire process of searching the correct instance of |(==)| to use is performed at compile time. No work is done at run time to search the correct instances and discard the incorrect ones. We apply the same concept to perform the search of a label into a record. Given that a label is represented by a singleton type we have enough information to determine the "path of instances" that goes to it, discarding any possible wrong path.
+
+Instead of a linear structure as used by HList, 
 we propose the use of an alternative structure for the representation of heterogeneous collections which 
 is based on balanced trees.
 Such a structure better profits 
 from the information given by the compile time search, leading to logarithmic length paths in the run time traversal
 (see Figure~\ref{fig:search-skew}). \marcos{no se habla de la version Array}
 
-Although this paper is focused on showing a more efficient implementation of extensible records,
+\begin{figure}[tp]
+\begin{center}
+\includegraphics[scale=0.5]{search-skew.pdf}
+\end{center}
+\caption{Search |l7| in balanced tree} \label{fig:search-skew}
+\end{figure}
+
+Although this paper is focused on showing more efficient implementations of extensible records,
 our aim is mainly to show how harnessing type level programming techniques it is possible
 to improve the run time performance of some operations by moving certain computations to compile time.
 Type level programming is commonly used to increase the expressivity and type safety of programs,
 but in this paper we show it can also be helpful for efficiency matters. 
 
 
-\begin{figure}[htp]
-\begin{center}
-\includegraphics[scale=0.5]{search-skew.pdf}
-\end{center}
-\caption{Search |l7| in balanced tree} \label{fig:search-skew}
-\end{figure}
+
 
 
 In the rest of this paper we review the type-level techniques used to implement extensible records 
@@ -586,6 +589,9 @@ arrayFind' ::  ArrayFind' b v' r l v n
                => b -> v' -> r -> l -> n
 arrayFind' = undefined
 ^
+data HZero
+data HSucc n
+^
 class ArrayFind' b v' r l v n | b v' r l -> v n
 instance ArrayFind' HTrue v r l v HZero
 instance (HEq l l' b, ArrayFind' b v' r l v n) 
@@ -617,14 +623,9 @@ instance ToValue (HSucc (HSucc HZero)) where
 ...
 \end{spec}
 
-\alberto{falta mencionar que se puede hacer con TH}
-
-\alberto{este parrafo hay que revisarlo, esta medio confuso lo que dice. el uso de although no es correcto. ademas, no diria que la implementacion en GHC  es mas generica, mas bien, es mas especifica porque depende de constant folding de GHC.}
 In this implementation of |ArrayFind| it is very easy to distinguish the two phases
 of the lookup process. However, the use of the function |toValue| introduces a big amount of
-boilerplate.
-\marcos{Although these instances can be automatically generated using Template Haskell,...}
-We make use of a couple of optimizations that are present in GHC to propose a less verbose implementation of |ToValue|.
+boilerplate. Although these instances can be automatically generated using Template Haskell, we make use of a couple of optimizations that are present in GHC to propose a less verbose implementation of |ToValue|.
 %We propose another less verbose implementation of |ToValue|,
 %which makes use of inlining and constant folding, two optimizations that are present in GHC.   
 %(and any ohter competent compiler) 
@@ -846,13 +847,10 @@ emptySkewRecord = HNil
 \end{code}
 
 %\noindent
-|HHeight| returns the height of a tree, where |HZero| and |HSucc| implement naturals at type-level.
+|HHeight| returns the height of a tree.
 We will use it to detect the case of two leading equal height trees in the spine.
 %
 \begin{code}
-data HZero
-data HSucc n
-
 class HHeight t h | t -> h
 instance  HHeight HEmpty HZero
 instance  HHeight t h =>
@@ -877,8 +875,6 @@ hSkewCarry :: HSkewCarry l b => l -> b
 hSkewCarry = undefined
 \end{code}
 %
-\alberto{no quedaria mejor definir |hSkewCarry| como metodo de |HSkewCarry|?}
-\marcos{creo que esta bien como esta ahora, dado que todo se hace a type-level}
 If the spine has none or one single tree we return |HFalse|.
 \begin{code}
 instance HSkewCarry HNil HFalse
@@ -908,8 +904,7 @@ infixr 2 `hSkewExtend`
 |HSkewCarry| is now responsible for discriminating
 the current case,
 while |HListGet| used |HEq| on the two labels.
-A smart test type-function saves on repetition.
-\alberto{quien es esa \emph{smart test type-function}? es |hSkewExtend'|? decir explicitamente a cual se refiere.} 
+%A smart test type-function saves on repetition.
 
 \begin{code}
 instance
@@ -963,9 +958,8 @@ class HSkewGet r l v | r l -> v where
 \end{code}
 Deciding on the path to the desired field
 is now more involved.
-The cases that both the test function and the work function must consider
+The cases that both the test function and the worker function must consider
 are more numerous and long.
-\alberto{no me queda claro quienes serian la test function y la work function. ademas, no seria worker function?}
 Thus, we merge both functions.
 |HSkewGet| returns a type level and value level Maybe,
 that is,
@@ -1066,8 +1060,6 @@ lastSkewCore = case rSkew of
 Thus, getting to |l7| at run time only traverses a (logarithmic length) fraction of the elements,
 as we have seen in Figure~\ref{fig:search-skew}.
 Later we will examine runtime benchmarks.
-
-\marcos{me parece que aqui habria que insistir que esto se debe al mecanimso de resolucion de instancias y no a algo especifico de GHC}
 
 \section{Efficiency}\label{sec:efficiency}
 
