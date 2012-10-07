@@ -618,10 +618,12 @@ instance ToValue (HSucc (HSucc HZero)) where
 
 \alberto{este parrafo hay que revisarlo, esta medio confuso lo que dice. el uso de although no es correcto. ademas, no diria que la implementacion en GHC  es mas generica, mas bien, es mas especifica porque depende de constant folding de GHC.}
 In this implementation of |ArrayFind| it is very easy to distinguish the two phases
-of the lookup process. Although, the use of function |toValue| introduces a big amount of
+of the lookup process. However, the use of the function |toValue| introduces a big amount of
 boilerplate.
-We propose another more generic implementation of |ToValue|,
-which makes use of inlining and constant folding, two optimizations that are present in GHC.   
+\marcos{Although these instances can be automatically generated using Template Haskell,...}
+We make use of a couple of optimizations that are present in GHC to propose a less verbose implementation of |ToValue|.
+%We propose another less verbose implementation of |ToValue|,
+%which makes use of inlining and constant folding, two optimizations that are present in GHC.   
 %(and any ohter competent compiler) 
 %
 \begin{code}
@@ -635,8 +637,8 @@ instance ToValue n => ToValue (HSucc n) where
   toValue n = 1 + toValue (hPrev n)
 \end{code}
 %
-Based on these optimizations the computation of the index, which would be linear time, is performed at compile time.
-
+%Based on these optimizations the computation of the index, which would be linear time, is performed at compile time.
+Based on inlining and constant folding, the computation of the index, which is linear time, is performed at compile time.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %if False
