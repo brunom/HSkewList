@@ -1103,7 +1103,7 @@ Run time comparisons are shown in Figure~\ref{run_time}.
 
 \begin{figure}[h]
 \begin{center}
-\begin{tikzpicture}[x=0.030cm,y=0.1875cm]
+\begin{tikzpicture}[x=0.027cm,y=0.16875cm]
 
   \def\xmin{0}
   \def\xmax{200}
@@ -1215,7 +1215,7 @@ It did not work for us and it made the presentation less clear, so we went with 
 
 \begin{figure}[h]
 \begin{center}
-\begin{tikzpicture}[x=0.015cm,y=0.375cm]
+\begin{tikzpicture}[x=0.0135cm,y=0.3375cm]
 
   \def\xmin{0}
   \def\xmax{400}
@@ -1266,7 +1266,7 @@ It did not work for us and it made the presentation less clear, so we went with 
 
 \begin{figure}[h]
 \begin{center}
-\begin{tikzpicture}[x=0.015cm,y=0.15cm]
+\begin{tikzpicture}[x=0.015cm,y=0.135cm]
 
   \def\xmin{0}
   \def\xmax{400}
