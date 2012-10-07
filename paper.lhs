@@ -566,10 +566,11 @@ class ArrayFind r l v | r l -> v where
   arrayFind :: r -> l -> Int
 instance
     (  HEq l l' b
-    ,  ArrayFind' b v' r' l v n) =>
+    ,  ArrayFind' b v' r' l v n
+    ,  ToValue n) =>
        ArrayFind (HCons (Field l' v') r') l v where
     arrayFind (HCons f' r') l =
-        toValue (arrayFind' (hEq l (label f')) r' l)
+        toValue (arrayFind' (hEq l (label f')) (value f') r' l)
 \end{code}
 %
 A difference with |HListGet| is that the work of searching the label,
@@ -578,13 +579,13 @@ There is no value-level member of the class |ArrayFind'|,
 observe that |arrayFind'| is just an undefined value.
 %
 \begin{code}
-arrayFind' :: ArrayFind' b r l v n => b -> r -> l -> n
+arrayFind' :: ArrayFind' b v' r l v n => b -> v' -> r -> l -> n
 arrayFind' = undefined
-^
-class ArrayFind' b r l v n | b r l -> v n
-instance ArrayFind' HTrue r l v HZero
-instance (HEq l l' b, ArrayFind' b r' l v n) 
-         => ArrayFind'  HFalse (HCons (Field l' v') r') l 
+
+class ArrayFind' b v' r l v n | b v' r l -> v n
+instance ArrayFind' HTrue v r l v HZero
+instance (HEq l l' b, ArrayFind' b v' r' l v n) 
+         => ArrayFind'  HFalse v'' (HCons (Field l' v') r') l 
                         v (HSucc n)
 \end{code}
 The types |HZero| and |HSucc| implement naturals at type-level.
@@ -602,7 +603,7 @@ class ToValue n where
 %
 In order to perform this conversion in constant time, we have to provide 
 one specific instance of |ToValue| for every type-level natural we use.
-\begin{code}
+\begin{spec}
 instance ToValue HZero where
  toValue _ = 0
 instance ToValue (HSucc HZero) where
@@ -610,7 +611,7 @@ instance ToValue (HSucc HZero) where
 instance ToValue (HSucc (HSucc HZero)) where
  toValue _ = 2
 ...
-\end{code}
+\end{spec}
 
 In this implementation of |HFind| it is very easy to distinguish the two phases separation
 of the lookup process. Although, the use of the function |toValue| introduces a big amount of
@@ -621,8 +622,11 @@ which makes uses of the GHC (and any ohter competent compiler) inlining and cons
 instance ToValue HZero where
  toValue _ = 0
 
+hPrev :: HSucc n -> n
+hPrev = undefined
+
 instance ToValue n => ToValue (HSucc n) where
- toValue _ = 1 + toValue (undefined :: n)
+ toValue n = 1 + toValue (hPrev n)
 \end{code}
 Based on these optimizations the computation of the index, which would be linear time, is performed at compile time.
 
