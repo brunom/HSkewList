@@ -119,7 +119,7 @@ compile time in both cases.
 
 \marcos{la intro quedo medio rara ahora que tenemos dos implementaciones y una de ellas usa array}
 Although there have been many different proposals for Extensible Records in Haskell 
-\cite{Gaster96apolymorphic, Jones99lightweightextensible, LabeledFunctions, Leijen:fclabels, Leijen:scopedlabels},
+\cite{Gaster96apolymorphic, Jones99lightweightextensible, LabeledFunctions, Leijen:fclabels, Leijen:scopedlabels, Jel10},
 it is still an open problem to find an implementation that manipulates records with satisfactory efficiency.
 Imperative dynamic languages use hash tables for objects,
 achieving constant time insertion and lookup.\marcos{esto es algo que sabemos o sospechamos? hay referencias para dar?}
@@ -151,17 +151,17 @@ insertion is also hit and rendered logarithmic.
 
 Hash maps and ordered trees need hashing and compare functions.
 This ends up being the biggest turnoff for these techniques in our setting.
-Types, standing as field labels, don't have natural, readily accessible implementations
+Types, standing as field labels, do not have natural, readily accessible implementations
 for these functions.
 
 This paper aims to contribute a solution in that direction. 
-Our starting point is the library for strongly typed heterogeneous collections HList \cite{KLS04}
+Our starting point is the Haskell library for strongly typed heterogeneous collections HList \cite{KLS04}
 which provides an example implementation of extensible records. 
-A drawback of HList is that lookup, the most used operation on records,
-is linear time.
-We propose two alternative implementations for extensible records, using the same techniques as HList.
+A drawback of HList is that lookup, the most used operation on records, is linear time.
+We propose two alternative implementations for extensible records as a Haskell library, using the same techniques as HList.
 |ArrayRecord| uses an array to hold the fields, achieving constant time lookup but linear time insertion.
-|SkewRecord| on the other hand maintains constant time insertions but lowers lookup to logarithmic time.\marcos{no se habla de la version Array} \bruno{ahora si}
+|SkewRecord| on the other hand maintains constant time insertions but lowers lookup to logarithmic time.
+%\marcos{no se habla de la version Array} \bruno{ahora si}
 
 Another contribution of this paper is the trick we use to reduce the run time work.
 We have observed that, when looking-up an element in a HList,
@@ -201,8 +201,10 @@ but in this paper we show it can also be helpful for efficiency matters.
 \end{figure}
 
 
-In the rest of this paper we review the type-level techniques used to implement extensible records by HList (Section~\ref{sec:hlist}) and how we use these techniques to provide an alternative implementation, based on so called skew lists \cite{Mye83,OkaThesis},
-which turns out to be faster at run time (Section~\ref{sec:faster}).\marcos{no se habla de la version Array} 
+In the rest of this paper we review the type-level techniques used to implement extensible records 
+by HList (Section~\ref{sec:hlist}) and how we use these techniques to provide a couple of alternative implementations, 
+%based on arrays and skew lists \cite{Mye83,OkaThesis},
+which turn out to have faster lookup operations at run time (Section~\ref{sec:faster}). 
 In Section~\ref{sec:efficiency} we show some results about the efficiency of our approach compared to HList.
 Finally, in Section~\ref{sec:conclusions} we present some conclusions and possible directions for future work.
 
