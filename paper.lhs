@@ -956,9 +956,11 @@ We compile and run the program in a 4 core 2.2 Ghz Intel i7 MacBook Pro Notebook
 We use GHC version 7.6.1 64 bits under OS X 10.8 Mountain Lion.
 The code is like this:
 
-\begin{code}
+\begin{spec}
 main = go (9999999::Int) where
-    go i = if i == 0 then return() else go (i - hListGet (make i) L2)
+    go i = if i == 0
+    then return()
+    else go (i - hListGet (make i) L2)
 
 {-# NOINLINE make #-}
 make i = list
@@ -969,7 +971,7 @@ list =
  HCons (L1 .=. (0::Int)) $
  HCons (L1 .=. (0::Int)) $
  HCons (L2 .=. (1::Int)) HNil
-\end{code}
+\end{spec}
 
 A certain convolution is needed to ensure that Haskell's lazy nature
 does not optimize away the benchmark.
