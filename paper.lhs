@@ -531,6 +531,92 @@ data ArrayRecord r =
   ArrayRecord r (Array Int Any)
 \end{code}
 
+\subsubsection{Lookup}
+Lookup is done as a two step operation.
+First the ordinal of a certain label in the record, and the type (|v|) of the stored element, is found with |HFind|.
+\begin{code}
+class HFind r l v | r l -> v where
+  hFind :: r -> l -> Int
+\end{code}
+Second, in |hArrayGet|, we use the index to obtain the element from the array and the
+type (|v|) to coerce the element to its correct type.
+%
+\begin{code}
+hArrayGet :: HFind r l v =>
+  ArrayRecord r -> l -> v
+hArrayGet (ArrayRecord r a) l = 
+  unsafeCoerce (a ! hFind r l)
+\end{code}
+
+Figure~\ref{fig:search-array} shows a graphical representation of this process. 
+Dashed arrow represents the compile time search of the field in the heterogeneous list which results in the index of the element in the array. Using this index the element is retrieved from the array in constant time at run time (solid arrow).
+
+\begin{figure}[htp]
+\begin{center}
+\includegraphics[scale=0.5]{search-array.pdf}
+\end{center}
+\caption{Search |l7| in Array} \label{fig:search-array}
+\end{figure}
+
+|HFind| follows the same pattern as |HListGet| shown earlier, 
+using |HEq| to discriminate the cases of 
+the label of the current field, which may match or not the searched one. 
+\begin{code}
+class ArrayFind r l v | r l -> v where
+  arrayFind :: r -> l -> Int
+instance
+    (  HEq l l' b
+    ,  ArrayFind' b v' r' l v n) =>
+       ArrayFind (HCons (Field l' v') r') l v where
+    arrayFind (HCons f' r') l =
+        toValue (arrayFind' (hEq l (label f')) r' l)
+\end{code}
+%
+A difference with |HListGet| is that the work of searching the label,
+performed by |ArrayFind'|, is only done at type-level.
+There is no value-level member of the class |ArrayFind'|,
+observe that |arrayFind'| is just an undefined value.
+%
+\begin{code}
+arrayFind' :: ArrayFind' b r l v n => b -> r -> l -> n
+arrayFind' = undefined
+^
+class ArrayFind' b r l v n | b r l -> v n
+instance ArrayFind' HTrue r l v HZero
+instance (HEq l l' b, ArrayFind' b r' l v n) 
+         => ArrayFind'  HFalse (HCons (Field l' v') r') l 
+                        v (HSucc n)
+\end{code}
+The types |HZero| and |HSucc| implement naturals at type-level.
+If the label is found, then the index |HZero| is returned.
+Otherwise, we increase the index by one (|HSucc|) and continue searching.
+%
+Once the index is found it has to be converted into an |Int| value,
+order to use this value as the index of the array.
+This is done by the function |toValue|.
+%
+\begin{code}
+class ToValue n where
+ toValue :: n -> Int
+\end{code}
+%
+In order to perform this conversion in constant time, we have to provide 
+one specific instance of |ToValue| for every type-level natural we use.
+\begin{code}
+instance ToValue HZero where
+ toValue _ = 0
+instance ToValue (HSucc HZero) where
+ toValue _ = 1
+instance ToValue (HSucc (HSucc HZero)) where
+ toValue _ = 2
+...
+\end{code}
+
+In this implementation of |HFind| it is very easy to distinguish the two phases separation
+of the lookup process. Although, the use of the function |toValue| introduces a big amount of
+boilerplate.
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%if False
 Lookup is done as a two step operation.
 First the ordinal of a certain label in the record is found with |HFind|.
 Second the index obtained is used
@@ -592,6 +678,10 @@ hArrayGet :: HFind r l v =>
 hArrayGet (ArrayRecord r a) l = 
   unsafeCoerce (a ! hFind r l)
 \end{code}
+%endif
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\subsubsection{Construction}
 
 An empty |ArrayRecord| consists of an empty heterogeneous list and an empty array.
 %
@@ -718,6 +808,9 @@ four =
 \end{code}
 
 %% $ fix emacs color highlighting
+
+\subsubsection{Construction}
+
 We define a smart constructor |emptySkewRecord| for empty skew lists, i.e. an empty list of trees.
 
 \begin{code}
@@ -828,6 +921,8 @@ instance
     hSkewExtend' _ f (HCons t (HCons t' r)) =
         (HCons (HNode f t t') r)
 \end{code}
+
+\subsubsection{Lookup}
 
 %The missing piece is
 Now, we turn to the introduction of |HSkewGet|,
