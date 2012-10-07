@@ -1071,34 +1071,16 @@ Later we will examine runtime benchmarks.
 
 \section{Efficiency}\label{sec:efficiency}
 
-\marcos{Actualizar graficas, agregar caso ArrayRecord. Agregar una mini-intro, incluyendo computadora usada y version de GHC.}
+In order to chose the best implementation in practice and as a sanity check,
+we did some synthetic benchmarks of the code.
+We compile and run the programs in a 4 core 2.2 Ghz second genertion (Sandy Bridge) Intel i7 MacBook Pro Notebook with 8 GB of RAM.
+We use GHC version 7.6.1 64 bits under OS X 10.8 Mountain Lion.
+
 We time accessing the last of an increasing number of fields.
 The program constructs the list once
-and runs a 10.000.000 iteration lookup loop.
-We compile and run the program in a 4 core 2.2 Ghz Intel i7 MacBook Pro Notebook with 8 GB of RAM.
-We use GHC version 7.6.1 64 bits under OS X 10.8 Mountain Lion.
-The code is like this:
-
-\begin{spec}
-main = go (9999999::Int) where
-    go i = if i == 0
-    then return()
-    else go (i - hListGet (make i) L2)
-
-{-# NOINLINE make #-}
-make i = list
-
-list =
- HCons (L1 .=. (0::Int)) $
- HCons (L1 .=. (0::Int)) $
- HCons (L1 .=. (0::Int)) $
- HCons (L1 .=. (0::Int)) $
- HCons (L2 .=. (1::Int)) HNil
-\end{spec}
-
-A certain convolution is needed to ensure that Haskell's lazy nature
-does not optimize away the benchmark.
-
+and runs a 10.000.000 iteration lookup loop,
+taking the necessary precautions to avoid the compiler
+exploiting the language lazyness to optimize out all our code.
 Run time comparisons are shown in Figure~\ref{run_time}.
 
 \begin{figure}[h]
@@ -1199,6 +1181,13 @@ Since the test is done at compile time, the adaptive structure has no
 run time overhead
 above having to copy the 10 fields from the linked list to the tree
 when the limit is surpassed.
+
+Next, Figure~\ref{extend_time} shows the runtime of inserting one more
+field to a record of a given length.
+To simulate a real time situation, the field just inserted is immediately
+looked up for, disabling the optimization for |ArrayRecord|.
+Only |ArrayRecord| is graphed because the other alternatives are too fast in this case.
+The graph exposes the linear time behavior of |ArrayRecord|, its Achilles' heel.
 
 Figure~\ref{compile_time} shows how compile time for the three implementations grows.
 |SkewRecord| is twice as slow as |HList| records, and |ArrayRecord| falls in between.
