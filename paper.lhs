@@ -615,6 +615,18 @@ instance ToValue (HSucc (HSucc HZero)) where
 In this implementation of |HFind| it is very easy to distinguish the two phases separation
 of the lookup process. Although, the use of the function |toValue| introduces a big amount of
 boilerplate.
+We propose another more generic implementation of |ToValue|,
+which makes uses of the GHC (and any ohter competent compiler) inlining and constant folding optimizations.
+\begin{code}
+instance ToValue HZero where
+ toValue _ = 0
+
+instance ToValue n => ToValue (HSucc n) where
+ toValue _ = 1 + toValue (undefined :: n)
+\end{code}
+Based on these optimizations the computation of the index, which would be linear time, is performed at compile time.
+
+
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 %if False
 Lookup is done as a two step operation.
