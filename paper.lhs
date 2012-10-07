@@ -15,9 +15,9 @@
 \newcommand{\alberto}[1]{\textcolor{red}{\textbf{Alberto: }#1}}
 \newcommand{\btext}[1]{\textcolor{blue}{#1}}
 \newcommand{\marcos}[1]{\textcolor{red}{\textbf{Marcos:}#1}}
-%\renewcommand{\bruno}[1]{}
-%\renewcommand{\alberto}[1]{}
-%\renewcommand{\marcos}[1]{}
+\renewcommand{\bruno}[1]{}
+\renewcommand{\alberto}[1]{}
+\renewcommand{\marcos}[1]{}
 %let paper = True
 
 %include lhs2TeX.fmt
