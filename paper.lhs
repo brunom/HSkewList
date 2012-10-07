@@ -533,19 +533,19 @@ data ArrayRecord r =
 
 \subsubsection{Lookup}
 Lookup is done as a two step operation.
-First the ordinal of a certain label in the record, and the type (|v|) of the stored element, is found with |HFind|.
+First the ordinal of a certain label in the record, and the type (|v|) of the stored element, is found with |ArrayFind|.
 \begin{code}
-class HFind r l v | r l -> v where
-  hFind :: r -> l -> Int
+class ArrayFind r l v | r l -> v where
+  arrayFind :: r -> l -> Int
 \end{code}
 Second, in |hArrayGet|, we use the index to obtain the element from the array and the
 type (|v|) to coerce the element to its correct type.
 %
 \begin{code}
-hArrayGet :: HFind r l v =>
+hArrayGet :: ArrayFind r l v =>
   ArrayRecord r -> l -> v
 hArrayGet (ArrayRecord r a) l = 
-  unsafeCoerce (a ! hFind r l)
+  unsafeCoerce (a ! arrayFind r l)
 \end{code}
 
 Figure~\ref{fig:search-array} shows a graphical representation of this process. 
@@ -558,12 +558,10 @@ Dashed arrow represents the compile time search of the field in the heterogeneou
 \caption{Search |l7| in Array} \label{fig:search-array}
 \end{figure}
 
-|HFind| follows the same pattern as |HListGet| shown earlier, 
+|ArrayFind| follows the same pattern as |HListGet| shown earlier, 
 using |HEq| to discriminate the cases of 
 the label of the current field, which may match or not the searched one. 
 \begin{code}
-class ArrayFind r l v | r l -> v where
-  arrayFind :: r -> l -> Int
 instance
     (  HEq l l' b
     ,  ArrayFind' b v' r' l v n
@@ -613,7 +611,7 @@ instance ToValue (HSucc (HSucc HZero)) where
 ...
 \end{spec}
 
-In this implementation of |HFind| it is very easy to distinguish the two phases separation
+In this implementation of |ArrayFind| it is very easy to distinguish the two phases separation
 of the lookup process. Although, the use of the function |toValue| introduces a big amount of
 boilerplate.
 We propose another more generic implementation of |ToValue|,
@@ -1091,7 +1089,7 @@ Run time comparisons are shown in Figure~\ref{run_time}.
 
 \begin{figure}[h]
 \begin{center}
-\begin{tikzpicture}[x=0.03cm,y=0.15cm]
+\begin{tikzpicture}[x=0.030cm,y=0.1875cm]
 
   \def\xmin{0}
   \def\xmax{200}
@@ -1099,7 +1097,7 @@ Run time comparisons are shown in Figure~\ref{run_time}.
   \def\ymax{25}
 
   % grid
-  \draw[style=help lines, xstep=12.5, ystep=2.5] (\xmin,\ymin) grid
+  \draw[style=help lines, xstep=12.5, ystep=2] (\xmin,\ymin) grid
   (\xmax,\ymax);
 
   % axes
@@ -1109,7 +1107,7 @@ Run time comparisons are shown in Figure~\ref{run_time}.
   % xticks and yticks
   \foreach \x in {25,50,...,\xmax}
   \node at (\x, \ymin) [below] {\x};
-  \foreach \y in {5,10,...,\ymax}
+  \foreach \y in {2,4,...,\ymax}
   \node at (\xmin,\y) [left] {\y};
 
   \draw[red] plot coordinates {
@@ -1125,7 +1123,7 @@ Run time comparisons are shown in Figure~\ref{run_time}.
     (150,18.3)
     (200,24.9)
   };
-  \node[right,red] at (150, 25) {Record};
+  \node[right,red] at (200, 25) {Record};
 
 
   \draw[green] plot coordinates {
@@ -1141,7 +1139,7 @@ Run time comparisons are shown in Figure~\ref{run_time}.
     (150,1.8)
     (200,1.8)
   };
-  \node[right,green] at (150, 10) {ArrayRecord};
+  \node[right,green] at (200, 4) {ArrayRecord};
 
   \draw[blue] plot coordinates {
     (0,  0.7)
@@ -1156,11 +1154,11 @@ Run time comparisons are shown in Figure~\ref{run_time}.
     (150,1.6)
     (200,1.5)
   };
-  \node[right,blue] at (150, 5) {SkewRecord};
+  \node[right,blue] at (200, 2) {SkewRecord};
 
 \end{tikzpicture}
 \end{center}
-\caption{Running time}
+\caption{Lookup time}
 \label{run_time}
 \end{figure}
 
@@ -1200,6 +1198,57 @@ To improve performance, the code can be rewritten with type families.
 \cite{PerfLeaks} suggest constraint reordering and striving for tail calls to improve
 performance.
 It did not work for us and it made the presentation less clear, so we went with the straightforward version. \marcos{todo este parrafo lo pasaria a future work y lo juntaria con lo que puso alberto}
+
+\begin{figure}[h]
+\begin{center}
+\begin{tikzpicture}[x=0.015cm,y=0.375cm]
+
+  \def\xmin{0}
+  \def\xmax{400}
+  \def\ymin{0}
+  \def\ymax{15}
+
+  % grid
+  \draw[style=help lines, xstep=25, ystep=1] (\xmin,\ymin) grid
+  (\xmax,\ymax);
+
+  % axes
+  \draw[->] (\xmin,\ymin) -- (\xmax,\ymin) node[right] {field count};
+  \draw[->] (\xmin,\ymin) -- (\xmin,\ymax) node[above] {time (s)};
+
+  % xticks and yticks
+  \foreach \x in {50,100,...,\xmax}
+  \node at (\x, \ymin) [below] {\x};
+  \foreach \y in {2,4,...,\ymax}
+  \node at (\xmin,\y) [left] {\y};
+
+  \draw[red] plot coordinates {
+    (0,   0.08)
+    (25,  0.53)
+    (50,  1.01)
+    (75,  1.53)
+    (100, 2.04)
+    (125, 2.73)
+    (150, 3.39)
+    (175, 4.28)
+    (200, 5.40)
+    (225, 5.94)
+    (250, 6.67)
+    (275, 7.81)
+    (300, 8.88)
+    (325, 9.83)
+    (350,10.75)
+    (375,11.60)
+    (400,12.71)
+  };
+  \node[right,red] at (400, 13) {ArrayRecord};
+
+\end{tikzpicture}
+\end{center}
+\caption{Extend time}
+\label{extend_time}
+\end{figure}
+
 
 \begin{figure}[h]
 \begin{center}

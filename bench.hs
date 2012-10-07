@@ -3,11 +3,11 @@ import System.Cmd
 import System.IO
 import Control.Monad
 
-main = bench_get
+main = bench_extend
 --ghcs = ["ghc-7.4.2", "ghc-7.6.1"]
 ghcs = ["ghc-7.6.1"]
---iters = [0,10,20,30,40,50,60,70,100,150,200]
-iters = [0, 25..400]
+iters = [0,25..400]
+--iters = [1]
 
 data Record = Record { name :: String, cons :: String, nil :: String, get :: String }
 records = [Record "Record" "HCons" "HNil" "hListGet"
@@ -69,8 +69,8 @@ bench_get = do
       startRun <- getCurrentTime
       --system $ dir ++ "get_" ++ show iter ++ "_" ++ ghc ++ "_" ++ name record
       endRun   <- getCurrentTime
-
       putStr $ show (endRun `diffUTCTime` startRun) ++ ", "
+
       hFlush stdout
     putChar '\n'
 
@@ -85,8 +85,9 @@ bench_extend = do
     
     -- headers
   putStr "iterations"
-  forM_ ghcs $ \ghc -> forM_ records $ \record ->
-      putStr $ ", " ++ ghc ++ " " ++ name record
+  forM_ ghcs $ \ghc -> forM_ records $ \record -> do
+      putStr $ ", " ++ ghc ++ " " ++ name record ++ " compile"
+      putStr $ ", " ++ ghc ++ " " ++ name record ++ " run"
   putChar '\n'
   
   -- body
@@ -98,23 +99,30 @@ bench_extend = do
 \{-# LANGUAGE NoMonomorphismRestriction #-}\n\
 \import Paper\n\
 \\n\
-\main = go (99999::Int) where\n\
+\main = go (999999::Int) where\n\
 \    go i = if i == 0 then return() else go (i - (get (make i) L1) + i - 1)\n\
 \\n\
-\step r = (L1 .=. (get r L1)) `cons` r\n\
-\\n\
 \{-# NOINLINE make #-}\n\
-\make i =\n" ++
-        concat (replicate iter " step $\n") ++
-        "  (L1 .=. i `cons` nil)" ++
+\make i = L1 .=. i `cons` list\n\
+\\n\
+\list =\n" ++
+        concat (replicate iter " cons (L2 .=. (0::Int)) $\n") ++
+        "  nil" ++
         "\ncons = " ++ cons record ++
         "\nnil = " ++ nil record ++
         "\nget = " ++ get record ++ "\n"
       system $ "rm " ++ dir ++ ghc ++ "_dir/Main.*" -- workaround http://hackage.haskell.org/trac/ghc/ticket/7038
       call ghc run
-      start <- getCurrentTime
-      system $ dir ++ ghc ++ "_dir/Main"
-      end   <- getCurrentTime
-      putStr $ show (end `diffUTCTime` start) ++ ", "
+
+      startCompile <- getCurrentTime
+      call ghc run
+      endCompile <- getCurrentTime
+      putStr $ show (endCompile `diffUTCTime` startCompile) ++ ", "
+
+      startRun <- getCurrentTime
+      system $ dir ++ "extend_" ++ show iter ++ "_" ++ ghc ++ "_" ++ name record
+      endRun   <- getCurrentTime
+      putStr $ show (endRun `diffUTCTime` startRun) ++ ", "
+
       hFlush stdout
     putChar '\n'
