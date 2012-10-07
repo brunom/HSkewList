@@ -124,6 +124,7 @@ it is still an open problem to find an implementation that manipulates records w
 Imperative dynamic languages use hash tables for objects,
 achieving constant time insertion and lookup.\marcos{esto es algo que sabemos o sospechamos? hay referencias para dar?}
 \bruno{sabemos pero no encuentro mejor referencia que http://en.wikipedia.org/wiki/Hashtable}
+\marcos{hash tables heterogeneas?}
 Inserting a field changes the table in place,
 destructing the old version of the object,
 not allowing for persistency as required in functional languages.
