@@ -533,17 +533,18 @@ data ArrayRecord r =
 
 \subsubsection{Lookup}
 Lookup is done as a two step operation.
-First the ordinal of a certain label in the record, and the type (|v|) of the stored element, is found with |ArrayFind|.
+First, the ordinal of a certain label in the record, and the type (|v|) of its stored element, are found with |ArrayFind|.
+%
 \begin{code}
 class ArrayFind r l v | r l -> v where
   arrayFind :: r -> l -> Int
 \end{code}
-Second, in |hArrayGet|, we use the index to obtain the element from the array and the
-type (|v|) to coerce the element to its correct type.
+%
+Second, function |hArrayGet| uses the index to obtain the element from the array and the
+type (|v|) to coerce that element to its correct type.
 %
 \begin{code}
-hArrayGet :: ArrayFind r l v =>
-  ArrayRecord r -> l -> v
+hArrayGet :: ArrayFind r l v => ArrayRecord r -> l -> v
 hArrayGet (ArrayRecord r a) l = 
   unsafeCoerce (a ! arrayFind r l)
 \end{code}
@@ -561,71 +562,79 @@ Dashed arrow represents the compile time search of the field in the heterogeneou
 |ArrayFind| follows the same pattern as |HListGet| shown earlier, 
 using |HEq| to discriminate the cases of 
 the label of the current field, which may match or not the searched one. 
+%
 \begin{code}
 instance
     (  HEq l l' b
-    ,  ArrayFind' b v' r' l v n
+    ,  ArrayFind' b v' r l v n
     ,  ToValue n) =>
-       ArrayFind (HCons (Field l' v') r') l v where
-    arrayFind (HCons f' r') l =
-        toValue (arrayFind' (hEq l (label f')) (value f') r' l)
+    ArrayFind (HCons (Field l' v') r) l v where
+      arrayFind (HCons f r) l =
+        toValue (arrayFind' (hEq l (label f)) (value f) r l)
 \end{code}
 %
 A difference with |HListGet| is that the work of searching the label,
 performed by |ArrayFind'|, is only done at type-level.
-There is no value-level member of the class |ArrayFind'|,
+There is no value-level member of the class |ArrayFind'|;
 observe that |arrayFind'| is just an undefined value.
 %
 \begin{code}
-arrayFind' :: ArrayFind' b v' r l v n => b -> v' -> r -> l -> n
+arrayFind' ::  ArrayFind' b v' r l v n  
+               => b -> v' -> r -> l -> n
 arrayFind' = undefined
-
+^
 class ArrayFind' b v' r l v n | b v' r l -> v n
 instance ArrayFind' HTrue v r l v HZero
-instance (HEq l l' b, ArrayFind' b v' r' l v n) 
-         => ArrayFind'  HFalse v'' (HCons (Field l' v') r') l 
+instance (HEq l l' b, ArrayFind' b v' r l v n) 
+         => ArrayFind'  HFalse v'' (HCons (Field l' v') r) l 
                         v (HSucc n)
 \end{code}
+%
 The types |HZero| and |HSucc| implement naturals at type-level.
 If the label is found, then the index |HZero| is returned.
 Otherwise, we increase the index by one (|HSucc|) and continue searching.
-%
 Once the index is found it has to be converted into an |Int| value,
-order to use this value as the index of the array.
+in order to use this value as the index of the array.
 This is done by the function |toValue|.
 %
 \begin{code}
 class ToValue n where
- toValue :: n -> Int
+  toValue :: n -> Int
 \end{code}
 %
 In order to perform this conversion in constant time, we have to provide 
 one specific instance of |ToValue| for every type-level natural we use.
 \begin{spec}
 instance ToValue HZero where
- toValue _ = 0
+  toValue _ = 0
 instance ToValue (HSucc HZero) where
- toValue _ = 1
+  toValue _ = 1
 instance ToValue (HSucc (HSucc HZero)) where
- toValue _ = 2
+  toValue _ = 2
 ...
 \end{spec}
 
-In this implementation of |ArrayFind| it is very easy to distinguish the two phases separation
-of the lookup process. Although, the use of the function |toValue| introduces a big amount of
+\alberto{falta mencionar que se puede hacer con TH}
+
+\alberto{este parrafo hay que revisarlo, esta medio confuso lo que dice. el uso de although no es correcto. ademas, no diria que la implementacion en GHC  es mas generica, mas bien, es mas especifica porque depende de constant folding de GHC.}
+In this implementation of |ArrayFind| it is very easy to distinguish the two phases
+of the lookup process. Although, the use of function |toValue| introduces a big amount of
 boilerplate.
 We propose another more generic implementation of |ToValue|,
-which makes uses of the GHC (and any ohter competent compiler) inlining and constant folding optimizations.
+which makes use of inlining and constant folding, two optimizations that are present in GHC.   
+%(and any ohter competent compiler) 
+%
 \begin{code}
 instance ToValue HZero where
- toValue _ = 0
-
+  toValue _ = 0
+^
 hPrev :: HSucc n -> n
 hPrev = undefined
-
+^
 instance ToValue n => ToValue (HSucc n) where
- toValue n = 1 + toValue (hPrev n)
+  toValue n = 1 + toValue (hPrev n)
 \end{code}
+%
 Based on these optimizations the computation of the index, which would be linear time, is performed at compile time.
 
 
