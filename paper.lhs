@@ -125,6 +125,7 @@ Imperative dynamic languages use hash tables for objects,
 achieving constant time insertion and lookup.\marcos{esto es algo que sabemos o sospechamos? hay referencias para dar?}
 \bruno{sabemos pero no encuentro mejor referencia que http://en.wikipedia.org/wiki/Hashtable}
 \marcos{hash tables heterogeneas?}
+\bruno{heterogeneas, si, porque son lenguajes dinamicos}
 Inserting a field changes the table in place,
 destructing the old version of the object,
 not allowing for persistency as required in functional languages.
@@ -138,8 +139,7 @@ then achieves logarithmic time insertion and lookup.
 
 The usual strategies for record insertion in functional languages are
 copying all existing fields along with the new one to a brand new tuple,
-or using a linked list. \marcos{esto es algo que sabemos o sospechamos? hay referencias para dar?}
-\bruno{sospechamos}
+or using a linked list \cite{Gaster96apolymorphic}.
 The tuple strategy offers the fastest possible lookup, but insertion is linear time.
 The linked list sits in opposite in the tradeoff curve,
 with constant time insertion but linear time lookup.
