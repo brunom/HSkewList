@@ -1196,9 +1196,10 @@ debugging and development, which require rapid turn around.
 When insertion is rare, we prefer |ArrayRecord| because of the compile time speed.
 Otherwise, |SkewRecord| is the best choice
 
-To improve performance, the code can be rewritten with type families. \cite{PerfLeaks} suggest constraint reordering and striving for tail calls to improve
+To improve performance, the code can be rewritten with type families. 
+\cite{PerfLeaks} suggest constraint reordering and striving for tail calls to improve
 performance.
-It did not work for us and it made the presentation less clear, so we went with the straightforward version.
+It did not work for us and it made the presentation less clear, so we went with the straightforward version. \marcos{todo este parrafo lo pasaria a future work y lo juntaria con lo que puso alberto}
 
 \begin{figure}[h]
 \begin{center}
