@@ -60,9 +60,6 @@ import Data.Array
 import GHC.Exts
 import Unsafe.Coerce
 
-hListUpdate a = hSkewUpdate a
-hListRemove = undefined
-
 \end{code}
 %endif
 
@@ -180,7 +177,7 @@ Since the structure is linear, the search and the path have the same length.
 \caption{Search |l7| in HList} \label{fig:search-hlist}
 \end{figure}
 
-Thus, the key idea is very simple. When in Haskell we do |"foo" == "baar"|, the entire process of searching the correct instance of |Eq| to use is performed at compile time. No work is done at run time to search the correct instances and discard the incorrect ones. We apply the same concept to perform the search of a label into a record. Given that a label is represented by a singleton type we have enough information to determine the ``path of instances" that goes to it, discarding any possible wrong path.
+Thus, the key idea is very simple. When in Haskell we do |"foo" == "baar"|, the entire process of searching the correct instance of |Eq| to use is performed at compile time. No work is done at run time to search the correct instances and discard the incorrect ones. We apply the same concept to perform the search of a label into a record. Given that a label is represented by a singleton type we have enough information to determine the "path of instances" that goes to it, discarding any possible wrong path.
 
 %Instead of a linear structure as used by HList, 
 For example, in one of our proposed implementations we use an alternative structure for the representation of heterogeneous collections which is based on balanced trees.
@@ -287,9 +284,9 @@ two values of type maybe.
 class HPlus a b c | a b -> c where
     hPlus :: a -> b -> c
 instance HPlus (HJust a) b (HJust a) where
-    hPlus a  _ = a
+    hPlus a b = a
 instance HPlus HNothing b b where
-    hPlus _  b = b
+    hPlus a b = b
 \end{code}
 
 \subsection{Heterogeneous Lists}
@@ -585,17 +582,16 @@ instance
 A difference with |HListGet| is that the work of searching the label,
 performed by |ArrayFind'|, is only done at type-level.
 There is no value-level member of the class |ArrayFind'|;
-observe that |arrayFind'| is just an undefined value
-and nothing will be computed at run time.
+observe that |arrayFind'| is just an undefined value.
 %
 \begin{code}
 arrayFind' ::  ArrayFind' b v' r l v n  
                => b -> v' -> r -> l -> n
 arrayFind' = undefined
-
+^
 data HZero
 data HSucc n
-
+^
 class ArrayFind' b v' r l v n | b v' r l -> v n
 instance ArrayFind' HTrue v r l v HZero
 instance (HEq l l' b, ArrayFind' b v' r l v n) 
@@ -637,10 +633,10 @@ boilerplate. Although these instances can be automatically generated using Templ
 \begin{code}
 instance ToValue HZero where
   toValue _ = 0
-
+^
 hPrev :: HSucc n -> n
 hPrev = undefined
-
+^
 instance ToValue n => ToValue (HSucc n) where
   toValue n = 1 + toValue (hPrev n)
 \end{code}
@@ -726,10 +722,8 @@ emptyArrayRecord =
 Function |hArrayExtend| adds a field to an array record.
 %
 \begin{code}
-hArrayExtend f = hArrayModifyList (HCons f)
- 
-hArrayModifyList f (ArrayRecord r _) =
-  let  r'  = f r
+hArrayExtend f (ArrayRecord r _) =
+  let  r'  = HCons f r 
        fs  = hMapAny r' 
   in   ArrayRecord r' (listArray (0, length fs - 1) fs)
 \end{code}
@@ -764,22 +758,6 @@ instance
     unsafeCoerce v : hMapAny r
 \end{code}
 
-
-\subsubsection{Update and Remove}
-
-Functions |hArrayUpdate| and |hArrayRemove|, to update and remove a field respectively,
-are similar to the extension function in the sense that both have to reconstruct
-the array after modifying the list.
-We use the respective functions |hListUpdate| and |hListRemove| from the HList 
-implementation of records. 
-%
-\begin{code}
-hArrayUpdate l e  = hArrayModifyList (hListUpdate  l e)
-
-hArrayRemove l    = hArrayModifyList (hListRemove  l)
-\end{code}
-%
-With |HArrayUpdate| we change a field of some label with a new field with possibly new label and value.
 
 
 \subsection{Skew Binary Random-Access List}\label{sec:skew}
@@ -1106,7 +1084,7 @@ instance  (  HSkewGet r l m
           HSkewUpdate l e r r'  where
     hSkewUpdate l e r = 
        hSkewUpdate' (hSkewGet r l) l e r
-
+^
 class HSkewUpdate' m l e r r' | m l e r -> r' where
     hSkewUpdate' :: m -> l -> e -> r -> r'
 \end{code}
@@ -1167,12 +1145,13 @@ keeping all other sub-trees intact.
 % Due to lazy evaluation, the searches of the label are performed only at compile time.
 Thus the operation runs in time logarithmic in the size of the record.
 
-\begin{figure}[tp]
-\begin{center}
-\includegraphics[scale=0.5]{tail.pdf}
-\end{center}
-\caption{Tail in a Skew} \label{fig:tail}
-\end{figure}
+
+%if style==newcode
+\begin{code}
+{-# NOINLINE myR' #-}
+updR = hUpdate l1 (l3 .=. "hi") myR'
+\end{code}
+%endif
 
 \subsubsection{Remove}
 
@@ -1187,6 +1166,13 @@ First we need a helper to remove the first element of a skew list.
 class HSkewTail ts ts' | ts -> ts' where
     hSkewTail :: ts -> ts'
 \end{code}
+
+\begin{figure}[tp]
+\begin{center}
+\includegraphics[scale=0.5]{tail.pdf}
+\end{center}
+\caption{Tail in a Skew} \label{fig:tail}
+\end{figure}
 
 \noindent
 In Figure~\ref{fig:tail} we show an example of the possible cases 
@@ -1216,17 +1202,29 @@ instance
 \end{code}
 
 
-Finally |hSkewRemove| takes the first node and calls |hSkewUpdate|
+Finally |HSkewRemove| is done in a single instance.
+We take the first field and call |HSkewUpdate|
 to duplicate it where the label we want gone was.
-Then |hSkewTail| removes the original occurrence,
-at the start of the list.
+Then |HSkewTail| removes the original occurrence of that field
+from the start of the list.
+%
 \begin{code}
-hSkewRemove l (HCons (HNode e t t') ts) =
+class HSkewRemove l r r' | l r -> r' where
+    hSkewRemove :: l -> r -> r'
+instance
+    (  HSkewUpdate l e e e'
+    ,  HSkewUpdate l e lt lt'
+    ,  HSkewUpdate l e rt rt'
+    ,  HSkewUpdate l e ts ts'
+    ,  HSkewTail (HCons (HNode e' lt' rt') ts') r'') =>
+       HSkewRemove
+        l
+        (HCons (HNode e lt rt) ts)
+        r'' where
+    hSkewRemove l (HCons (HNode e t t') ts) =
         hSkewTail $
         hSkewUpdate l e (HCons (HNode e t t') ts)
 \end{code}
-
-%% $ fix emacs color highlighting
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -1315,7 +1313,7 @@ Run time comparisons are shown in Figure~\ref{run_time}.
 
 \end{tikzpicture}
 \end{center}
-\caption{Lookup: run time}
+\caption{Lookup time}
 \label{run_time}
 \end{figure}
 
@@ -1347,7 +1345,6 @@ Next, Figure~\ref{extend_time} shows the runtime of inserting one more
 field to a record of a given length.
 To simulate a real time situation, the field just inserted is immediately
 looked up for, disabling the optimization for |ArrayRecord|.
-The insert-lookup process is run 1.000.000 times.
 Only |ArrayRecord| is graphed because the other alternatives are too fast in this case.
 The graph exposes the linear time behavior of |ArrayRecord|, its Achilles' heel.
 
@@ -1397,7 +1394,7 @@ The graph exposes the linear time behavior of |ArrayRecord|, its Achilles' heel.
 
 \end{tikzpicture}
 \end{center}
-\caption{Extend: run time}
+\caption{Extend time}
 \label{extend_time}
 \end{figure}
 
@@ -1496,25 +1493,21 @@ Otherwise, |SkewRecord| is the best choice
   \node[right,blue] at (400,15) {ArrayRecord};
 \end{tikzpicture}
 \end{center}
-\caption{Lookup: compile time}
+\caption{Compile time}
 \label{compile_time}
 \end{figure}
 
 
 \section{Conclusions and Future Work}\label{sec:conclusions}
 
-Using type level programming techniques we have developed
-a couple of library implementations of extensible records for Haskell. 
-A tuple style implementation, with constant time search and linear time insertion, and a new formulation that
+Using type level programming techniques we have developed 
+an implementation of extensible records for Haskell that, during run-time, 
 takes logarithmic time for searching and removing elements and constant time for
-inserting elements. This run time performance is achieved by moving
-most of the effort to compile time
+inserting elements. This run time performance is achieved by moving 
+most of the effort to compile time. 
+
 \marcos{se podria decir en que casos es mejor usar Skew y en cuales Array}
 \bruno{hecho}
-
-In the actual implementations we follow \cite{Leijen:scopedlabels} in allowing label repetition.  
-A type-predicate |HLabelSet| can be added to disallow this as in \cite{KLS04}, with a slight cost in clarity 
-but no cost in run time performance.
 
 This approach can be used to improve the performance of systems
 that make extensive use of extensible records. 
