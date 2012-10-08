@@ -1182,19 +1182,6 @@ looked up for, disabling the optimization for |ArrayRecord|.
 Only |ArrayRecord| is graphed because the other alternatives are too fast in this case.
 The graph exposes the linear time behavior of |ArrayRecord|, its Achilles' heel.
 
-Figure~\ref{compile_time} shows how compile time for the three implementations grows.
-|SkewRecord| is twice as slow as |HList| records, and |ArrayRecord| falls in between.
-In previous versions of this paper that run the benchmarks with GHC version 7.4,
-|SkewRecord| was comparatively much slower and we had to advise against it for
-debugging and development, which require rapid turn around.
-When insertion is rare, we prefer |ArrayRecord| because of the compile time speed.
-Otherwise, |SkewRecord| is the best choice
-
-To improve performance, the code can be rewritten with type families. 
-\cite{PerfLeaks} suggest constraint reordering and striving for tail calls to improve
-performance.
-It did not work for us and it made the presentation less clear, so we went with the straightforward version. \marcos{todo este parrafo lo pasaria a future work y lo juntaria con lo que puso alberto}
-
 \begin{figure}[h]
 \begin{center}
 \begin{tikzpicture}[x=0.0135cm,y=0.3375cm]
@@ -1245,6 +1232,13 @@ It did not work for us and it made the presentation less clear, so we went with 
 \label{extend_time}
 \end{figure}
 
+Figure~\ref{compile_time} shows how compile time for the three implementations grows.
+|SkewRecord| is twice as slow as |HList| records, and |ArrayRecord| falls in between.
+In previous versions of this paper that run the benchmarks with GHC version 7.4,
+|SkewRecord| was comparatively much slower and we had to advise against it for
+debugging and development, which require rapid turn around.
+When insertion is rare, we prefer |ArrayRecord| because of the compile time speed.
+Otherwise, |SkewRecord| is the best choice
 
 \begin{figure}[h]
 \begin{center}
@@ -1360,9 +1354,12 @@ Experiments demonstrate that GHC memoizes class instances,
 but some particularity of our instances seem to confuse the mechanism.
 \marcos{tambien se podria decir que este es un buen ejemplo de type-level programming y que entre los trabajos futuros podría estar el probar otras tecnicas, como type families o incluso lenguages de tipos dependientes, como Agda.}
 
-\alberto{el siguiente texto se podria usar en las conclusiones. refiriendo a overlapping 
-\emph{This is the main reason why we base our development on functional dependencies. 
-Case further investigation on type families solve this problem we would be able to rephrase our implementation in terms of type families with a trivial translation, achieving a more functional style implementation.}}
+To improve performance, the code can be rewritten with type families. 
+\cite{PerfLeaks} suggest constraint reordering and striving for tail calls to improve
+performance.
+It did not work for us and it made the presentation less clear, so we went with the straightforward version. 
+This is the main reason why we based our development on functional dependencies. 
+Case further investigation on type families solve this problem we would be able to rephrase our implementation in terms of type families with a trivial translation, achieving a more functional style implementation.
 
 \bibliographystyle{plainnat}
 
