@@ -433,7 +433,7 @@ instance
 
 \noindent
 If the labels match, the corresponding value is returned, both at the value and type levels.
-Otherwise, |HHasFieldList'| calls back to |HHasFieldList| to continue the search.  
+Otherwise, |HListGet'| calls back to |HListGet| to continue the search.  
 The two type-functions are mutually recursive.  
 There is no case for the empty list; lookup fails.
 
@@ -1015,7 +1015,7 @@ instance
 Finally, the |Field| case, when a field is found, is the case 
 %\alberto{cual, la que sigue o la anterior? no queda bien arrancar la orcion con And.....} 
 that may actually build a |HJust| result.
-As in |HHasFieldList| for linked lists, |HEq| compares both labels.
+As in |HListGet| for linked lists, |HEq| compares both labels.
 We call |HMakeMaybe| with the result of the comparison,
 and |HNothing| or |HJust| is returned as appropriate.
 %
@@ -1068,53 +1068,49 @@ Later we will examine runtime benchmarks.
 \subsubsection{Update}\label{sec:update}
 
 
-We can define a type-function |HUpdate| to change
-a field of some label
-with a new field with possibly new label and value.
-Analogously to |HHasField| and |HExtend|,
-|HUpdate| unpacks and repacks the |SkewRecord|,
-doing |HSkewUpdate| all the real work.
-|HSkewHasField| checks that the record
-does contain a field with our label. 
+We can define a type-function |HSkewUpdate| to change
+a field of some label with a new field with possibly new label and value.
 
 \begin{code}
-class HUpdate l e r r' | l e r -> r' where
-    hUpdate :: l -> e -> r -> r'
-instance
-    (  HSkewHasField l r (HJust v)
-    ,  HSkewUpdate l e r r') =>
-       HUpdate l e (SkewRecord r) (SkewRecord r') where
-    hUpdate l e (SkewRecord r) =
-        SkewRecord (hSkewUpdate l e r)
-
 class HSkewUpdate l e r r' | l e r -> r' where
     hSkewUpdate :: l -> e -> r -> r'
 \end{code}
-
-\noindent
-The base cases just return their argument using |id|.
-With no field, there's nothing to change.
+%
+We use our lookup operation |HSkewGet|, to discriminate at type-level
+in which cases the field with the searched label is present or not.
 \begin{code}
-instance HSkewUpdate l e HNil HNil where
-    hSkewUpdate _ _ = id
-instance HSkewUpdate l e HEmpty HEmpty where
-    hSkewUpdate _ _ = id
+instance  (  HSkewGet r l m
+          ,  HSkewUpdate' m l e r r') => 
+          HSkewUpdate l e r r'  where
+    hSkewUpdate l e r = 
+       hSkewUpdate' (hSkewGet r l) l e r
+^
+class HSkewUpdate' m l e r r' | m l e r -> r' where
+    hSkewUpdate' :: m -> l -> e -> r -> r'
 \end{code}
-
-\noindent
-|HSkewUpdate| is simpler than |HHasField|.
-We do not have to decide which subtree has the field to change.
-Instead, we just call |hSkewUpdate| recursively for all parts.
+%
+In case the label is not present we have nothing to do than just returning the 
+structure unchanged.
+\begin{code}
+instance HSkewUpdate' HNothing l e r r  where
+    hSkewUpdate' _ l e r = r
+\end{code}
+%
+In other cases (the lookup results in |HJust v|) we call |hSkewUpdate| recursively for all parts, to apply the update when necessary.
+We start the process in the spine. Notice that, at run time, the recursion will not enter in the cases
+where the label is not present.
 \begin{code}
 instance
     (  HSkewUpdate l e t t'
     ,  HSkewUpdate l e ts ts') =>
-       HSkewUpdate l e (HCons t ts) (HCons t' ts') where
-    hSkewUpdate l e (HCons t ts) =
-        HCons
-            (hSkewUpdate l e t)
-            (hSkewUpdate l e ts)
+    HSkewUpdate' (HJust v) l e  (HCons t ts) 
+                                (HCons t' ts') 
+    where
+    hSkewUpdate' _ l e (HCons t ts) =
+        HCons  (hSkewUpdate l e t)
+               (hSkewUpdate l e ts)
 \end{code}
+%
 In the |HNode| case, |hSkewUpdate| is recursively called to
 the left and right sub-trees, and also to the element of the node.
 \begin{code}
@@ -1122,46 +1118,30 @@ instance
     (  HSkewUpdate l e e' e''
     ,  HSkewUpdate l e tl tl'
     ,  HSkewUpdate l e tr tr') =>
-       HSkewUpdate l e (HNode e' tl tr) (HNode e'' tl' tr')
-       where
-    hSkewUpdate l e (HNode e' tl tr) =
-        HNode
-            (hSkewUpdate l e e')
-            (hSkewUpdate l e tl)
-            (hSkewUpdate l e tr)
+    HSkewUpdate' (HJust v) l e  (HNode e' tl tr) 
+                                (HNode e'' tl' tr')
+    where
+    hSkewUpdate' _ l e (HNode e' tl tr) =
+        HNode  (hSkewUpdate l e e')
+               (hSkewUpdate l e tl)
+               (hSkewUpdate l e tr)
 \end{code}
-
-\noindent
-The bottom case |LVPair| uses |HCond|
-from the |HList| type-function collection to only return
-an updated field if the labels match. 
-In other case the original element is returned.
+%
+Finally, when we arrive to a |Field| and we know the label is the one we
+are searching (because we are considering the case |HJust v|) we return the updated field. 
 \begin{code}
 instance
-    (  HEq l l' b
-    ,  HCond b e (LVPair l' v') p) =>
-       HSkewUpdate l e (LVPair l' v') p where
-    hSkewUpdate l e e' =
-        hCond
-            (hEq l (labelLVPair e'))
-            e
-            e'
+    HSkewUpdate' (HJust v) l e (Field l v) e 
+     where
+    hSkewUpdate' _ l e e' = e
 \end{code}
 
-Of course, we want |HUpdate| to run as fast as possible.
-Rebuilding only the path to the field suffices,
-keeping all other subtrees intact,
-so the operation runs in time logarithmic in the size of the record.
-But we do not make any effort to reuse untouched parts of our original structure.
-In particular, the |HNode| case calls |hSkewUpdate| for the children
-and reassembles a new |HNode| with the result,
-even when no matching field exists below the current node.
-Executed literally, this program touches all nodes
-and runs in linear time,
-not what we want.
-However, GHC with optimizations enabled is smart enough
-to recognize that we are constructing values already available
-and changes our naive program to the smart, logarithm-time, version.
+This implementation of |hUpdate| at run time only
+rebuilds only the path to the field to update,
+keeping all other subtrees intact.
+Due to lazy evaluation, the searches of the label are performed only at compile time.
+Thus the operation runs in time logarithmic in the size of the record.
+
 
 %if style==newcode
 \begin{code}
@@ -1235,10 +1215,9 @@ instance
     ,  HSkewTail (HCons (HNode e' lt' rt') ts') r'') =>
        HRemove
         l
-        (SkewRecord (HCons (HNode e lt rt) ts))
-        (SkewRecord r'') where
-    hRemove l (SkewRecord (HCons (HNode e t t') ts)) =
-        SkewRecord $
+        (HCons (HNode e lt rt) ts)
+        r'' where
+    hRemove l (HCons (HNode e t t') ts) =
         hSkewTail $
         hSkewUpdate l e (HCons (HNode e t t') ts)
 \end{code}
