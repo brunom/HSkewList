@@ -60,6 +60,9 @@ import Data.Array
 import GHC.Exts
 import Unsafe.Coerce
 
+hListUpdate a = hSkewUpdate a
+hListRemove = undefined
+
 \end{code}
 %endif
 
@@ -1164,15 +1167,6 @@ keeping all other sub-trees intact.
 % Due to lazy evaluation, the searches of the label are performed only at compile time.
 Thus the operation runs in time logarithmic in the size of the record.
 
-<<<<<<< HEAD
-
-%if style==newcode
-\begin{code}
-{-# NOINLINE myR' #-}
-updR = hUpdate l1 (l3 .=. "hi") myR'
-\end{code}
-%endif
-
 \begin{figure}[tp]
 \begin{center}
 \includegraphics[scale=0.5]{tail.pdf}
@@ -1180,8 +1174,6 @@ updR = hUpdate l1 (l3 .=. "hi") myR'
 \caption{Tail in a Skew} \label{fig:tail}
 \end{figure}
 
-=======
->>>>>>> e877fd8850ab35accebf231c6ce5adfd0a60182c
 \subsubsection{Remove}
 
 Removing a field is easy based on updating.
@@ -1224,35 +1216,12 @@ instance
 \end{code}
 
 
-<<<<<<< HEAD
-Finally |HSkewRemove| is done in a single instance.
-We take the first field and call |HSkewUpdate|
-to duplicate it where the label we want gone was.
-Then |HSkewTail| removes the original occurrence of that field
-from the start of the list.
-%
-\begin{code}
-class HSkewRemove l r r' | l r -> r' where
-    hSkewRemove :: l -> r -> r'
-instance
-    (  HSkewUpdate l e e e'
-    ,  HSkewUpdate l e lt lt'
-    ,  HSkewUpdate l e rt rt'
-    ,  HSkewUpdate l e ts ts'
-    ,  HSkewTail (HCons (HNode e' lt' rt') ts') r'') =>
-       HSkewRemove
-        l
-        (HCons (HNode e lt rt) ts)
-        r'' where
-    hSkewRemove l (HCons (HNode e t t') ts) =
-=======
 Finally |hSkewRemove| takes the first node and calls |hSkewUpdate|
 to duplicate it where the label we want gone was.
 Then |hSkewTail| removes the original occurrence,
 at the start of the list.
 \begin{code}
 hSkewRemove l (HCons (HNode e t t') ts) =
->>>>>>> e877fd8850ab35accebf231c6ce5adfd0a60182c
         hSkewTail $
         hSkewUpdate l e (HCons (HNode e t t') ts)
 \end{code}
