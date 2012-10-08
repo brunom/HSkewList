@@ -766,11 +766,13 @@ instance
 Functions |hArrayUpdate| and |hArrayRemove|, to update and remove a field respectively,
 are similar to the extension function in the sense that both have to reconstruct
 the array after modifying the list.
+We use the respective functions |hListUpdate| and |hListRemove| from the HList 
+implementation of records. 
 %
 \begin{code}
-hArrayUpdate l e  = hArrayModifyList (hUpdate l e)
+hArrayUpdate l e  = hArrayModifyList (hListUpdate  l e)
 
-hArrayRemove l    = hArrayModifyList (hRemove l)
+hArrayRemove l    = hArrayModifyList (hListRemove  l)
 \end{code}
 %
 With |HArrayUpdate| we change a field of some label with a new field with possibly new label and value.
