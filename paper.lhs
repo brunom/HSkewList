@@ -177,7 +177,7 @@ Since the structure is linear, the search and the path have the same length.
 \caption{Search |l7| in HList} \label{fig:search-hlist}
 \end{figure}
 
-Thus, the key idea is very simple. When in Haskell we do |"foo" == "baar"|, the entire process of searching the correct instance of |Eq| to use is performed at compile time. No work is done at run time to search the correct instances and discard the incorrect ones. We apply the same concept to perform the search of a label into a record. Given that a label is represented by a singleton type we have enough information to determine the "path of instances" that goes to it, discarding any possible wrong path.
+Thus, the key idea is very simple. When in Haskell we do |"foo" == "baar"|, the entire process of searching the correct instance of |Eq| to use is performed at compile time. No work is done at run time to search the correct instances and discard the incorrect ones. We apply the same concept to perform the search of a label into a record. Given that a label is represented by a singleton type we have enough information to determine the ``path of instances" that goes to it, discarding any possible wrong path.
 
 %Instead of a linear structure as used by HList, 
 For example, in one of our proposed implementations we use an alternative structure for the representation of heterogeneous collections which is based on balanced trees.
@@ -582,7 +582,8 @@ instance
 A difference with |HListGet| is that the work of searching the label,
 performed by |ArrayFind'|, is only done at type-level.
 There is no value-level member of the class |ArrayFind'|;
-observe that |arrayFind'| is just an undefined value.
+observe that |arrayFind'| is just an undefined value
+and nothing will be computed at run time.
 %
 \begin{code}
 arrayFind' ::  ArrayFind' b v' r l v n  
@@ -722,9 +723,10 @@ emptyArrayRecord =
 Function |hArrayExtend| adds a field to an array record.
 %
 \begin{code}
-hArrayExtend f (ArrayRecord r _) =
-  let  r'  = HCons f r 
-       fs  = hMapAny r' 
+hArrayExtend f = hArrayModifyList (HCons f)
+^ 
+hArrayModifyList f (ArrayRecord r _) =
+  let  fs  = hMapAny (f r) 
   in   ArrayRecord r' (listArray (0, length fs - 1) fs)
 \end{code}
 %
@@ -758,6 +760,22 @@ instance
     unsafeCoerce v : hMapAny r
 \end{code}
 
+
+\subsubsection{Update and Remove}
+
+Functions |hArrayUpdate| and |hArrayRemove|, to update and remove a field respectively,
+are similar to the extension function in the sense that both have to reconstruct
+the array after modifying the list.
+We use the respective functions |hListUpdate| and |hListRemove| from the HList 
+implementation of records. 
+%
+\begin{code}
+hArrayUpdate l e  = hArrayModifyList (hListUpdate  l e)
+
+hArrayRemove l    = hArrayModifyList (hListRemove  l)
+\end{code}
+%
+With |HArrayUpdate| we change a field of some label with a new field with possibly new label and value.
 
 
 \subsection{Skew Binary Random-Access List}\label{sec:skew}
@@ -1289,7 +1307,7 @@ Run time comparisons are shown in Figure~\ref{run_time}.
 
 \end{tikzpicture}
 \end{center}
-\caption{Lookup time}
+\caption{Lookup: run time}
 \label{run_time}
 \end{figure}
 
@@ -1321,6 +1339,7 @@ Next, Figure~\ref{extend_time} shows the runtime of inserting one more
 field to a record of a given length.
 To simulate a real time situation, the field just inserted is immediately
 looked up for, disabling the optimization for |ArrayRecord|.
+The insert-lookup process is run 1.000.000 times.
 Only |ArrayRecord| is graphed because the other alternatives are too fast in this case.
 The graph exposes the linear time behavior of |ArrayRecord|, its Achilles' heel.
 
@@ -1370,7 +1389,7 @@ The graph exposes the linear time behavior of |ArrayRecord|, its Achilles' heel.
 
 \end{tikzpicture}
 \end{center}
-\caption{Extend time}
+\caption{Extend: run time}
 \label{extend_time}
 \end{figure}
 
@@ -1469,7 +1488,7 @@ Otherwise, |SkewRecord| is the best choice
   \node[right,blue] at (400,15) {ArrayRecord};
 \end{tikzpicture}
 \end{center}
-\caption{Compile time}
+\caption{Lookup: compile time}
 \label{compile_time}
 \end{figure}
 
