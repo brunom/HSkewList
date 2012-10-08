@@ -72,7 +72,7 @@ import Unsafe.Coerce
 %\copyrightdata{978-1-60558-332-7/09/08}
 
 %\titlebanner{submitted to Haskell Symposium 2011}         % These are ignored unless
-\preprintfooter{version of Jul 21, 2012}     % 'preprint' option specified.
+%\preprintfooter{version of Jul 21, 2012}     % 'preprint' option specified.
 
 %\title{Fast Extensible Records In Haskell}
 \title{Just Do It While Compiling!}
@@ -1085,17 +1085,18 @@ Later we will examine runtime benchmarks.
 
 \subsubsection{Update}\label{sec:update}
 
-
-We can define a type-function |HSkewUpdate| to change
+%a type-function |HSkewUpdate| 
+We now define an update operation that makes it possible to change
 a field of some label with a new field with possibly new label and value.
-
+%
 \begin{code}
 class HSkewUpdate l e r r' | l e r -> r' where
     hSkewUpdate :: l -> e -> r -> r'
 \end{code}
 %
-We use our lookup operation |HSkewGet|, to discriminate at type-level
-in which cases the field with the searched label is present or not.
+We use the lookup operation |HSkewGet| to discriminate at type-level
+whether the field with the searched label is present or not in the skew list.
+%
 \begin{code}
 instance  (  HSkewGet r l m
           ,  HSkewUpdate' m l e r r') => 
@@ -1108,15 +1109,17 @@ class HSkewUpdate' m l e r r' | m l e r -> r' where
 \end{code}
 %
 In case the label is not present we have nothing to do than just returning the 
-structure unchanged.
+structure unchanged. 
+%
 \begin{code}
 instance HSkewUpdate' HNothing l e r r  where
     hSkewUpdate' _ l e r = r
 \end{code}
 %
-In other cases (the lookup results in |HJust v|) we call |hSkewUpdate| recursively for all parts, to apply the update when necessary.
-We start the process in the spine. Notice that, at run time, the recursion will not enter in the cases
-where the label is not present.
+In the other cases (i.e. when lookup results in |HJust v|) we call |hSkewUpdate| recursively on all subparts in order to apply the update when necessary.
+Because of the previous instance (when lookup returns |HNothing|), at run time recursion will not enter in those cases where the label is not present.
+We start the process in the spine. 
+%
 \begin{code}
 instance
     (  HSkewUpdate l e t t'
@@ -1129,8 +1132,8 @@ instance
                (hSkewUpdate l e ts)
 \end{code}
 %
-In the |HNode| case, |hSkewUpdate| is recursively called to
-the left and right sub-trees, and also to the element of the node.
+On a |HNode|, |hSkewUpdate| is recursively called on
+the left and right sub-trees as well as on the element of the node.
 \begin{code}
 instance
     (  HSkewUpdate l e e' e''
@@ -1146,7 +1149,8 @@ instance
 \end{code}
 %
 Finally, when we arrive to a |Field| and we know the label is the one we
-are searching (because we are considering the case |HJust v|) we return the updated field. 
+are searching for (because we are considering the case |HJust v|), we simply return the updated field. 
+%
 \begin{code}
 instance
     HSkewUpdate' (HJust v) l e (Field l v) e 
@@ -1154,31 +1158,43 @@ instance
     hSkewUpdate' _ l e e' = e
 \end{code}
 
-This implementation of |hUpdate| at run time only
-rebuilds only the path to the field to update,
-keeping all other subtrees intact.
-Due to lazy evaluation, the searches of the label are performed only at compile time.
+At run time, this implementation of |hSkewUpdate| only
+rebuilds the path to the field to update,
+keeping all other sub-trees intact.
+% Due to lazy evaluation, the searches of the label are performed only at compile time.
 Thus the operation runs in time logarithmic in the size of the record.
 
-\subsubsection{Remove}
+<<<<<<< HEAD
 
-Removing a field is easy based on updating.
-We overwrite the field we want gone with the first node,
-and then we remove the first node.
-Thus, we remove elements in logarithmic time while keeping the tree balanced.
-
-\noindent
-First we need a helper to remove the first element of a skew list.
+%if style==newcode
 \begin{code}
-class HSkewTail ts ts' | ts -> ts' where
-    hSkewTail :: ts -> ts'
+{-# NOINLINE myR' #-}
+updR = hUpdate l1 (l3 .=. "hi") myR'
 \end{code}
- \begin{figure}[htp]
+%endif
+
+\begin{figure}[tp]
 \begin{center}
 \includegraphics[scale=0.5]{tail.pdf}
 \end{center}
 \caption{Tail in a Skew} \label{fig:tail}
 \end{figure}
+
+=======
+>>>>>>> e877fd8850ab35accebf231c6ce5adfd0a60182c
+\subsubsection{Remove}
+
+Removing a field is easy based on updating.
+We overwrite the field we want to eliminate with the first field in the skew list,
+and then we remove the first field from the list.
+Thus, we remove elements in logarithmic time while keeping the tree balanced.
+
+First we need a helper to remove the first element of a skew list.
+%
+\begin{code}
+class HSkewTail ts ts' | ts -> ts' where
+    hSkewTail :: ts -> ts'
+\end{code}
 
 \noindent
 In Figure~\ref{fig:tail} we show an example of the possible cases 
@@ -1192,13 +1208,12 @@ instance HSkewTail (HCons (HLeaf e) ts) ts where
 
 \noindent
 The other case is when the spine begins with a tree of three or more elements.
-Since |HLeaf| is a synonym of |HNode HEmpty HEmpty|,
-we need to assert that the subtrees of the root |HNode|
-are |HNode|s themselves.
-By construction, both subtrees have the same shape
-and pattern matching only the first suffices
-to make sure this case does not overlap with the previous one.
-In this case we grow the spine with the subtrees, throwing away the root.
+Since |HLeaf| is a synonym of |HNode| with |HEmpty| as sub-trees,
+we need to assert the case when the sub-trees of the root |HNode|
+are nonempty (i.e. |HNode|s themselves).
+By construction, both sub-trees have the same shape, but doing pattern matching on the first one only suffices to make sure this case does not overlap with the previous one.
+In this case we grow the spine with the sub-trees, throwing away the root.
+%
 \begin{code}
 instance
     HSkewTail
@@ -1209,12 +1224,35 @@ instance
 \end{code}
 
 
+<<<<<<< HEAD
+Finally |HSkewRemove| is done in a single instance.
+We take the first field and call |HSkewUpdate|
+to duplicate it where the label we want gone was.
+Then |HSkewTail| removes the original occurrence of that field
+from the start of the list.
+%
+\begin{code}
+class HSkewRemove l r r' | l r -> r' where
+    hSkewRemove :: l -> r -> r'
+instance
+    (  HSkewUpdate l e e e'
+    ,  HSkewUpdate l e lt lt'
+    ,  HSkewUpdate l e rt rt'
+    ,  HSkewUpdate l e ts ts'
+    ,  HSkewTail (HCons (HNode e' lt' rt') ts') r'') =>
+       HSkewRemove
+        l
+        (HCons (HNode e lt rt) ts)
+        r'' where
+    hSkewRemove l (HCons (HNode e t t') ts) =
+=======
 Finally |hSkewRemove| takes the first node and calls |hSkewUpdate|
 to duplicate it where the label we want gone was.
 Then |hSkewTail| removes the original occurrence,
 at the start of the list.
 \begin{code}
 hSkewRemove l (HCons (HNode e t t') ts) =
+>>>>>>> e877fd8850ab35accebf231c6ce5adfd0a60182c
         hSkewTail $
         hSkewUpdate l e (HCons (HNode e t t') ts)
 \end{code}
