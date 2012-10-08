@@ -284,9 +284,9 @@ two values of type maybe.
 class HPlus a b c | a b -> c where
     hPlus :: a -> b -> c
 instance HPlus (HJust a) b (HJust a) where
-    hPlus a b = a
+    hPlus a  _ = a
 instance HPlus HNothing b b where
-    hPlus a b = b
+    hPlus _  b = b
 \end{code}
 
 \subsection{Heterogeneous Lists}
