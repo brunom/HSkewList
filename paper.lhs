@@ -437,6 +437,8 @@ Otherwise, |HHasFieldList'| calls back to |HHasFieldList| to continue the search
 The two type-functions are mutually recursive.  
 There is no case for the empty list; lookup fails.
 
+For GHC, the type level machinery not only generates correct value level code, 
+but efficient code too.
 At the value level, the functions |hListGet| and |hListGet'| are trivial,
 devoid of logic and conditions.
 For this reason,
