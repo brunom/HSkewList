@@ -1352,14 +1352,14 @@ or libraries for relational databases such as CoddFish \cite{SV06} and HaskellDB
 Interesting future work is to find a way to reduce compilation time.
 Experiments demonstrate that GHC memoizes class instances,
 but some particularity of our instances seem to confuse the mechanism.
-\marcos{tambien se podria decir que este es un buen ejemplo de type-level programming y que entre los trabajos futuros podría estar el probar otras tecnicas, como type families o incluso lenguages de tipos dependientes, como Agda.}
-
-To improve performance, the code can be rewritten with type families. 
-\cite{PerfLeaks} suggest constraint reordering and striving for tail calls to improve
+\cite{PerfLeaks} suggests constraint reordering and striving for tail calls to improve
 performance.
 It did not work for us and it made the presentation less clear, so we went with the straightforward version. 
-This is the main reason why we based our development on functional dependencies. 
-Case further investigation on type families solve this problem we would be able to rephrase our implementation in terms of type families with a trivial translation, achieving a more functional style implementation.
+
+To improve performance, the code can be rewritten with type families. 
+The main reason why we based our development on functional dependencies is the lack of overlapping instances at type families. 
+In case further investigation on type families solves this problem we would be able to rephrase our implementation 
+in terms of type families with a trivial translation, achieving a more functional style implementation.
 
 \bibliographystyle{plainnat}
 
