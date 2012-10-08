@@ -180,9 +180,8 @@ Since the structure is linear, the search and the path have the same length.
 
 Thus, the key idea is very simple. When in Haskell we do |"foo" == "baar"|, the entire process of searching the correct instance of |(==)| to use is performed at compile time. No work is done at run time to search the correct instances and discard the incorrect ones. We apply the same concept to perform the search of a label into a record. Given that a label is represented by a singleton type we have enough information to determine the "path of instances" that goes to it, discarding any possible wrong path.
 
-Instead of a linear structure as used by HList, 
-we propose the use of an alternative structure for the representation of heterogeneous collections which 
-is based on balanced trees.
+%Instead of a linear structure as used by HList, 
+For example, in one of our proposed implementations we use an alternative structure for the representation of heterogeneous collections which is based on balanced trees.
 Such a structure better profits 
 from the information given by the compile time search, leading to logarithmic length paths in the run time traversal
 (see Figure~\ref{fig:search-skew}). \marcos{no se habla de la version Array}
