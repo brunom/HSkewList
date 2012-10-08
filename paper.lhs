@@ -1496,14 +1496,18 @@ Otherwise, |SkewRecord| is the best choice
 
 \section{Conclusions and Future Work}\label{sec:conclusions}
 
-Using type level programming techniques we have developed 
-an implementation of extensible records for Haskell that, during run-time, 
+Using type level programming techniques we have developed
+a couple of library implementations of extensible records for Haskell. 
+A tuple style implementation, with constant time search and linear time insertion, and a new formulation that
 takes logarithmic time for searching and removing elements and constant time for
-inserting elements. This run time performance is achieved by moving 
-most of the effort to compile time. 
-
+inserting elements. This run time performance is achieved by moving
+most of the effort to compile time
 \marcos{se podria decir en que casos es mejor usar Skew y en cuales Array}
 \bruno{hecho}
+
+In the actual implementations we follow \cite{Leijen:scopedlabels} in allowing label repetition.  
+A type-predicate |HLabelSet| can be added to disallow this as in \cite{KLS04}, with a slight cost in clarity 
+but no cost in run time performance.
 
 This approach can be used to improve the performance of systems
 that make extensive use of extensible records. 
