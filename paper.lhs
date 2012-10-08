@@ -588,10 +588,10 @@ observe that |arrayFind'| is just an undefined value.
 arrayFind' ::  ArrayFind' b v' r l v n  
                => b -> v' -> r -> l -> n
 arrayFind' = undefined
-^
+
 data HZero
 data HSucc n
-^
+
 class ArrayFind' b v' r l v n | b v' r l -> v n
 instance ArrayFind' HTrue v r l v HZero
 instance (HEq l l' b, ArrayFind' b v' r l v n) 
@@ -633,10 +633,10 @@ boilerplate. Although these instances can be automatically generated using Templ
 \begin{code}
 instance ToValue HZero where
   toValue _ = 0
-^
+
 hPrev :: HSucc n -> n
 hPrev = undefined
-^
+
 instance ToValue n => ToValue (HSucc n) where
   toValue n = 1 + toValue (hPrev n)
 \end{code}
@@ -1083,7 +1083,7 @@ instance  (  HSkewGet r l m
           HSkewUpdate l e r r'  where
     hSkewUpdate l e r = 
        hSkewUpdate' (hSkewGet r l) l e r
-^
+
 class HSkewUpdate' m l e r r' | m l e r -> r' where
     hSkewUpdate' :: m -> l -> e -> r -> r'
 \end{code}
@@ -1141,14 +1141,6 @@ keeping all other subtrees intact.
 Due to lazy evaluation, the searches of the label are performed only at compile time.
 Thus the operation runs in time logarithmic in the size of the record.
 
-
-%if style==newcode
-\begin{code}
-{-# NOINLINE myR' #-}
-updR = hUpdate l1 (l3 .=. "hi") myR'
-\end{code}
-%endif
-
 \subsubsection{Remove}
 
 Removing a field is easy based on updating.
@@ -1198,28 +1190,17 @@ instance
 \end{code}
 
 
-Finally |HRemove| is done in a single instance.
-We take the first node and call |HSkewUpdate|
+Finally |hSkewRemove| takes the first node and calls |hSkewUpdate|
 to duplicate it where the label we want gone was.
-Then |HSkewTail| removes the original occurrence,
+Then |hSkewTail| removes the original occurrence,
 at the start of the list.
 \begin{code}
-class HRemove l r r' | l r -> r' where
-    hRemove :: l -> r -> r'
-instance
-    (  HSkewUpdate l e e e'
-    ,  HSkewUpdate l e lt lt'
-    ,  HSkewUpdate l e rt rt'
-    ,  HSkewUpdate l e ts ts'
-    ,  HSkewTail (HCons (HNode e' lt' rt') ts') r'') =>
-       HRemove
-        l
-        (HCons (HNode e lt rt) ts)
-        r'' where
-    hRemove l (HCons (HNode e t t') ts) =
+hSkewRemove l (HCons (HNode e t t') ts) =
         hSkewTail $
         hSkewUpdate l e (HCons (HNode e t t') ts)
 \end{code}
+
+%% $ fix emacs color highlighting
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
