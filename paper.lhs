@@ -1062,6 +1062,189 @@ Thus, getting to |l7| at run time only traverses a (logarithmic length) fraction
 as we have seen in Figure~\ref{fig:search-skew}.
 Later we will examine runtime benchmarks.
 
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
+\subsubsection{Update}\label{sec:update}
+
+
+We can define a type-function |HUpdate| to change
+a field of some label
+with a new field with possibly new label and value.
+Analogously to |HHasField| and |HExtend|,
+|HUpdate| unpacks and repacks the |SkewRecord|,
+doing |HSkewUpdate| all the real work.
+|HSkewHasField| checks that the record
+does contain a field with our label. 
+
+\begin{code}
+class HUpdate l e r r' | l e r -> r' where
+    hUpdate :: l -> e -> r -> r'
+instance
+    (  HSkewHasField l r (HJust v)
+    ,  HSkewUpdate l e r r') =>
+       HUpdate l e (SkewRecord r) (SkewRecord r') where
+    hUpdate l e (SkewRecord r) =
+        SkewRecord (hSkewUpdate l e r)
+
+class HSkewUpdate l e r r' | l e r -> r' where
+    hSkewUpdate :: l -> e -> r -> r'
+\end{code}
+
+\noindent
+The base cases just return their argument using |id|.
+With no field, there's nothing to change.
+\begin{code}
+instance HSkewUpdate l e HNil HNil where
+    hSkewUpdate _ _ = id
+instance HSkewUpdate l e HEmpty HEmpty where
+    hSkewUpdate _ _ = id
+\end{code}
+
+\noindent
+|HSkewUpdate| is simpler than |HHasField|.
+We do not have to decide which subtree has the field to change.
+Instead, we just call |hSkewUpdate| recursively for all parts.
+\begin{code}
+instance
+    (  HSkewUpdate l e t t'
+    ,  HSkewUpdate l e ts ts') =>
+       HSkewUpdate l e (HCons t ts) (HCons t' ts') where
+    hSkewUpdate l e (HCons t ts) =
+        HCons
+            (hSkewUpdate l e t)
+            (hSkewUpdate l e ts)
+\end{code}
+In the |HNode| case, |hSkewUpdate| is recursively called to
+the left and right sub-trees, and also to the element of the node.
+\begin{code}
+instance
+    (  HSkewUpdate l e e' e''
+    ,  HSkewUpdate l e tl tl'
+    ,  HSkewUpdate l e tr tr') =>
+       HSkewUpdate l e (HNode e' tl tr) (HNode e'' tl' tr')
+       where
+    hSkewUpdate l e (HNode e' tl tr) =
+        HNode
+            (hSkewUpdate l e e')
+            (hSkewUpdate l e tl)
+            (hSkewUpdate l e tr)
+\end{code}
+
+\noindent
+The bottom case |LVPair| uses |HCond|
+from the |HList| type-function collection to only return
+an updated field if the labels match. 
+In other case the original element is returned.
+\begin{code}
+instance
+    (  HEq l l' b
+    ,  HCond b e (LVPair l' v') p) =>
+       HSkewUpdate l e (LVPair l' v') p where
+    hSkewUpdate l e e' =
+        hCond
+            (hEq l (labelLVPair e'))
+            e
+            e'
+\end{code}
+
+Of course, we want |HUpdate| to run as fast as possible.
+Rebuilding only the path to the field suffices,
+keeping all other subtrees intact,
+so the operation runs in time logarithmic in the size of the record.
+But we do not make any effort to reuse untouched parts of our original structure.
+In particular, the |HNode| case calls |hSkewUpdate| for the children
+and reassembles a new |HNode| with the result,
+even when no matching field exists below the current node.
+Executed literally, this program touches all nodes
+and runs in linear time,
+not what we want.
+However, GHC with optimizations enabled is smart enough
+to recognize that we are constructing values already available
+and changes our naive program to the smart, logarithm-time, version.
+
+%if style==newcode
+\begin{code}
+{-# NOINLINE myR' #-}
+updR = hUpdate l1 (l3 .=. "hi") myR'
+\end{code}
+%endif
+
+\subsubsection{Remove}
+
+Removing a field is easy based on updating.
+We overwrite the field we want gone with the first node,
+and then we remove the first node.
+Thus, we remove elements in logarithmic time while keeping the tree balanced.
+
+\noindent
+First we need a helper to remove the first element of a skew list.
+\begin{code}
+class HSkewTail ts ts' | ts -> ts' where
+    hSkewTail :: ts -> ts'
+\end{code}
+ \begin{figure}[htp]
+\begin{center}
+\includegraphics[scale=0.5]{tail.pdf}
+\end{center}
+\caption{Tail in a Skew} \label{fig:tail}
+\end{figure}
+
+\noindent
+In Figure~\ref{fig:tail} we show an example of the possible cases 
+we can find.
+The easy case is when the spine begins with a leaf.
+We just return the tail of the spine list.
+\begin{code}
+instance HSkewTail (HCons (HLeaf e) ts) ts where
+    hSkewTail (HCons _ ts) = ts
+\end{code}
+
+\noindent
+The other case is when the spine begins with a tree of three or more elements.
+Since |HLeaf| is a synonym of |HNode HEmpty HEmpty|,
+we need to assert that the subtrees of the root |HNode|
+are |HNode|s themselves.
+By construction, both subtrees have the same shape
+and pattern matching only the first suffices
+to make sure this case does not overlap with the previous one.
+In this case we grow the spine with the subtrees, throwing away the root.
+\begin{code}
+instance
+    HSkewTail
+        (HCons (HNode e t (HNode e' t' t'')) ts)
+        (HCons t ((HCons (HNode e' t' t'')) ts)) where
+    hSkewTail (HCons (HNode _ t t') ts) =
+        HCons t (HCons t' ts)
+\end{code}
+
+
+Finally |HRemove| is done in a single instance.
+We take the first node and call |HSkewUpdate|
+to duplicate it where the label we want gone was.
+Then |HSkewTail| removes the original occurrence,
+at the start of the list.
+\begin{code}
+class HRemove l r r' | l r -> r' where
+    hRemove :: l -> r -> r'
+instance
+    (  HSkewUpdate l e e e'
+    ,  HSkewUpdate l e lt lt'
+    ,  HSkewUpdate l e rt rt'
+    ,  HSkewUpdate l e ts ts'
+    ,  HSkewTail (HCons (HNode e' lt' rt') ts') r'') =>
+       HRemove
+        l
+        (SkewRecord (HCons (HNode e lt rt) ts))
+        (SkewRecord r'') where
+    hRemove l (SkewRecord (HCons (HNode e t t') ts)) =
+        SkewRecord $
+        hSkewTail $
+        hSkewUpdate l e (HCons (HNode e t t') ts)
+\end{code}
+
+%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+
 \section{Efficiency}\label{sec:efficiency}
 
 In order to chose the best implementation in practice and as a sanity check,
