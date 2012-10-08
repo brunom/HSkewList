@@ -142,7 +142,6 @@ or using a linked list \cite{Gaster96apolymorphic}.
 The tuple strategy offers the fastest possible lookup, but insertion is linear time.
 The linked list sits in opposite in the tradeoff curve,
 with constant time insertion but linear time lookup.
-
 Since a record is essentially a dictionary,
 the obvious strategy to bridge this gap is a search tree.
 While lookup is much improved to logarithmic time,
@@ -158,8 +157,8 @@ Our starting point is the Haskell library for strongly typed heterogeneous colle
 which provides an example implementation of extensible records. 
 A drawback of HList is that lookup, the most used operation on records, is linear time.
 We propose two alternative implementations for extensible records as a Haskell library, using the same techniques as HList.
-One is called |ArrayRecord| since it uses an array to hold the fields, achieving constant time lookup but linear time insertion.
-The other, |SkewRecord|, is based on a balanced tree structure and maintains constant time insertions but lowers lookup to logarithmic time.
+One, called |ArrayRecord|, uses an array to hold the fields, achieving constant time lookup but linear time insertion.
+The other alternative, called |SkewRecord|, is based on a balanced tree structure. It maintains constant time insertions, but lowers lookup to logarithmic time.
 %\marcos{no se habla de la version Array} \bruno{ahora si}
 
 Another contribution of this paper is the trick we use to reduce the run time work.
