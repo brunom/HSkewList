@@ -1017,7 +1017,12 @@ instance
         hSkewGet r l `hPlus` hSkewGet r' l
 \end{code}
 %
-The |HNode| case is a bigger version of the |HCons| case.
+Observe that when doing |hSkewGet r l `hPlus` hSkewGet r' l| if the label is not present in |r| then 
+the type system chooses the second instance of |HPlus|  (|HPlus HNothing b b|).
+Thus, by lazy evaluation, the subexpression |hSkewGet r l| is not evaluated
+since |hPlus| in that case simply returns its second argumnt.
+
+\noindent The |HNode| case is a bigger version of the |HCons| case.
 Here three recursive calls are made,
 for the current field, the left tree, and the right tree.
 Thus two |HPlus| calls are needed to combine the result.
