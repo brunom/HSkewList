@@ -720,8 +720,8 @@ Function |hArrayExtend| adds a field to an array record.
 \begin{code}
 hArrayExtend f = hArrayModifyList (HCons f)
  
-hArrayModifyList f (ArrayRecord r _) =
-  let  r'  = f r
+hArrayModifyList hc (ArrayRecord r _) =
+  let  r'  = hc r
        fs  = hMapAny r' 
   in   ArrayRecord r' (listArray (0, length fs - 1) fs)
 \end{code}
@@ -766,9 +766,11 @@ We use the respective functions |hListUpdate| and |hListRemove| from the HList
 implementation of records. 
 %
 \begin{code}
-hArrayUpdate l e  = hArrayModifyList (hListUpdate  l e)
+hArrayUpdate l e  
+   = hArrayModifyList (hListUpdate l e)
 
-hArrayRemove l    = hArrayModifyList (hListRemove  l)
+hArrayRemove l    
+   = hArrayModifyList (hListRemove l)
 \end{code}
 %
 With |HArrayUpdate| we change a field of some label with a new field with possibly new label and value.
