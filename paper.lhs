@@ -1401,6 +1401,73 @@ The graph exposes the linear time behavior of |ArrayRecord|, its Achilles' heel.
 \label{extend_time}
 \end{figure}
 
+For Figure~\ref{update_time} we compared updating the first and deepest element
+in each implementation.  As expected, |SkewRecord| is negligible.
+|Record| is a linear graph picking up somewhat probably after the CPU cache effects begins
+to play a role.  |ArrayRecord| is also linear but much slower.
+
+\begin{figure}[h]
+\begin{center}
+\begin{tikzpicture}[x=0.03375cm,y=0.0675cm]
+
+  \def\xmin{0}
+  \def\xmax{150}
+  \def\ymin{0}
+  \def\ymax{90}
+
+  % grid
+  \draw[style=help lines, xstep=10, ystep=5] (\xmin,\ymin) grid
+  (\xmax,\ymax);
+
+  % axes
+  \draw[->] (\xmin,\ymin) -- (\xmax,\ymin) node[right] {field count};
+  \draw[->] (\xmin,\ymin) -- (\xmin,\ymax) node[above] {time (s)};
+
+  % xticks and yticks
+  \foreach \x in {20,40,...,\xmax}
+  \node at (\x, \ymin) [below] {\x};
+  \foreach \y in {10,20,...,\ymax}
+  \node at (\xmin,\y) [left] {\y};
+
+  \draw[red] plot coordinates {
+    (0,   0.04)
+    (25,  0.59)
+    (50,  2.89)
+    (75,  4.31)
+    (100, 7.46)
+    (125, 10.5)
+    (150, 18.6)
+  };
+  \node[right,red] at (150, 19) {Record};
+
+  \draw[green] plot coordinates {
+    (0,   0.75)
+    (25,  7.45)
+    (50,  15.3)
+    (75,  30.5)
+    (100, 49.6)
+    (125, 67.7)
+    (150, 86.7)
+  };
+  \node[right,green] at (150, 87) {ArrayRecord};
+
+  \draw[blue] plot coordinates {
+    (0,   0.049)
+    (25,  0.096)
+    (50,  0.11)
+    (75,  0.11)
+    (100, 0.10)
+    (125, 0.10)
+    (150, 0.12)
+  };
+  \node[right,blue] at (150, 5) {SkewRecord};
+
+\end{tikzpicture}
+\end{center}
+\caption{Update: run time}
+\label{update_time}
+\end{figure}
+
 Figure~\ref{compile_time} shows how compile time for the three implementations grows.
 |SkewRecord| is twice as slow as |HList| records, and |ArrayRecord| falls in between.
 In previous versions of this paper that run the benchmarks with GHC version 7.4,
