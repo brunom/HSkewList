@@ -1254,7 +1254,7 @@ Run time comparisons are shown in Figure~\ref{run_time}.
   \def\xmin{0}
   \def\xmax{200}
   \def\ymin{0}
-  \def\ymax{25}
+  \def\ymax{26}
 
   % grid
   \draw[style=help lines, xstep=12.5, ystep=2] (\xmin,\ymin) grid
@@ -1377,7 +1377,7 @@ The graph exposes the linear time behavior of |ArrayRecord|, its Achilles' heel.
   \foreach \y in {2,4,...,\ymax}
   \node at (\xmin,\y) [left] {\y};
 
-  \draw[red] plot coordinates {
+  \draw[green] plot coordinates {
     (0,   0.08)
     (25,  0.53)
     (50,  1.01)
@@ -1396,12 +1396,79 @@ The graph exposes the linear time behavior of |ArrayRecord|, its Achilles' heel.
     (375,11.60)
     (400,12.71)
   };
-  \node[right,red] at (400, 13) {ArrayRecord};
+  \node[right,green] at (400, 13) {ArrayRecord};
 
 \end{tikzpicture}
 \end{center}
 \caption{Extend: run time}
 \label{extend_time}
+\end{figure}
+
+For Figure~\ref{update_time} we compared updating the first and deepest element
+in each implementation.  As expected, |SkewRecord| is negligible.
+|Record| is a linear graph picking up somewhat probably after the CPU cache effects begins
+to play a role.  |ArrayRecord| is also linear but much slower.
+
+\begin{figure}[h]
+\begin{center}
+\begin{tikzpicture}[x=0.03375cm,y=0.045cm]
+
+  \def\xmin{0}
+  \def\xmax{150}
+  \def\ymin{0}
+  \def\ymax{90}
+
+  % grid
+  \draw[style=help lines, xstep=10, ystep=7.5] (\xmin,\ymin) grid
+  (\xmax,\ymax);
+
+  % axes
+  \draw[->] (\xmin,\ymin) -- (\xmax,\ymin) node[right] {field count};
+  \draw[->] (\xmin,\ymin) -- (\xmin,\ymax) node[above] {time (s)};
+
+  % xticks and yticks
+  \foreach \x in {20,40,...,\xmax}
+  \node at (\x, \ymin) [below] {\x};
+  \foreach \y in {15,30,...,\ymax}
+  \node at (\xmin,\y) [left] {\y};
+
+  \draw[red] plot coordinates {
+    (0,   0.04)
+    (25,  0.59)
+    (50,  2.89)
+    (75,  4.31)
+    (100, 7.46)
+    (125, 10.5)
+    (150, 18.6)
+  };
+  \node[right,red] at (150, 19) {Record};
+
+  \draw[green] plot coordinates {
+    (0,   0.75)
+    (25,  7.45)
+    (50,  15.3)
+    (75,  30.5)
+    (100, 49.6)
+    (125, 67.7)
+    (150, 86.7)
+  };
+  \node[right,green] at (150, 87) {ArrayRecord};
+
+  \draw[blue] plot coordinates {
+    (0,   0.049)
+    (25,  0.096)
+    (50,  0.11)
+    (75,  0.11)
+    (100, 0.10)
+    (125, 0.10)
+    (150, 0.12)
+  };
+  \node[right,blue] at (150, 7) {SkewRecord};
+
+\end{tikzpicture}
+\end{center}
+\caption{Update: run time}
+\label{update_time}
 \end{figure}
 
 Figure~\ref{compile_time} shows how compile time for the three implementations grows.
@@ -1457,27 +1524,6 @@ Otherwise, |SkewRecord| is the best choice
   \node[right,red] at (400, 10) {Record};
 
   \draw[green] plot coordinates {
-    (0  ,0.54)
-    (25 ,0.55)
-    (50 ,0.84)
-    (75 ,1.27)
-    (100,1.83)
-    (125,2.54)
-    (150,3.53)
-    (175,4.86)
-    (200,6.17)
-    (225,7.81)
-    (250,9.72)
-    (275,13.20)
-    (300,15.80)
-    (325,19.07)
-    (350,21.94)
-    (375,27.50)
-    (400,31.29)
-  };
-  \node[right,green] at (400,30) {SkewRecord};
-
-  \draw[blue] plot coordinates {
     (0  ,0.36)
     (25 ,0.56)
     (50 ,0.86)
@@ -1496,7 +1542,29 @@ Otherwise, |SkewRecord| is the best choice
     (375,13.18)
     (400,15.58)
   };
-  \node[right,blue] at (400,15) {ArrayRecord};
+  \node[right,green] at (400,15) {ArrayRecord};
+
+  \draw[blue] plot coordinates {
+    (0  ,0.54)
+    (25 ,0.55)
+    (50 ,0.84)
+    (75 ,1.27)
+    (100,1.83)
+    (125,2.54)
+    (150,3.53)
+    (175,4.86)
+    (200,6.17)
+    (225,7.81)
+    (250,9.72)
+    (275,13.20)
+    (300,15.80)
+    (325,19.07)
+    (350,21.94)
+    (375,27.50)
+    (400,31.29)
+  };
+  \node[right,blue] at (400,30) {SkewRecord};
+
 \end{tikzpicture}
 \end{center}
 \caption{Lookup: compile time}
