@@ -181,6 +181,7 @@ Since the structure is linear, the search and the path have the same length.
 \end{figure}
 
 Thus, the key idea is very simple. When in Haskell we do |"foo" == "baar"|, the entire process of searching the correct instance of |Eq| to use is performed at compile time. No work is done at run time to search the correct instances and discard the incorrect ones. We apply the same concept to perform the search of a label into a record. Given that a label is represented by a singleton type we have enough information to determine the ``path of instances" that goes to it, discarding any possible wrong path.
+We also make use of lazy evaluation, to tell the compiler which path to follow without any cost at run time.
 
 %Instead of a linear structure as used by HList, 
 For example, in one of our proposed implementations we use an alternative structure for the representation of heterogeneous collections which is based on balanced trees.
@@ -194,15 +195,6 @@ from the information given by the compile time search, leading to logarithmic le
 \end{center}
 \caption{Search |l7| in balanced tree} \label{fig:search-skew}
 \end{figure}
-
-Although this paper is focused on showing more efficient implementations of extensible records,
-our aim is mainly to show how harnessing type level programming techniques it is possible
-to improve the run time performance of some operations by moving certain computations to compile time.
-Type level programming is commonly used to increase the expressivity and type safety of programs,
-but in this paper we show it can also be helpful for efficiency matters. 
-
-
-
 
 
 In the rest of this paper we review the type-level techniques used to implement extensible records 
@@ -1502,6 +1494,16 @@ Otherwise, |SkewRecord| is the best choice
 
 
 \section{Conclusions and Future Work}\label{sec:conclusions}
+
+Although this paper is focused on showing more efficient implementations of extensible records,
+our aim is mainly to show how harnessing type level programming techniques it is possible
+to improve the run time performance of some operations by moving certain computations to compile time.
+Type level programming is commonly used to increase the expressivity and type safety of programs,
+but in this paper we show it can also be helpful for efficiency matters. 
+This is the case specially for type level programming in Haskell, 
+where there exists a phase distinction between compile and run time;
+types are computed at compile time while values are computed at run time.
+
 
 Using type level programming techniques we have developed
 a couple of library implementations of extensible records for Haskell. 
