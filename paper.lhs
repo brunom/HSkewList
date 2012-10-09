@@ -1368,7 +1368,7 @@ The graph exposes the linear time behavior of |ArrayRecord|, its Achilles' heel.
   \foreach \y in {2,4,...,\ymax}
   \node at (\xmin,\y) [left] {\y};
 
-  \draw[red] plot coordinates {
+  \draw[green] plot coordinates {
     (0,   0.08)
     (25,  0.53)
     (50,  1.01)
@@ -1387,7 +1387,7 @@ The graph exposes the linear time behavior of |ArrayRecord|, its Achilles' heel.
     (375,11.60)
     (400,12.71)
   };
-  \node[right,red] at (400, 13) {ArrayRecord};
+  \node[right,green] at (400, 13) {ArrayRecord};
 
 \end{tikzpicture}
 \end{center}
@@ -1515,27 +1515,6 @@ Otherwise, |SkewRecord| is the best choice
   \node[right,red] at (400, 10) {Record};
 
   \draw[green] plot coordinates {
-    (0  ,0.54)
-    (25 ,0.55)
-    (50 ,0.84)
-    (75 ,1.27)
-    (100,1.83)
-    (125,2.54)
-    (150,3.53)
-    (175,4.86)
-    (200,6.17)
-    (225,7.81)
-    (250,9.72)
-    (275,13.20)
-    (300,15.80)
-    (325,19.07)
-    (350,21.94)
-    (375,27.50)
-    (400,31.29)
-  };
-  \node[right,green] at (400,30) {SkewRecord};
-
-  \draw[blue] plot coordinates {
     (0  ,0.36)
     (25 ,0.56)
     (50 ,0.86)
@@ -1554,7 +1533,29 @@ Otherwise, |SkewRecord| is the best choice
     (375,13.18)
     (400,15.58)
   };
-  \node[right,blue] at (400,15) {ArrayRecord};
+  \node[right,green] at (400,15) {ArrayRecord};
+
+  \draw[blue] plot coordinates {
+    (0  ,0.54)
+    (25 ,0.55)
+    (50 ,0.84)
+    (75 ,1.27)
+    (100,1.83)
+    (125,2.54)
+    (150,3.53)
+    (175,4.86)
+    (200,6.17)
+    (225,7.81)
+    (250,9.72)
+    (275,13.20)
+    (300,15.80)
+    (325,19.07)
+    (350,21.94)
+    (375,27.50)
+    (400,31.29)
+  };
+  \node[right,blue] at (400,30) {SkewRecord};
+
 \end{tikzpicture}
 \end{center}
 \caption{Lookup: compile time}
