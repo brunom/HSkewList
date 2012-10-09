@@ -167,7 +167,8 @@ The other alternative, called |SkewRecord|, is based on a balanced tree structur
 Another contribution of this paper is the trick we use to reduce the run time work.
 We have observed that, when looking-up an element in a HList,
 the element is first searched at compile time in order to determine whether it
-belongs to the list and raise an error when it does not.
+belongs to the list.
+%and raise an error when it does not.
 This search generates the path the program follows at run time to obtain the element.
 In Figure~\ref{fig:search-hlist} we represent with a dashed arrow the compile time search, 
 and with a solid arrow the generated path followed at run time. 
@@ -180,14 +181,13 @@ Since the structure is linear, the search and the path have the same length.
 \caption{Search |l7| in HList} \label{fig:search-hlist}
 \end{figure}
 
-Thus, the key idea is very simple. When in Haskell we do |"foo" == "baar"|, the entire process of searching the correct instance of |Eq| to use is performed at compile time. No work is done at run time to search the correct instances and discard the incorrect ones. We apply the same concept to perform the search of a label into a record. Given that a label is represented by a singleton type we have enough information to determine the ``path of instances" that goes to it, discarding any possible wrong path.
+Thus, the key idea is very simple. When in Haskell we compare, for example, two stings, such as |"foo" == "baar"|, the entire process of searching the correct instance of |Eq| to be used is performed at compile time. No work is done at run time to search the correct instance and discard the incorrect one. We apply the same concept to perform the search of a label into a record. Given that a label is represented by a singleton type we have enough information to determine the ``path of instances" that goes to it, discarding any possible wrong path.
 We also make use of lazy evaluation, to tell the compiler which path to follow without any cost at run time.
 
 %Instead of a linear structure as used by HList, 
-For example, in one of our proposed implementations we use an alternative structure for the representation of heterogeneous collections which is based on balanced trees.
-Such a structure better profits 
-from the information given by the compile time search, leading to logarithmic length paths in the run time traversal
-(see Figure~\ref{fig:search-skew}). \marcos{no se habla de la version Array}
+For example, one of our proposed implementations uses an alternative structure for the representation of heterogeneous collections which is based on balanced trees.
+Such a structure better profits from the information given by the compile time search, leading to logarithmic length paths in the run time traversal (see Figure~\ref{fig:search-skew}). 
+We show experimental results that confirm this behaviour. 
 
 \begin{figure}[tp]
 \begin{center}
@@ -197,12 +197,21 @@ from the information given by the compile time search, leading to logarithmic le
 \end{figure}
 
 
+The rest of the paper is organized as follows. 
+We start with a brief review of the type-level techniques used to implement extensible records 
+by HList (Section~\ref{sec:hlist}). 
+In Section~\ref{sec:faster} we show how using the same type-level techniques we can obtain alternative implementations of extensible records with faster lookup operations at run time. 
+Section~\ref{sec:efficiency} presents some experimental results that compare the implementations we propose with HList, both at compile time and run time. 
+Finally, in Section~\ref{sec:conclusions} we draw some conclusions and present possible directions for future work.
+
+%if False
 In the rest of this paper we review the type-level techniques used to implement extensible records 
 by HList (Section~\ref{sec:hlist}) and how we use these techniques to provide a couple of alternative implementations, 
 %based on arrays and skew lists \cite{Mye83,OkaThesis},
 which turn out to have faster lookup operations at run time (Section~\ref{sec:faster}). 
 In Section~\ref{sec:efficiency} we show some results about the efficiency of our approach compared to HList.
 Finally, in Section~\ref{sec:conclusions} we present some conclusions and possible directions for future work.
+%endif
 
 
 \section{HList}\label{sec:hlist}
