@@ -1114,7 +1114,7 @@ instance  (  HSkewGet r l m
           HSkewUpdate l e r r'  where
     hSkewUpdate l e r = 
        hSkewUpdate' (hSkewGet r l) l e r
-
+^
 class HSkewUpdate' m l e r r' | m l e r -> r' where
     hSkewUpdate' :: m -> l -> e -> r -> r'
 \end{code}
@@ -1166,7 +1166,7 @@ are searching for (because we are considering the case |HJust v|), we simply ret
 instance
     HSkewUpdate' (HJust v) l e (Field l v) e 
      where
-    hSkewUpdate' _ l e e' = e
+       hSkewUpdate' _ l e e' = e
 \end{code}
 
 At run time, this implementation of |hSkewUpdate| only
@@ -1175,13 +1175,6 @@ keeping all other sub-trees intact.
 % Due to lazy evaluation, the searches of the label are performed only at compile time.
 Thus the operation runs in time logarithmic in the size of the record.
 
-\begin{figure}[tp]
-\begin{center}
-\includegraphics[scale=0.5]{tail.pdf}
-\end{center}
-\caption{Tail in a Skew} \label{fig:tail}
-\end{figure}
-
 \subsubsection{Remove}
 
 Removing a field is easy based on updating.
@@ -1189,7 +1182,7 @@ We overwrite the field we want to eliminate with the first field in the skew lis
 and then we remove the first field from the list.
 Thus, we remove elements in logarithmic time while keeping the tree balanced.
 
-First we need a helper to remove the first element of a skew list.
+First, we need a helper to remove the first element of a skew list.
 %
 \begin{code}
 class HSkewTail ts ts' | ts -> ts' where
@@ -1199,6 +1192,14 @@ class HSkewTail ts ts' | ts -> ts' where
 \noindent
 In Figure~\ref{fig:tail} we show an example of the possible cases 
 we can find.
+
+\begin{figure}[htp]
+\begin{center}
+\includegraphics[scale=0.5]{tail.pdf}
+\end{center}
+\caption{Tail in a Skew} \label{fig:tail}
+\end{figure}
+
 The easy case is when the spine begins with a leaf.
 We just return the tail of the spine list.
 \begin{code}
@@ -1218,7 +1219,8 @@ In this case we grow the spine with the sub-trees, throwing away the root.
 instance
     HSkewTail
         (HCons (HNode e t (HNode e' t' t'')) ts)
-        (HCons t ((HCons (HNode e' t' t'')) ts)) where
+        (HCons t ((HCons (HNode e' t' t'')) ts)) 
+    where
     hSkewTail (HCons (HNode _ t t') ts) =
         HCons t (HCons t' ts)
 \end{code}
@@ -1579,15 +1581,6 @@ Otherwise, |SkewRecord| is the best choice
 
 \section{Conclusions and Future Work}\label{sec:conclusions}
 
-Although this paper was focused on showing more efficient implementations of extensible records,
-our aim was mainly to show how harnessing type level programming techniques it is possible
-to improve the run time performance of some operations by moving certain computations to compile time.
-Type level programming is commonly used to increase the expressivity and type safety of programs,
-but in this paper we showed it can also be helpful for efficiency matters. 
-This is the case specially for type level programming in Haskell, 
-where there exists a phase distinction between compile and run time;
-types are computed at compile time while values are computed at run time.
-
 Using type level programming techniques we developed two
 new implementations of extensible records for Haskell: 
 An array-like implementation, with constant time search and linear time insertion, and an impementation based on balanced trees that takes logarithmic time for searching and removing elements and constant time for
@@ -1604,6 +1597,15 @@ that make extensive use of extensible records.
 Some examples of such systems are the first-class attribute grammars library AspectAG \cite{FlyFirstClass}, 
 the OOHaskell \cite{OOHaskell} library for object-oriented functional programming,
 or libraries for relational databases such as CoddFish \cite{SV06} and HaskellDB \cite{haskelldb}.
+
+Although the paper was focused on showing more efficient implementations of extensible records,
+our aim was mainly to show how harnessing type level programming techniques it is possible
+to improve the run time performance of some operations by moving certain computations to compile time.
+Type level programming is commonly used to increase the expressivity and type safety of programs,
+but in this paper we showed it can also be helpful for efficiency matters. 
+This is the case specially for type level programming in Haskell, 
+where there exists a phase distinction between compile and run time;
+types are computed at compile time while values are computed at run time.
 
 Interesting future work is to find a way to reduce compilation time.
 Experiments demonstrate that GHC memoizes class instances,
