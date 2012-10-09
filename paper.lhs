@@ -1245,7 +1245,7 @@ Run time comparisons are shown in Figure~\ref{run_time}.
   \def\xmin{0}
   \def\xmax{200}
   \def\ymin{0}
-  \def\ymax{25}
+  \def\ymax{26}
 
   % grid
   \draw[style=help lines, xstep=12.5, ystep=2] (\xmin,\ymin) grid
@@ -1402,7 +1402,7 @@ to play a role.  |ArrayRecord| is also linear but much slower.
 
 \begin{figure}[h]
 \begin{center}
-\begin{tikzpicture}[x=0.03375cm,y=0.0675cm]
+\begin{tikzpicture}[x=0.03375cm,y=0.045cm]
 
   \def\xmin{0}
   \def\xmax{150}
@@ -1410,7 +1410,7 @@ to play a role.  |ArrayRecord| is also linear but much slower.
   \def\ymax{90}
 
   % grid
-  \draw[style=help lines, xstep=10, ystep=5] (\xmin,\ymin) grid
+  \draw[style=help lines, xstep=10, ystep=7.5] (\xmin,\ymin) grid
   (\xmax,\ymax);
 
   % axes
@@ -1420,7 +1420,7 @@ to play a role.  |ArrayRecord| is also linear but much slower.
   % xticks and yticks
   \foreach \x in {20,40,...,\xmax}
   \node at (\x, \ymin) [below] {\x};
-  \foreach \y in {10,20,...,\ymax}
+  \foreach \y in {15,30,...,\ymax}
   \node at (\xmin,\y) [left] {\y};
 
   \draw[red] plot coordinates {
@@ -1454,7 +1454,7 @@ to play a role.  |ArrayRecord| is also linear but much slower.
     (125, 0.10)
     (150, 0.12)
   };
-  \node[right,blue] at (150, 5) {SkewRecord};
+  \node[right,blue] at (150, 7) {SkewRecord};
 
 \end{tikzpicture}
 \end{center}
