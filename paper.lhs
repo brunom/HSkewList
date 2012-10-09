@@ -181,7 +181,7 @@ Since the structure is linear, the search and the path have the same length.
 \caption{Search |l7| in HList} \label{fig:search-hlist}
 \end{figure}
 
-Thus, the key idea is very simple. When in Haskell we compare, for example, two stings, such as |"foo" == "baar"|, the entire process of searching the correct instance of |Eq| to be used is performed at compile time. No work is done at run time to search the correct instance and discard the incorrect one. We apply the same concept to perform the search of a label into a record. Given that a label is represented by a singleton type we have enough information to determine the ``path of instances" that goes to it, discarding any possible wrong path.
+Thus, the key idea is very simple. When in Haskell we compare, for example, two stings, such as |"foo" == "baar"|, the entire process of searching the correct instance of |Eq| to be used is performed at compile time. No work is done at run time to search the correct instance and discard the incorrect ones. We apply the same concept to perform the search of a label into a record. Given that a label is represented by a singleton type we have enough information to determine the ``path of instances" that goes to it, discarding any possible wrong path.
 We also make use of lazy evaluation, to tell the compiler which path to follow without any cost at run time.
 
 %Instead of a linear structure as used by HList, 
@@ -1020,7 +1020,7 @@ instance
 Observe that when doing |hSkewGet r l `hPlus` hSkewGet r' l| if the label is not present in |r| then 
 the type system chooses the second instance of |HPlus|  (|HPlus HNothing b b|).
 Thus, by lazy evaluation, the subexpression |hSkewGet r l| is not evaluated
-since |hPlus| in that case simply returns its second argumnt.
+since |hPlus| in that case simply returns its second argument.
 
 \noindent The |HNode| case is a bigger version of the |HCons| case.
 Here three recursive calls are made,
@@ -1579,28 +1579,25 @@ Otherwise, |SkewRecord| is the best choice
 
 \section{Conclusions and Future Work}\label{sec:conclusions}
 
-Although this paper is focused on showing more efficient implementations of extensible records,
-our aim is mainly to show how harnessing type level programming techniques it is possible
+Although this paper was focused on showing more efficient implementations of extensible records,
+our aim was mainly to show how harnessing type level programming techniques it is possible
 to improve the run time performance of some operations by moving certain computations to compile time.
 Type level programming is commonly used to increase the expressivity and type safety of programs,
-but in this paper we show it can also be helpful for efficiency matters. 
+but in this paper we showed it can also be helpful for efficiency matters. 
 This is the case specially for type level programming in Haskell, 
 where there exists a phase distinction between compile and run time;
 types are computed at compile time while values are computed at run time.
 
-
-Using type level programming techniques we have developed
-a couple of library implementations of extensible records for Haskell. 
-A tuple style implementation, with constant time search and linear time insertion, and a new formulation that
-takes logarithmic time for searching and removing elements and constant time for
+Using type level programming techniques we developed two
+new implementations of extensible records for Haskell: 
+An array-like implementation, with constant time search and linear time insertion, and an impementation based on balanced trees that takes logarithmic time for searching and removing elements and constant time for
 inserting elements. This run time performance is achieved by moving
-most of the effort to compile time
+most of the effort to compile time.
 \marcos{se podria decir en que casos es mejor usar Skew y en cuales Array}
 \bruno{hecho}
 
 In the actual implementations we follow \cite{Leijen:scopedlabels} in allowing label repetition.  
-A type-predicate |HLabelSet| can be added to disallow this as in \cite{KLS04}, with a slight cost in clarity 
-but no cost in run time performance.
+A type-predicate |HLabelSet| can be added to disallow this as in \cite{KLS04}, with a slight cost in clarity but no cost in run time performance.
 
 This approach can be used to improve the performance of systems
 that make extensive use of extensible records. 
