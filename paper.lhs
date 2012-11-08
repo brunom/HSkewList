@@ -1,4 +1,5 @@
-\documentclass[natbib,preprint]{sigplanconf}
+\documentclass[natbib]{sigplanconf}
+
 %\usepackage{pdfsync}
 \usepackage{color}
 \usepackage{graphicx}
@@ -64,15 +65,18 @@ hListUpdate a = hSkewUpdate a
 hListRemove = undefined
 
 \end{code}
+
+%format ^ = 
+
 %endif
 
 %\setlength{\parindent}{0in}
 
 \begin{document}
 
-\conferenceinfo{Partial Evaluation and Program Manipulation,} {January 20-21, 2013, Rome, Italy}
+\conferenceinfo{PEPM'13,} {January 21--22, 2013, Rome, Italy.}
 \CopyrightYear{2013}
-%\copyrightdata{978-1-60558-332-7/09/08}
+\copyrightdata{978-1-4503-1842-6/13/01}
 
 %\titlebanner{submitted to Haskell Symposium 2011}         % These are ignored unless
 %\preprintfooter{version of Jul 21, 2012}     % 'preprint' option specified.
@@ -366,7 +370,7 @@ class HListGet r l v | r l -> v where
 \noindent 
 At the type-level it is statically checked that the record |r| indeed has
 a field with label |l| associated with a value of the type |v|.
-At value-level |(hListGet)| returns the value of type |v|.
+At value-level |hListGet| returns the value of type |v|.
 For example, the following expression returns the string |"last"|:
 
 \begin{code}
@@ -479,7 +483,7 @@ The usual replacement when lookup in a linked list is slow
 is a search tree.
 In that case we would need to define a |HOrd| type-function
 analogue to HList's magic |HEq|
-and port some staple balanced tree to compile time,
+and port some standard balanced tree to compile time,
 tricky rotations and all.
 As unappealing as this already is,
 the real roadblock is |HOrd|.
@@ -488,8 +492,8 @@ defining such type function for
 unstructured labels is beyond (our) reach. 
 
 The key insight is that sub-linear behavior is only needed at run time.
-We do not worry to keep the work done at compile time superlinear
-if it helps us to speed up our programs at run time.
+We do not worry if the work done at compile time is superlinear
+as long as it helps us to speed up our programs at run time.
 |HListGet| already looks for our label at compile time
 to fail compilation if we require a field for a record
 without such label.
@@ -499,7 +503,12 @@ in a structure that allows fast random access and depends on the compiler to
 hardcode the path to our fields.
 
 We will present two variants of faster records.
-The first follows the conventional approach of
+To make code listing shorter and easier to understand,
+we implement each variant with independent interfaces.
+However, it would be possible to provide a common class-based interface
+for all variants. 
+
+The first variant follows the conventional approach of
 storing the record as a tuple.
 However, because Haskell does not offer
 genericity over the length of tuples as in \cite{Tullsen00thezip}, i.e. efficient access to the $i$-th element of an arbitrary length tuple,
@@ -562,7 +571,7 @@ hArrayGet (ArrayRecord r a) l =
 Figure~\ref{fig:search-array} shows a graphical representation of this process. 
 Dashed arrow represents the compile time search of the field in the heterogeneous list which results in the index of the element in the array. Using this index the element is retrieved from the array in constant time at run time (solid arrow).
 
-\begin{figure}[htp]
+\begin{figure}[t]
 \begin{center}
 \includegraphics[scale=0.5]{search-array.pdf}
 \end{center}
@@ -574,13 +583,12 @@ using |HEq| to discriminate the cases of
 the label of the current field, which may match or not the searched one. 
 %
 \begin{code}
-instance
-    (  HEq l l' b
-    ,  ArrayFind' b v' r l v n
-    ,  ToValue n) =>
-    ArrayFind (HCons (Field l' v') r) l v where
-      arrayFind (HCons f r) l =
-        toValue (arrayFind' (hEq l (label f)) (value f) r l)
+instance  (  HEq l l' b
+          ,  ArrayFind' b v' r l v n
+          ,  ToValue n) =>
+   ArrayFind (HCons (Field l' v') r) l v where
+     arrayFind (HCons f r) l =
+       toValue (arrayFind' (hEq l (label f)) (value f) r l)
 \end{code}
 %
 A difference with |HListGet| is that the work of searching the label,
@@ -616,7 +624,7 @@ class ToValue n where
   toValue :: n -> Int
 \end{code}
 %
-In order to perform this conversion in constant time, we have to provide 
+To perform this conversion in constant time, we have to provide 
 one specific instance of |ToValue| for every type-level natural we use.
 \begin{spec}
 instance ToValue HZero where
@@ -736,7 +744,11 @@ hArrayModifyList hc (ArrayRecord r _) =
 \end{code}
 %
 %if False
-> infixr 2 `hArrayExtend`
+
+\begin{code}
+infixr 2 `hArrayExtend`
+\end{code}
+
 %endif
 %
 The new field (which includes the type information of the element) is added to the heterogeneous list of the old record. The extended heterogeneous list
@@ -1226,7 +1238,7 @@ instance
 \end{code}
 
 
-Finally |hSkewRemove| takes the first node and calls |hSkewUpdate|
+Last, |hSkewRemove| takes the first node and calls |hSkewUpdate|
 to duplicate it where the label we want gone was.
 Then |hSkewTail| removes the original occurrence,
 at the start of the list.
@@ -1249,12 +1261,12 @@ We use GHC version 7.6.1 64 bits under OS X 10.8 Mountain Lion.
 
 We time accessing the last of an increasing number of fields.
 The program constructs the list once
-and runs a 10.000.000 iteration lookup loop,
+and runs a 10 million iteration lookup loop,
 taking the necessary precautions to avoid the compiler
 exploiting the language lazyness to optimize out all our code.
 Run time comparisons are shown in Figure~\ref{run_time}.
 
-\begin{figure}[h]
+\begin{figure}[b]
 \begin{center}
 \begin{tikzpicture}[x=0.027cm,y=0.16875cm]
 
@@ -1290,7 +1302,7 @@ Run time comparisons are shown in Figure~\ref{run_time}.
     (150,18.3)
     (200,24.9)
   };
-  \node[right,red] at (200, 25) {Record};
+  \node[right,red] at (200, 25) {HListRecord};
 
 
   \draw[green] plot coordinates {
@@ -1330,7 +1342,7 @@ Run time comparisons are shown in Figure~\ref{run_time}.
 \end{figure}
 
 Note how in practice |ArrayRecord| and |SkewRecord| take the same time no matter the length of the record.
-Actually, sometimes larger records run faster than smaller for |SkewRecord|.
+Actually, sometimes larger records run faster than smaller records for |SkewRecord|.
 For example, a 31 size skew list contains a single tree,
 so elements are at most 5 hops away.
 But a 28 size skew lists contains trees sized
@@ -1353,15 +1365,7 @@ run time overhead
 above having to copy the 10 fields from the linked list to the tree
 when the limit is surpassed.
 
-Next, Figure~\ref{extend_time} shows the runtime of inserting one more
-field to a record of a given length.
-To simulate a real time situation, the field just inserted is immediately
-looked up for, disabling the optimization for |ArrayRecord|.
-The insert-lookup process is run 1.000.000 times.
-Only |ArrayRecord| is graphed because the other alternatives are too fast in this case.
-The graph exposes the linear time behavior of |ArrayRecord|, its Achilles' heel.
-
-\begin{figure}[h]
+\begin{figure}[t]
 \begin{center}
 \begin{tikzpicture}[x=0.0135cm,y=0.3375cm]
 
@@ -1411,12 +1415,17 @@ The graph exposes the linear time behavior of |ArrayRecord|, its Achilles' heel.
 \label{extend_time}
 \end{figure}
 
-For Figure~\ref{update_time} we compared updating the first and deepest element
-in each implementation.  As expected, |SkewRecord| is negligible.
-|Record| is a linear graph picking up somewhat probably after the CPU cache effects begins
-to play a role.  |ArrayRecord| is also linear but much slower.
 
-\begin{figure}[h]
+Next, Figure~\ref{extend_time} shows the runtime of inserting one more
+field to a record of a given length.
+To force the worst case for |ArrayRecord|, we disable the insertion optimization by immediately looking up the field just inserted.
+The insert-lookup process is run one million times.
+Only |ArrayRecord| is graphed because the other alternatives are too fast in this case.
+The graph exposes the linear time behavior of |ArrayRecord|, its Achilles' heel.
+However, we do not expect real life applications to fall in this case.
+In general, multiple adjacent insertions preceding a lookup would be the common case. 
+
+\begin{figure}[b]
 \begin{center}
 \begin{tikzpicture}[x=0.03375cm,y=0.045cm]
 
@@ -1448,7 +1457,7 @@ to play a role.  |ArrayRecord| is also linear but much slower.
     (125, 10.5)
     (150, 18.6)
   };
-  \node[right,red] at (150, 19) {Record};
+  \node[right,red] at (150, 19) {HListRecord};
 
   \draw[green] plot coordinates {
     (0,   0.75)
@@ -1478,15 +1487,24 @@ to play a role.  |ArrayRecord| is also linear but much slower.
 \label{update_time}
 \end{figure}
 
+
+For Figure~\ref{update_time} we compared updating the first and deepest element
+in each implementation.  As expected, |SkewRecord| is negligible.
+|HListRecord| is a linear graph picking up somewhat probably after the CPU cache effects begins
+to play a role.  |ArrayRecord| is also linear but much slower.
+
+
 Figure~\ref{compile_time} shows how compile time for the three implementations grows.
 |SkewRecord| is twice as slow as |HList| records, and |ArrayRecord| falls in between.
+%if False
 In previous versions of this paper that run the benchmarks with GHC version 7.4,
 |SkewRecord| was comparatively much slower and we had to advise against it for
 debugging and development, which require rapid turn around.
+%endif
 When insertion is rare, we prefer |ArrayRecord| because of the compile time speed.
 Otherwise, |SkewRecord| is the best choice
 
-\begin{figure}[h]
+\begin{figure}[t]
 \begin{center}
 \begin{tikzpicture}[x=0.015cm,y=0.135cm]
 
@@ -1528,7 +1546,7 @@ Otherwise, |SkewRecord| is the best choice
     (375,8.61)
     (400,9.64)
    };
-  \node[right,red] at (400, 10) {Record};
+  \node[right,red] at (400, 10) {HListRecord};
 
   \draw[green] plot coordinates {
     (0  ,0.36)
@@ -1586,8 +1604,6 @@ new implementations of extensible records for Haskell:
 An array-like implementation, with constant time search and linear time insertion, and an impementation based on balanced trees that takes logarithmic time for searching and removing elements and constant time for
 inserting elements. This run time performance is achieved by moving
 most of the effort to compile time.
-\marcos{se podria decir en que casos es mejor usar Skew y en cuales Array}
-\bruno{hecho}
 
 In the actual implementations we follow \cite{Leijen:scopedlabels} in allowing label repetition.  
 A type-predicate |HLabelSet| can be added to disallow this as in \cite{KLS04}, with a slight cost in clarity but no cost in run time performance.
@@ -1618,6 +1634,13 @@ To improve performance, the code can be rewritten with type families.
 The main reason why we based our development on functional dependencies is the lack of overlapping instances at type families. 
 In case further investigation on type families solves this problem we would be able to rephrase our implementation 
 in terms of type families with a trivial translation, achieving a more functional style implementation.
+
+An interesting aspect of the proposed approach to extensible records is that it can be encoded as a Haskell library, 
+using only nowadays established extensions implemented for example in current versions of GHC.
+However, better performance could be achieved if our approach is developed as a built-in implementation in a compiler. 
+In that case, the |ArrayRecord| solution reduces to the standard tuple-based techniques \cite{Gaster96apolymorphic}.
+On the other hand, |SkewRecord| provides a novel encoding with fast lookup and insertion that would preserve its advantages
+even as a built-in solution.
 
 \bibliographystyle{plainnat}
 

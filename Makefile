@@ -3,7 +3,8 @@ all: paper.pdf paper.exe
 run : paper.exe
 	time ./paper.exe
 
-GHC=ghc-7.6.1
+GHC=ghc
+%GHC=ghc-7.6.1
 %GHC=ghc-7.4.2
 
 paper.exe : paper.hs
