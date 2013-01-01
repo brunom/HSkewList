@@ -219,19 +219,18 @@
 
 \begin{frame}
   \frametitle{Skew lists}
-    \only<0>{
+    \only<1>{
       \begin{tikzpicture}
         \node (0) [circle,draw=blue] {0};
       \end{tikzpicture}
     }
-    \only<1>{
+    \only<2>{
       \begin{tikzpicture}
         \node (1) [circle,draw=blue] {1};
         \node (0) [circle,right=of 1,draw=black] {0};
-        \draw [->] (1) to (0);
       \end{tikzpicture}
     }
-    \only<2>{
+    \only<3>{
       \begin{tikzpicture}
         \node (2) [circle,draw=blue] {2}
           child {node[circle,draw=black] {1}}
@@ -239,30 +238,27 @@
         ;
       \end{tikzpicture}
     }
-    \only<3>{
+    \only<4>{
       \begin{tikzpicture}
         \node (3) [circle,draw=blue] {3};
         \node (2) [circle,right=of 3,draw=black] {2}
           child {node[circle,draw=black] {1}}
           child {node[circle,draw=black] {0}}
         ;
-        \draw [->] (3) to (2);
-      \end{tikzpicture}
-    }
-    \only<4>{
-      \begin{tikzpicture}
-        \node (4) [circle,draw=blue] {4};
-        \node (3) [circle,right=of 4,draw=black] {3};
-        \draw [->] (4) to (3);
-        \node (2) [circle,right=of 3,draw=black] {2}
-          child {node[circle,draw=black] {1}}
-          child {node[circle,draw=black] {0}}
-        ;
-        \draw [->] (3) to (2);
       \end{tikzpicture}
     }
     \only<5>{
       \begin{tikzpicture}
+        \node (4) [circle,draw=blue] {4};
+        \node (3) [circle,right=of 4,draw=black] {3};
+        \node (2) [circle,right=of 3,draw=black] {2}
+          child {node[circle,draw=black] {1}}
+          child {node[circle,draw=black] {0}}
+        ;
+      \end{tikzpicture}
+    }
+    \only<6>{
+      \begin{tikzpicture} [level 1/.style={sibling distance=8mm}]
         \node (5) [circle,draw=blue] {5}
           child {node (4) [circle,draw=black] {4}}
           child {node (3) [circle,draw=black] {3}}
@@ -271,11 +267,10 @@
           child {node[circle,draw=black] {1}}
           child {node[circle,draw=black] {0}}
         ;
-        \draw [->] (5) to (2);
       \end{tikzpicture}
     }
-    \only<6>{
-      \begin{tikzpicture}
+    \only<7>{
+      \begin{tikzpicture} [level 2/.style={sibling distance=8mm}]
         \node (6) [circle,draw=blue] {6}
           child {node (5) [circle,draw=black] {5}
             child {node (4) [circle,draw=black] {4}}
@@ -294,7 +289,28 @@
     This structure is called Skew List.\\
     It's built from a list of perfect trees,\\
     ordered by height.\\
-    The list contains at most a pair of trees of the same height.\\    
+    The list contains at most a pair of trees of the same height.\\
+    Whenever the list starts with two trees of the same height,\\
+    a new node becomes the parent of the old trees.\\
+    Otherwise, the new node is just inserted at the beginning.\\
+  }
+\end{frame}
+
+\begin{frame}
+  \frametitle{Comparison}
+  \begin{tabular}{c||c||c}
+    structure & selection & extension\\
+    \hline
+    list & O(n) & O(1)\\
+    array & O(1) & O(n)\\
+    search tree & O(log(n)) & O(log(n))\\
+    skew list & O(log(n)) & O(1)\\
+  \end{tabular}
+  \note{
+    In the table updated with skew list,\\
+    note how skew list dominates HList.\\
+    Constant time extension makes Skew List a drop in replacement for HList.\\
+    
   }
 \end{frame}
 
