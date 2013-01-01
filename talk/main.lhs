@@ -197,8 +197,106 @@
 
 \begin{frame}
   \frametitle{Dumb trees}
+  \begin{figure}[tp]
+    \begin{center}
+      \includegraphics[scale=0.75]{../search-skew.pdf}
+    \end{center}
+  \end{figure}
   \note{
+    But don't abandon trees entirely.\\
+    For records, the keys, the labels, are known statically and\\
+    erased from the runtime representation.\\
+    When the compiler runs,\\
+    the type checker already verified the presence of needed labels.\\
+    Not only that, but the compiler already knows where the field is.\\
+    These are the two traversals in the picture,\\
+    for an unordered, dumb, tree.\\
+    The lookup visits all nodes in the tree, but at compile time.\\
+    The selection itself only visits the nodes in the tree path to the field.\\
+    You can think of this as a form of partial evaluation.\\
   }
 \end{frame}
+
+\begin{frame}
+  \frametitle{Skew lists}
+    \only<0>{
+      \begin{tikzpicture}
+        \node (0) [circle,draw=blue] {0};
+      \end{tikzpicture}
+    }
+    \only<1>{
+      \begin{tikzpicture}
+        \node (1) [circle,draw=blue] {1};
+        \node (0) [circle,right=of 1,draw=black] {0};
+        \draw [->] (1) to (0);
+      \end{tikzpicture}
+    }
+    \only<2>{
+      \begin{tikzpicture}
+        \node (2) [circle,draw=blue] {2}
+          child {node[circle,draw=black] {1}}
+          child {node[circle,draw=black] {0}}
+        ;
+      \end{tikzpicture}
+    }
+    \only<3>{
+      \begin{tikzpicture}
+        \node (3) [circle,draw=blue] {3};
+        \node (2) [circle,right=of 3,draw=black] {2}
+          child {node[circle,draw=black] {1}}
+          child {node[circle,draw=black] {0}}
+        ;
+        \draw [->] (3) to (2);
+      \end{tikzpicture}
+    }
+    \only<4>{
+      \begin{tikzpicture}
+        \node (4) [circle,draw=blue] {4};
+        \node (3) [circle,right=of 4,draw=black] {3};
+        \draw [->] (4) to (3);
+        \node (2) [circle,right=of 3,draw=black] {2}
+          child {node[circle,draw=black] {1}}
+          child {node[circle,draw=black] {0}}
+        ;
+        \draw [->] (3) to (2);
+      \end{tikzpicture}
+    }
+    \only<5>{
+      \begin{tikzpicture}
+        \node (5) [circle,draw=blue] {5}
+          child {node (4) [circle,draw=black] {4}}
+          child {node (3) [circle,draw=black] {3}}
+        ;
+        \node (2) [circle,right=of 5,draw=black] {2}
+          child {node[circle,draw=black] {1}}
+          child {node[circle,draw=black] {0}}
+        ;
+        \draw [->] (5) to (2);
+      \end{tikzpicture}
+    }
+    \only<6>{
+      \begin{tikzpicture}
+        \node (6) [circle,draw=blue] {6}
+          child {node (5) [circle,draw=black] {5}
+            child {node (4) [circle,draw=black] {4}}
+            child {node (3) [circle,draw=black] {3}}
+            }
+          child {node (2) [circle,right=of 5,draw=black] {2}
+            child {node[circle,draw=black] {1}}
+            child {node[circle,draw=black] {0}}
+            };
+      \end{tikzpicture}
+    }
+  \note{
+    Free from the requirement of keeping the nodes ordered,\\
+    we can insert nodes in constant time,\\
+    while still keeping trees shallow.\\
+    This structure is called Skew List.\\
+    It's built from a list of perfect trees,\\
+    ordered by height.\\
+    The list contains at most a pair of trees of the same height.\\    
+  }
+\end{frame}
+
 \end{document}
 
