@@ -11,6 +11,7 @@
 
 %include lhs2TeX.fmt
 %include polycode.fmt
+%format . = "."
 
 \begin{document}
 
@@ -24,13 +25,13 @@
 \begin{frame}
   \titlepage
   \note{
-    Hi. I'll show how to speed up extensible records.\\
-    We achieve fast extension without slow selection,\\
-    for applications where fields are numerous,\\
-    such as attribute grammars,\\
-    our original target,\\
-    but also algebras\\
-    and even module systems on top of records.\\
+    Hi. I'm Bruno Martinez from Uruguay.\\
+    In this talk I'll show you how to speed up extensible records.\\
+    .\\
+    Asymptotic speed is important for applications where fields are numerous,\\
+    such as attribute grammars, our original purpose,\\
+    but also algebras and even module systems.\\
+    .\\
     Our sample implementation is in Haskell\\
     but the idea works in other languages.\\
   }
@@ -47,18 +48,20 @@
     marcos = {name = "Marcos", surname = "Viera", phone = 555 }
   \end{code}
   \note{
-    Record types enable you to use labeled fields in tuples\\
+    Record types enable you to use named fields\\
     without the inconvenience of defining the record in advance.\\
     Record construction is anonymous.\\
-    Here I'm defining the record 'me' for myself,\\
-    including given name, family name and age.\\
-    The 'fullname' function concatenates the parts of the name.\\
-    The type checker disallows calling 'fullname'\\
-    if 'name' or 'surname' is missing from the argument,\\
-    but calling 'fullname' on my coauthor 'Marcos' record,\\
+    .\\
+    Here I'm defining the record 'me', \\
+    including given name, family name and age,\\
+    and the 'fullname' function that concatenates both parts of the name.\\
+    .\\
+    At compile time, the type checker disallows calling 'fullname'\\
+    if 'name' or 'surname' is missing from the argument.\\
+    However, calling 'fullname' on my coauthor 'Marcos' record,\\
     which includes a 'phone' field but not an 'age' field,\\
     does work.\\
-    Extra fields are ignored.\\
+    Extra fields are just ignored.\\
   }
 \end{frame}
 
@@ -70,19 +73,21 @@
     marry s r = {spouse = s | r} 
   \end{code}
   \note{
-    New fields can be added to existing records.\\
+    Extra fields can be added to existing records.\\
     The record is extended.\\
     Here I'm updating my data after getting married.\\
-    But extension is polymorphic.\\
+    All record values can be constructed from the empty record via extension.\\
+    .\\
+    Furthermore, extension is polymorphic.\\
     A field can be added to a record\\
-    even if its type is not fully known.\\
+    even if the record type is not fully known.\\
     The marry function is an example of polymorphic extension.\\
-    The old record is still available.\\
+    It can add a spouse field to any record.\\
+    .\\
+    Extension does not destroy the old record.\\
     As all values in functional languages,\\
     records are persistent.\\
-    Most extensible record system require\\
-    that the record not already contain the label to add,\\
-    to prevent duplicate labels.\\
+    The old version of the record is still available.\\
   }
 \end{frame}
 
@@ -97,16 +102,21 @@
   \end{code}
   \note{
     For completeness, here are the rest of the fundamental record operations.\\
+    .\\
     We've already seen selection and extension.\\
+    .\\
     Update takes a record already containing a label\\
     and replaces its value.\\
     The type of the value may change.\\
+    .\\
     Rename replaces a field with a field of a new label but the same value.\\
     If the record system keeps the labels only at the type level,\\
     maybe as a phantom type,\\
     rename is free at runtime.\\
+    .\\
     Finally, restriction removes the field of a certain label.\\
-    We'll focus on just selection and extension.\\
+    .\\
+    Today I'll talk only of selection and extension.\\
   }
 \end{frame}
 
@@ -130,17 +140,68 @@
     }}
   \end{tikzpicture}
   \note{
-    Association lists are the simplest implementation strategy.\\
+    The simplest implementation for records is association list.\\
     A linked list has a node for each field.\\
+    Slide.\\
     To select a field, the list is traversed.\\
+    All field nodes before the wanted one are visited.\\
+    Slide.\\
     To extend the record,\\
-    the new field is inserted at the beginning,
-    reusing the old, immutable, list.\\
+    the new field is inserted at the beginning,\\
+    reusing the old list.\\
+    .\\
     So, selection is linear time,\\
     and insertion is constant time.\\
+  }
+\end{frame}
+
+\begin{frame}
+  \frametitle{HList}
+  \begin{code}
+    data HNil = HNil
+    data HCons e l = HCons e l
+
+    newtype Field l v   =   Field { value :: v }
+    (.=.)               ::  l -> v -> Field l v
+    _  .=.  v           =   Field v
+  \end{code}
+  \note{
     HList is an implementation of association lists for records\\
     on top of common Haskell extensions.\\
-    Labels are phantom types and don't consume space.\\
+    .\\
+    The foundations of HList are data types HNil and HCons.\\
+    The type of the empty list is different from the type of a non empty list,\\
+    allowing us to statically distinguish them.\\
+    The elements themselves can also have different types.\\
+    .\\
+    To build records, we'll fill HLists with Fields.\\
+    The label of a field appears only in the left side of the type definition.\\
+    It's a phantom type.\\
+    The equals constructor takes a value-level label but keeps only it's type.
+  }
+\end{frame}
+
+\begin{frame}
+  \frametitle{HList example}
+  \begin{code}
+    data Name     = Name
+    data Surname  = Surname
+    data Age      = Age
+    me =
+      (Name     .=.  "Bruno"           )  `HCons` 
+      (Surname  .=.  "Martinez"        )  `HCons` 
+      (Age      .=.  30                )  `HCons`
+      HNil
+    me ::    HCons (Field Name String)
+          (  HCons (Field Surname String)
+          (  HCons (Field Age Int)
+             HNil))
+  \end{code}
+  \note{
+    Here's how our record looks like in HList.\\
+    In the latest GHC, promoted literals allows us to omit the label declarations.\\
+    The type is similar to the ideal record type of previous slides.\\
+    Note that the type encodes the length of the record and the label of fields.\\
   }
 \end{frame}
 
@@ -151,25 +212,53 @@
     \node (name)    [field,draw=black!50,fill=black!20,label=name] {Bruno};
     \node (surname) [field,draw=black!50,fill=black!20,label=surname,right=of name] {Martinez};
     \node (age)     [field,draw=black!50,fill=black!20,label=age,right=of surname] {30};
-    \alert{\uncover<2>{
+    \only<1>{
       \node (age_lookup) [below=of surname] {me.age};
       \draw [->] (age_lookup) to node {1} (age);
-    }}
-    \alert{\uncover<3>{
-      \node (spouse)     [field,draw=black!50,fill=black!20,label=spouse,left=of name] {Analia};
+    }
+    \alert{\uncover<2>{
+        \node (name2)    [field,draw=black!50,fill=black!20,label=name,node distance=2 cm,below=of name] {Bruno};
+        \node (surname2) [field,draw=black!50,fill=black!20,label=surname,right=of name2] {Martinez};
+        \node (age2)     [field,draw=black!50,fill=black!20,label=age,right=of surname2] {30};
+        \node (spouse2)     [field,draw=black!50,fill=black!20,label=spouse,right=of age2] {Analia};
     }}
   \end{tikzpicture}
   \note{
-    Holding the fields in an array,\\
-    contiguous in memory,\\
-    achieves the fastest, constant time selection.\\
-    To extend the record,\\
-    the old fields and the new one are copied to a new array.\\
+    Simple tuples and most record implementations use arrays instead of lists.\\
+    Holding the fields contiguous in memory\\
+    achieves the fastest selection, in constant time.\\
+    Slide.\\
+    But to extend the record,\\
+    we have to copy the old fields and the new one to a new array.\\
+    The new array does not reuse any part of the old.\\
+    .\\
     While the compiler can coalesce several extensions\\
     and only create the array when the record is handled to other code,\\
     specially helpful when a record is first created,\\
     extension in the general case is linear time.\\
-    Arrays underlie normal tuples and most record implementations.\\
+  }
+\end{frame}
+
+\begin{frame}
+  \frametitle{HArray}
+  \begin{code}
+    data ArrayRecord r =
+      ArrayRecord r (Array Int Any)
+  \end{code}
+  \note{
+    If you can stomach hacks,\\
+    constant time selection records can be encoded in today's Haskell.\\
+    .\\
+    The trick is pairing an HList with an Array of Anys.\\
+    Any signals that unsafeCoerce is used to hide the actual type of values.\\
+    To find a field, search in the HList for the index and the type of the value.\\
+    Then subscript with the index in the array,\\
+    and cast back to the value.\\
+    .\\
+    The trick is that coming up with the index is a compile time operation.\\
+    Thanks to compiler inlining, the index is just a constant,\\
+    so selection is constant time.\\
+    Casting to and from Any has no runtime cost.\\
   }
 \end{frame}
 
@@ -183,9 +272,11 @@
     search tree & O(log(n)) & O(log(n))\\
   \end{tabular}
   \note{
-    The natural data structure to improve extension asymptotic time is the search tree.\\
-    Both selection and extension become log time,\\
-    so extension is much better and selection a little worse.\\
+    So far we have a structure with fast extension, list, and a structure with fast selection, array.\\
+    .\\
+    Naturally, the data structure that sits in the middle of this trade off is the search tree.\\
+    Both selection and extension become log time.\\
+    Compared to a list, extension is much better and selection only a little worse.\\
     While the immutable nature of values force us to copy arrays,\\
     it also enables us to reuse most nodes of the tree of the old record in the new one.\\
     Search trees require an ordering on the labels.\\
