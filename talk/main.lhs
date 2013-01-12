@@ -310,21 +310,54 @@
 
 \begin{frame}
   \frametitle{Skew lists}
-  \begin{tikzpicture} [level 1/.style={sibling distance=8mm}]
-    \node (5) [circle,draw=red] {};
-    \node (4) [circle,right=of 5,draw=black] {};
-    \node (3) [circle,right=of 4,draw=black] {}
-      child {node[circle,draw=black] {}}
-      child {node[circle,draw=black] {}}
-      ;
-    \draw (5) -- (4) -- (3);
+  \begin{tikzpicture}
+    [
+      every node/.style={node distance=2 cm,inner sep=0},
+      level 1/.style={sibling distance=8mm},
+      level 2/.style={sibling distance=4mm},
+      level 3/.style={sibling distance=2mm},
+      level 4/.style={sibling distance=1mm},
+      level 5/.style={sibling distance=0.5mm},
+      level 6/.style={sibling distance=0.25mm},
+      level 7/.style={sibling distance=0.125mm}
+    ]
+    \node (a) {} child { child {} child {} } child { child {} child {} };
+    \node (b) [right=of a] {} child { child {} child {} } child { child {} child {} };
+    \node (c) [right=of b] {}
+    child { child { child {} child {} } child { child {} child {} } }
+    child { child { child {} child {} } child { child {} child {} } }
+    ;
+    \node (d) [right=of c] {}
+    child {
+       child {
+         child { child { child {} child {} } child { child {} child {} } }
+         child { child { child {} child {} } child { child {} child {} } }
+       }
+       child {
+         child { child { child {} child {} } child { child {} child {} } }
+         child { child { child {} child {} } child { child {} child {} } }
+       }
+    }
+    child {
+       child {
+         child { child { child {} child {} } child { child {} child {} } }
+         child { child { child {} child {} } child { child {} child {} } }
+       }
+       child {
+         child { child { child {} child {} } child { child {} child {} } }
+         child { child { child {} child {} } child { child {} child {} } }
+       }
+    }
+    ;
+    \draw (a) -- (b) -- (c) -- (d);
   \end{tikzpicture}
   \note{
     Common balanced tree implementation support insertion in logarithmic time.\\
-    But we don't have to keep fields ordered.\\
-    There are algorithms that keep trees shallow but also insert in constant time.\\
-    We'll use Skew Lists,\\
-    which is a list of increasingly bigger perfect trees.\\
+    But we don't need to keep fields ordered.\\
+    The skew list structure takes advantage of this extra flexibility\\
+    to support insertion in constant time.\\
+    .\\
+    A skew list is formed by a list of increasingly larger perfect trees.\\
     Only the first two trees are allowed to be of the same size.\\
     When inserting, if the list starts with two trees of the same height,\\
     a new node becomes the parent of the two old trees.\\
@@ -401,8 +434,42 @@
       };
     \end{tikzpicture}
   }
-  \node{
+  \note{
     Let's see an example.\\
+    The first item is the only node of the only tree.\\
+    Slide.\\
+    The second item forms a new tree that becomes the first in the list.\\
+    Slide.\\
+    But to add item number 3 we remove the previous two fields and form a new tree.\\
+    The fourth,\\
+    Slide.\\
+    and fifth item are just added at the beginning.\\
+    Slide.\\
+    And the sixth item builds a new tree just as the third item did.\\
+    Slide.\\
+    Item 7 builds the first height two tree.\\
+  }
+\end{frame}
+
+\begin{frame}
+  \frametitle{HSkew}
+  \begin{code}
+    data  HNode  e  t  t'  =  HNode  e  t  t'
+    data  HLeaf  e         =  HLeaf  e 
+
+    me =
+      HLeaf     (Name     .=.  "Bruno"           )   `HCons`
+      HNode     (Surname  .=.  "Martinez"        )
+        (HLeaf  (Age      .=.  30                ))
+        (HLeaf  (Phone    .=.  555               ))  `HCons`
+      HNil
+  \end{code}
+  \note{
+    To use skew list at the type level we define HNode and HLeaf, analogues to HCons and HNil.\\
+    For the list spine of the skew list we repurpose HCond and HNil.\\
+    A record with 4 fields is a list with a singleton tree followed by a 3 item tree.\\
+    In the paper we define an extend type level function that implements the skew list algorithm,\\
+    but I won't bore you with it here.\\
   }
 \end{frame}
 
@@ -419,7 +486,9 @@
   \note{
     In the table updated with skew list,\\
     note how skew list dominates HList.\\
-    Constant time extension makes Skew List a drop in replacement for HList.\\
+    It's better in all scenarios.\\
+    If you replace HList by skew list,  your program won't get slower.\\
+    On the other hand, replacing HList by array may improve or not your run time.\\
   }
 \end{frame}
 
