@@ -274,12 +274,10 @@
   \note{
     So far we have a structure with fast extension, list, and a structure with fast selection, array.\\
     .\\
-    Naturally, the data structure that sits in the middle of this trade off is the search tree.\\
+    Naturally, the dictionary implementation in the middle of this trade off is the search tree.\\
     Both selection and extension become log time.\\
-    Compared to a list, extension is much better and selection only a little worse.\\
-    While the immutable nature of values force us to copy arrays,\\
-    it also enables us to reuse most nodes of the tree of the old record in the new one.\\
-    Search trees require an ordering on the labels.\\
+    .\\
+    But search trees require an ordering on the labels.\\
     This makes it difficult to retrofit search trees into HList,\\
     which uses phantom types as labels.\\
     Types aren't naturally ordered.\\
@@ -300,90 +298,111 @@
     When the compiler runs,\\
     the type checker already verified the presence of needed labels.\\
     Not only that, but the compiler already knows where the field is.\\
+    This fact is already key to Arrays selection running in constant time.\\
+    .\\
     These are the two traversals in the picture,\\
     for an unordered, dumb, tree.\\
     The lookup visits all nodes in the tree, but at compile time.\\
     The selection itself only visits the nodes in the tree path to the field.\\
-    You can think of this as a form of partial evaluation.\\
+    You can think of this as a form of partial evaluation or staged compilation.\\
   }
 \end{frame}
 
 \begin{frame}
   \frametitle{Skew lists}
-    \only<1>{
-      \begin{tikzpicture}
-        \node (0) [circle,draw=blue] {0};
-      \end{tikzpicture}
-    }
-    \only<2>{
-      \begin{tikzpicture}
-        \node (1) [circle,draw=blue] {1};
-        \node (0) [circle,right=of 1,draw=black] {0};
-      \end{tikzpicture}
-    }
-    \only<3>{
-      \begin{tikzpicture}
-        \node (2) [circle,draw=blue] {2}
-          child {node[circle,draw=black] {1}}
-          child {node[circle,draw=black] {0}}
-        ;
-      \end{tikzpicture}
-    }
-    \only<4>{
-      \begin{tikzpicture}
-        \node (3) [circle,draw=blue] {3};
-        \node (2) [circle,right=of 3,draw=black] {2}
-          child {node[circle,draw=black] {1}}
-          child {node[circle,draw=black] {0}}
-        ;
-      \end{tikzpicture}
-    }
-    \only<5>{
-      \begin{tikzpicture}
-        \node (4) [circle,draw=blue] {4};
-        \node (3) [circle,right=of 4,draw=black] {3};
-        \node (2) [circle,right=of 3,draw=black] {2}
-          child {node[circle,draw=black] {1}}
-          child {node[circle,draw=black] {0}}
-        ;
-      \end{tikzpicture}
-    }
-    \only<6>{
-      \begin{tikzpicture} [level 1/.style={sibling distance=8mm}]
-        \node (5) [circle,draw=blue] {5}
-          child {node (4) [circle,draw=black] {4}}
-          child {node (3) [circle,draw=black] {3}}
-        ;
-        \node (2) [circle,right=of 5,draw=black] {2}
-          child {node[circle,draw=black] {1}}
-          child {node[circle,draw=black] {0}}
-        ;
-      \end{tikzpicture}
-    }
-    \only<7>{
-      \begin{tikzpicture} [level 2/.style={sibling distance=8mm}]
-        \node (6) [circle,draw=blue] {6}
-          child {node (5) [circle,draw=black] {5}
-            child {node (4) [circle,draw=black] {4}}
-            child {node (3) [circle,draw=black] {3}}
-            }
-          child {node (2) [circle,right=of 5,draw=black] {2}
-            child {node[circle,draw=black] {1}}
-            child {node[circle,draw=black] {0}}
-            };
-      \end{tikzpicture}
-    }
+  \begin{tikzpicture} [level 1/.style={sibling distance=8mm}]
+    \node (5) [circle,draw=red] {};
+    \node (4) [circle,right=of 5,draw=black] {};
+    \node (3) [circle,right=of 4,draw=black] {}
+      child {node[circle,draw=black] {}}
+      child {node[circle,draw=black] {}}
+      ;
+    \draw (5) -- (4) -- (3);
+  \end{tikzpicture}
   \note{
-    Free from the requirement of keeping the nodes ordered,\\
-    we can insert nodes in constant time,\\
-    while still keeping trees shallow.\\
-    This structure is called Skew List.\\
-    It's built from a list of perfect trees,\\
-    ordered by height.\\
-    The list contains at most a pair of trees of the same height.\\
-    Whenever the list starts with two trees of the same height,\\
-    a new node becomes the parent of the old trees.\\
+    Common balanced tree implementation support insertion in logarithmic time.\\
+    But we don't have to keep fields ordered.\\
+    There are algorithms that keep trees shallow but also insert in constant time.\\
+    We'll use Skew Lists,\\
+    which is a list of increasingly bigger perfect trees.\\
+    Only the first two trees are allowed to be of the same size.\\
+    When inserting, if the list starts with two trees of the same height,\\
+    a new node becomes the parent of the two old trees.\\
     Otherwise, the new node is just inserted at the beginning.\\
+  }
+\end{frame}
+
+\begin{frame}
+  \frametitle{SkewList example}
+  \only<1>{
+    \begin{tikzpicture}
+      \node (1) [circle,draw=red] {1};
+    \end{tikzpicture}
+  }
+  \only<2>{
+    \begin{tikzpicture} [level 1/.style={sibling distance=8mm}]
+      \node (2) [circle,draw=red] {2};
+      \node (1) [circle,right=of 2,draw=black] {1};
+      \draw (2) -- (1);
+    \end{tikzpicture}
+  }
+  \only<3>{
+    \begin{tikzpicture} [level 1/.style={sibling distance=8mm}]
+      \node (3) [circle,draw=red] {3}
+      child {node[circle,draw=black] {2}}
+      child {node[circle,draw=black] {1}}
+      ;
+    \end{tikzpicture}
+  }
+  \only<4>{
+    \begin{tikzpicture} [level 1/.style={sibling distance=8mm}]
+      \node (4) [circle,draw=red] {4};
+      \node (3) [circle,right=of 4,draw=black] {3}
+      child {node[circle,draw=black] {2}}
+      child {node[circle,draw=black] {1}}
+      ;
+      \draw (4) -- (3);
+    \end{tikzpicture}
+  }
+  \only<5>{
+    \begin{tikzpicture} [level 1/.style={sibling distance=8mm}]
+      \node (5) [circle,draw=red] {5};
+      \node (4) [circle,right=of 5,draw=black] {4};
+      \node (3) [circle,right=of 4,draw=black] {3}
+      child {node[circle,draw=black] {2}}
+      child {node[circle,draw=black] {1}}
+      ;
+      \draw (5) -- (4) -- (3);
+    \end{tikzpicture}
+  }
+  \only<6>{
+    \begin{tikzpicture} [level 1/.style={sibling distance=8mm}]
+      \node (6) [circle,draw=red] {6}
+      child {node (5) [circle,draw=black] {5}}
+      child {node (4) [circle,draw=black] {4}}
+      ;
+      \node (3) [circle,right=of 6,draw=black] {3}
+      child {node[circle,draw=black] {2}}
+      child {node[circle,draw=black] {1}}
+      ;
+      \draw (6) -- (3);
+    \end{tikzpicture}
+  }
+  \only<7>{
+    \begin{tikzpicture} [level 2/.style={sibling distance=8mm}]
+      \node (7) [circle,draw=red] {7}
+      child {node (6) [circle,draw=black] {6}
+        child {node (5) [circle,draw=black] {5}}
+        child {node (4) [circle,draw=black] {4}}
+      }
+      child {node (3) [circle,right=of 6,draw=black] {3}
+        child {node[circle,draw=black] {2}}
+        child {node[circle,draw=black] {1}}
+      };
+    \end{tikzpicture}
+  }
+  \node{
+    Let's see an example.\\
   }
 \end{frame}
 
@@ -401,7 +420,6 @@
     In the table updated with skew list,\\
     note how skew list dominates HList.\\
     Constant time extension makes Skew List a drop in replacement for HList.\\
-    
   }
 \end{frame}
 
