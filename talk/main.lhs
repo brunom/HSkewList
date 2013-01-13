@@ -26,7 +26,7 @@
   \titlepage
   \note{
     Hi. I'm Bruno Martinez from Uruguay.\\
-    In this talk I'll show you how to speed up extensible records.\\
+    In this talk I'll show you how to asymptotically speed up extensible records.\\
     .\\
     Asymptotic speed is important for applications where fields are numerous,\\
     such as attribute grammars, our original purpose,\\
@@ -140,8 +140,8 @@
     }}
   \end{tikzpicture}
   \note{
-    The simplest implementation for records is association list.\\
-    A linked list has a node for each field.\\
+    The simplest implementation for records is an association list.\\
+    An association list has a node for each field.\\
     Slide.\\
     To select a field, the list is traversed.\\
     All field nodes before the wanted one are visited.\\
@@ -158,15 +158,15 @@
 \begin{frame}
   \frametitle{HList}
   \begin{code}
-    data HNil = HNil
-    data HCons e l = HCons e l
+    data HNil           =   HNil
+    data HCons e l      =   HCons e l
 
     newtype Field l v   =   Field { value :: v }
     (.=.)               ::  l -> v -> Field l v
     _  .=.  v           =   Field v
   \end{code}
   \note{
-    HList is an implementation of association lists for records\\
+    HList is an implementation of heterogeneous lists\\
     on top of common Haskell extensions.\\
     .\\
     The foundations of HList are data types HNil and HCons.\\
@@ -199,7 +199,10 @@
   \end{code}
   \note{
     Here's how our record looks like in HList.\\
+    We start by defining types and constructors for the labels.\\
     In the latest GHC, promoted literals allows us to omit the label declarations.\\
+    HNil is our empty record, and we use HCons to extend it 3 times,\\
+    with fields built with the equals constructor.\\
     The type is similar to the ideal record type of previous slides.\\
     Note that the type encodes the length of the record and the label of fields.\\
   }
@@ -224,16 +227,18 @@
     }}
   \end{tikzpicture}
   \note{
-    Simple tuples and most record implementations use arrays instead of lists.\\
-    Holding the fields contiguous in memory\\
+    Native tuples and built-in records in other languages are usually arrays instead of lists.\\
+    Holding the fields contiguously in memory\\
     achieves the fastest selection, in constant time.\\
     Slide.\\
     But to extend the record,\\
     we have to copy the old fields and the new one to a new array.\\
     The new array does not reuse any part of the old.\\
+    Imperative languages get away with growable arrays and hash tables\\
+    because the old version of the object need not be preserved.
     .\\
     While the compiler can coalesce several extensions\\
-    and only create the array when the record is handled to other code,\\
+    and only create the array when the record escapes to other code,\\
     specially helpful when a record is first created,\\
     extension in the general case is linear time.\\
   }
@@ -253,12 +258,12 @@
     Any signals that unsafeCoerce is used to hide the actual type of values.\\
     To find a field, search in the HList for the index and the type of the value.\\
     Then subscript with the index in the array,\\
-    and cast back to the value.\\
+    and cast back to the correct type.\\
     .\\
-    The trick is that coming up with the index is a compile time operation.\\
-    Thanks to compiler inlining, the index is just a constant,\\
-    so selection is constant time.\\
+    Calculating the index is a compile time operation.\\
+    Thanks to compiler inlining, the index is just a constant.\\
     Casting to and from Any has no runtime cost.\\
+    So selection is constant time.\\
   }
 \end{frame}
 
@@ -292,27 +297,28 @@
     \end{center}
   \end{figure}
   \note{
-    But don't abandon trees entirely.\\
-    For records, the keys, the labels, are known statically and\\
-    erased from the runtime representation.\\
-    When the compiler runs,\\
+    But don't abandon trees yet.\\
+    Get rid of the ordering!\\
+    .\\
+    Because labels are static,\\
+    when compiling a selection,\\
     the type checker already verified the presence of needed labels.\\
     Not only that, but the compiler already knows where the field is.\\
-    This fact is already key to Arrays selection running in constant time.\\
     .\\
-    These are the two traversals in the picture,\\
-    for an unordered, dumb, tree.\\
-    The lookup visits all nodes in the tree, but at compile time.\\
-    The selection itself only visits the nodes in the tree path to the field.\\
+    Selection is a two step process.\\
+    The lookup visits all nodes in the tree, but only at compile time.\\
+    The selection itself digs directly to the field.\\
     You can think of this as a form of partial evaluation or staged compilation.\\
   }
 \end{frame}
+
+\newcommand{\twice}[1]{#1 #1}
 
 \begin{frame}
   \frametitle{Skew lists}
   \begin{tikzpicture}
     [
-      every node/.style={node distance=2 cm,inner sep=0},
+      every node/.style={node distance=2 cm, inner sep=0, outer sep=0},
       level 1/.style={sibling distance=8mm},
       level 2/.style={sibling distance=4mm},
       level 3/.style={sibling distance=2mm},
@@ -321,47 +327,30 @@
       level 6/.style={sibling distance=0.25mm},
       level 7/.style={sibling distance=0.125mm}
     ]
-    \node (a) {} child { child {} child {} } child { child {} child {} };
-    \node (b) [right=of a] {} child { child {} child {} } child { child {} child {} };
+    \node (a) {}
+    \twice{child{}};
+    \node (b) [right=of a] {}
+    \twice{child{}};
     \node (c) [right=of b] {}
-    child { child { child {} child {} } child { child {} child {} } }
-    child { child { child {} child {} } child { child {} child {} } }
-    ;
+    \twice{child{\twice{child{\twice{child{}}}}}};
     \node (d) [right=of c] {}
-    child {
-       child {
-         child { child { child {} child {} } child { child {} child {} } }
-         child { child { child {} child {} } child { child {} child {} } }
-       }
-       child {
-         child { child { child {} child {} } child { child {} child {} } }
-         child { child { child {} child {} } child { child {} child {} } }
-       }
-    }
-    child {
-       child {
-         child { child { child {} child {} } child { child {} child {} } }
-         child { child { child {} child {} } child { child {} child {} } }
-       }
-       child {
-         child { child { child {} child {} } child { child {} child {} } }
-         child { child { child {} child {} } child { child {} child {} } }
-       }
-    }
-    ;
+    \twice{child{\twice{child{\twice{child{\twice{child{}}}}}}}};
     \draw (a) -- (b) -- (c) -- (d);
   \end{tikzpicture}
   \note{
-    Common balanced tree implementation support insertion in logarithmic time.\\
-    But we don't need to keep fields ordered.\\
-    The skew list structure takes advantage of this extra flexibility\\
-    to support insertion in constant time.\\
+    Common balanced tree implementation such as red black trees support insertion in logarithmic time.\\
+    But the extra flexibility of not needing to keep fields ordered allows us to use skew lists instead,\\
+    a simple scheme that supports insertion in constant time.\\
     .\\
-    A skew list is formed by a list of increasingly larger perfect trees.\\
+    A skew list is formed by a list of increasingly larger perfect binary trees.\\
+    All nodes store items, not only leafs.\\
     Only the first two trees are allowed to be of the same size.\\
-    When inserting, if the list starts with two trees of the same height,\\
-    a new node becomes the parent of the two old trees.\\
-    Otherwise, the new node is just inserted at the beginning.\\
+    In that case, a new node becomes the parent of the two old trees.\\
+    Otherwise, the new node is just inserted at the beginning of the list.\\
+    .\\
+    The path to a node traverses the list (of logarithmic length)\\
+    and down one tree (also logarithmic height),\\
+    so selection is logarithmic.\\
   }
 \end{frame}
 
@@ -435,19 +424,20 @@
     \end{tikzpicture}
   }
   \note{
-    Let's see an example.\\
+    Let's see how small skew lists are built.\\
+    Unlike search trees, all skew lists of a given size have the same shape.\\
     The first item is the only node of the only tree.\\
     Slide.\\
-    The second item forms a new tree that becomes the first in the list.\\
+    The second item forms a new tree and comes first in the list.\\
     Slide.\\
     But to add item number 3 we remove the previous two fields and form a new tree.\\
     The fourth,\\
     Slide.\\
-    and fifth item are just added at the beginning.\\
+    and fifth items are just added at the beginning.\\
     Slide.\\
-    And the sixth item builds a new tree just as the third item did.\\
+    And the sixth item builds a new tree just as the third did.\\
     Slide.\\
-    Item 7 builds the first height two tree.\\
+    Finally, item 7 becomes the root of the first tree of height two.\\
   }
 \end{frame}
 
@@ -465,16 +455,16 @@
       HNil
   \end{code}
   \note{
-    To use skew list at the type level we define HNode and HLeaf, analogues to HCons and HNil.\\
-    For the list spine of the skew list we repurpose HCond and HNil.\\
+    To use skew list at the type level we define HNode, for the case of nodes with children, and HLeaf.\\
+    For the list spine of the skew list we just reuse HCond and HNil.\\
     A record with 4 fields is a list with a singleton tree followed by a 3 item tree.\\
-    In the paper we define an extend type level function that implements the skew list algorithm,\\
+    In the paper we define a function to extend skew list records of any size,\\
     but I won't bore you with it here.\\
   }
 \end{frame}
 
 \begin{frame}
-  \frametitle{Comparison}
+  \frametitle{Conclusion}
   \begin{tabular}{c||c||c}
     structure & selection & extension\\
     \hline
@@ -485,9 +475,11 @@
   \end{tabular}
   \note{
     In the table updated with skew list,\\
-    note how skew list dominates HList.\\
+    note how skew list asymptoticallydominates HList.\\
     It's better in all scenarios.\\
-    If you replace HList by skew list,  your program won't get slower.\\
+    Selection is faster even for small reco
+    If you replace HList by skew list, no program will get slower.\\
+    Try skew list records if you are using HList
     On the other hand, replacing HList by array may improve or not your run time.\\
   }
 \end{frame}
