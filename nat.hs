@@ -1,55 +1,60 @@
-{-# LANGUAGE DataKinds, TypeOperators, GADTs, TypeFamilies, RecordWildCards #-}
+{-# LANGUAGE DataKinds, TypeOperators, GADTs, TypeFamilies, RecordWildCards, TemplateHaskell, FunctionalDependencies, TypeSynonymInstances, FlexibleInstances, UndecidableInstances, ExistentialQuantification, ScopedTypeVariables, PolyKinds, RankNTypes, FlexibleContexts, ConstraintKinds #-}
+
+import Data.Singletons.TH
+import Data.Singletons.Prelude
+import Data.Singletons.Prelude.Base
+import Data.Singletons.TypeLits
 import GHC.TypeLits
+
 
 -- Unary naturals
 data Unary = Z | S Unary
   deriving Show
-           
--- GADT unary naturals
-data GUnary :: Unary -> * where
-  GZero :: GUnary Z
-  GSucc :: GUnary n -> GUnary (S n)
 
--- GADT unary shared naturals
-data GSUnary :: Unary -> * where
- GSZero :: {succZ :: GSUnary (S Z)} -> GSUnary Z
- GSSucc :: {gspred :: GSUnary a, succS :: GSUnary (S (S a))} -> GSUnary (S a)
+ -- Singleton unary shared naturals
+data GSUnary :: Nat -> * where
+  GSZero :: GSUnary 1 -> GSUnary 0
+  GSSucc :: GSUnary a -> GSUnary (a+2) -> GSUnary (a+1)
 
-gssucc :: GSUnary a -> GSUnary (S a)
-gssucc GSZero{..} = succZ
-gssucc GSSucc{..} = succS
+gssucc :: GSUnary a -> GSUnary (a+1)
+gssucc (GSZero s) = s
+--gssucc (GSSucc p s) = s
 
-gszero = GSZero { succZ = gsbuild gszero }
-gsbuild :: GSUnary n -> GSUnary (S n)
-gsbuild pred = node
-  where node = GSSucc {gspred = pred, succS = gsbuild node}
+-- gszero = GSZero (gsbuild gszero)
+-- gsbuild :: GSUnary n -> GSUnary (n+1)
+-- gsbuild pred = node
+--   where node = GSSucc pred (gsbuild node)
 
--- Segmented binary naturals
-segSucc []                   = ((Z, Z):[])
-segSucc ((Z,n):[])           = ((S n, Z):[])
-segSucc ((Z,n):(Z,m):ns)     = ((S n, S m):ns)
-segSucc ((Z,n):(S x, m):ns)  = ((S n, Z):(x, m):ns)
-segSucc ((S Z, n):ns)        = ((Z, S n):ns)
-segSucc ((S (S n), m):ns)    = ((Z, Z):(n, m):ns)
+-- Template Haskell doesn't recognize n+k patterns,
+-- ruins the symmetry between pred and succ,
+-- and forces the order of clauses.
+$(promote [d|
+ -- Segmented binary naturals
+ segSucc []               = ((0,0):[])
+ segSucc ((0,n):[])       = ((n+1,0):[])
+ segSucc ((0,n):(0,m):ns) = ((n+1,m+1):ns)
+ segSucc ((0,n):(x,m):ns) = ((n+1,0):(x-1,m):ns)
+ segSucc ((1,n):ns)       = ((0,n+1):ns)
+ segSucc ((n, m):ns)      = ((0,0):(n-1,m):ns)
 
-segPred ((Z, Z):[])          = []
-segPred ((S n, Z):[])        = ((Z,n):[])
-segPred ((S n, S m):ns)      = ((Z,n):(Z,m):ns)
-segPred ((S n, Z):(x, m):ns) = ((Z,n):(S x, m):ns)
-segPred ((Z, S n):ns)        = ((S Z, n):ns)
-segPred ((Z, Z):(n, m):ns)   = ((S (S n), m):ns)
+ segPred ((0,0):[])       = []
+ segPred ((0,0):(n,m):ns) = ((n+2,m):ns)
+ segPred ((0,n):ns)       = ((1,n-1):ns)
+ segPred ((n,0):[])       = ((0,n-1):[])
+ segPred ((n,0):(x,m):ns) = ((0,n-1):(x+1, m):ns)
+ segPred ((n,m):ns)       = ((0,n-1):(0,m-1):ns)
 
--- Skew binary naturals
-skewSucc []           = [Z]
-skewSucc [d]          = [Z,d]
-skewSucc (d:Z:ds)     = (S d:ds)
-skewSucc (d1:S d2:ds) = (Z:d1:d2:ds)
+ -- Skew binary naturals
+ skewSucc []           = [0]
+ skewSucc [d]          = [0,d]
+ skewSucc (d:0:ds)     = (d+1:ds)
+ skewSucc (d1:d2:ds)   = (0:d1:d2-1:ds)
 
-skewPred [Z]          = []
-skewPred [Z,d]        = [d]
-skewPred (S d:ds)     = (d:Z:ds)
-skewPred (Z:d1:d2:ds) = (d1:S d2:ds)
-
+ skewPred [0]          = []
+ skewPred [0,d]        = [d]
+ skewPred (0:d1:d2:ds) = (d1:d2+1:ds)
+ skewPred (d:ds)       = (d-1:0:ds)
+ |])
 
 data SNat (n::Unary) where
   SNE :: SNat Z 
@@ -101,40 +106,27 @@ cin = sNSucc cua
 sei = sNSucc cin
 
 
--- Type level skew binary naturals
-type family HSkewSucc (a :: [Unary]) :: [Unary] where
-  HSkewSucc '[]                = '[Z]
-  HSkewSucc '[d]               = '[Z,d]
-  HSkewSucc (d ':Z ':ds)       = (S d ':ds)
-  HSkewSucc (d1 ':S d2 ':ds)   = (Z ':d1 ':d2 ':ds)
+-- -- Length indexed lists
+-- data Vec :: * -> Unary -> * where
+--   VecNil :: Vec a Z
+--   VecCons :: a -> Vec a n -> Vec a (S n)
 
-type family HSkewPred (a :: [Unary]) :: [Unary] where
-  HSkewPred '[Z]               = '[]
-  HSkewPred '[Z,d]             = '[d]
-  HSkewPred (S d ':ds)         = (d ':Z ':ds)
-  HSkewPred (Z ':d1 ':d2 ':ds) = (d1 ':S d2 ':ds)
+-- -- GADT unary ordinals
+-- data OUnary :: Unary -> * where
+--   OZero :: OUnary (S n)
+--   OSucc :: OUnary n -> OUnary (S n)
 
--- Length indexed lists
-data Vec :: * -> Unary -> * where
-  VecNil :: Vec a Z
-  VecCons :: a -> Vec a n -> Vec a (S n)
+-- unaryNth :: Vec a n -> OUnary n -> a
+-- unaryNth (VecCons a _) OZero = a
+-- unaryNth (VecCons _ v) (OSucc n) = unaryNth v n
 
--- GADT unary ordinals
-data OUnary :: Unary -> * where
-  OZero :: OUnary (S n)
-  OSucc :: OUnary n -> OUnary (S n)
+-- -- GADT skew ordinals
+-- data OSkew :: Unary -> * where
 
-unaryNth :: Vec a n -> OUnary n -> a
-unaryNth (VecCons a _) OZero = a
-unaryNth (VecCons _ v) (OSucc n) = unaryNth v n
+-- skewNth :: Vec a n -> OSkew n -> a
+-- skewNth = undefined
 
--- GADT skew ordinals
-data OSkew :: Unary -> * where
-
-skewNth :: Vec a n -> OSkew n -> a
-skewNth = undefined
-
--- GADT skew binary numbers
---data GSkew :: [Unary] -> * where
---  GSkew :: GSkew '[]
---  GSkewSucc :: GSkew '[d] ->
+-- -- GADT skew binary numbers
+-- --data GSkew :: [Unary] -> * where
+-- --  GSkew :: GSkew '[]
+-- --  GSkewSucc :: GSkew '[d] ->
