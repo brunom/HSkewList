@@ -1,8 +1,10 @@
 {-# LANGUAGE DataKinds, TypeOperators, GADTs, TypeFamilies, RecordWildCards #-}
+import GHC.TypeLits
 
 -- Unary naturals
 data Unary = Z | S Unary
-
+  deriving Show
+           
 -- GADT unary naturals
 data GUnary :: Unary -> * where
   GZero :: GUnary Z
@@ -47,6 +49,57 @@ skewPred [Z]          = []
 skewPred [Z,d]        = [d]
 skewPred (S d:ds)     = (d:Z:ds)
 skewPred (Z:d1:d2:ds) = (d1:S d2:ds)
+
+
+data SNat (n::Unary) where
+  SNE :: SNat Z 
+  SNC :: NatFun n' n -> Unary -> SNat n' -> SNat n
+
+instance Show (SNat a) where
+ show SNE = "SNE"
+ show (SNC f u r) = "SNC ("++ show f ++ "," ++ show u ++ "," ++ show r ++ ")"
+   
+data NatFun (n::Unary) (n'::Unary) where
+  FS :: NatFun n (S n)
+  FC :: NatFun n' n'' -> NatFun n n' -> NatFun n n''  
+  
+instance Show (NatFun n n') where   
+  show FS = "FS"
+  show (FC x y) = "FC(" ++ show x  ++ "|"++ show y  ++ ")"
+  
+sNSucc :: SNat n -> SNat (S n)
+sNSucc SNE  = SNC FS Z SNE
+sNSucc (SNC f d SNE) = SNC FS Z (SNC f d SNE)
+sNSucc (SNC f d (SNC f2 Z ds)) = (SNC (FC FS (FC f f2)) (S d) ds) 
+sNSucc (SNC f d1 (SNC f1 (S d2) ds)) = (SNC FS Z (SNC f d1 (SNC f1 d2 ds)))
+
+
+sNPred :: SNat (S n) -> SNat n
+sNPred (SNC FS Z SNE) = SNE  
+sNPred (SNC FS Z (SNC f1 d SNE)) = (SNC f1 d SNE)
+sNPred (SNC (FC FS (FC f f2)) (S d) ds) = (SNC f d (SNC f2 Z ds))  
+sNPred (SNC FS Z (SNC f d1 (SNC f1 d2 ds))) = (SNC f d1 (SNC f1 (S d2) ds))
+
+data PPF (n :: Nat) where
+  PPFS :: PPF 1
+  PPFC :: PPF n -> PPF (n + n + 1)
+
+data PPNat (n :: Nat) where
+  PPNil :: PPNat 0
+  PPCons :: PPF n -> PPNat n' -> PPNat (n + n')
+
+ppPred :: PPNat (1+n) -> PPNat n
+ppPred (PPCons PPFS PPNil) = PPNil
+
+cero = SNE 
+uno = sNSucc cero
+
+dos = sNSucc uno
+tre = sNSucc dos
+cua = sNSucc tre
+cin = sNSucc cua
+sei = sNSucc cin
+
 
 -- Type level skew binary naturals
 type family HSkewSucc (a :: [Unary]) :: [Unary] where
