@@ -56,33 +56,33 @@ $(promote [d|
  skewPred (d:ds)       = (d-1:0:ds)
  |])
 
-data SNat (n::Unary) where
-  SNE :: SNat Z 
-  SNC :: NatFun n' n -> Unary -> SNat n' -> SNat n
+data SkNat (n::Unary) where
+  SNE :: SkNat Z
+  SNC :: NatFun n' n -> Unary -> SkNat n' -> SkNat n
 
-instance Show (SNat a) where
+instance Show (SkNat a) where
  show SNE = "SNE"
  show (SNC f u r) = "SNC ("++ show f ++ "," ++ show u ++ "," ++ show r ++ ")"
-   
+
 data NatFun (n::Unary) (n'::Unary) where
   FS :: NatFun n (S n)
-  FC :: NatFun n' n'' -> NatFun n n' -> NatFun n n''  
-  
-instance Show (NatFun n n') where   
+  FC :: NatFun n' n'' -> NatFun n n' -> NatFun n n''
+
+instance Show (NatFun n n') where
   show FS = "FS"
   show (FC x y) = "FC(" ++ show x  ++ "|"++ show y  ++ ")"
-  
-sNSucc :: SNat n -> SNat (S n)
+
+sNSucc :: SkNat n -> SkNat (S n)
 sNSucc SNE  = SNC FS Z SNE
 sNSucc (SNC f d SNE) = SNC FS Z (SNC f d SNE)
-sNSucc (SNC f d (SNC f2 Z ds)) = (SNC (FC FS (FC f f2)) (S d) ds) 
+sNSucc (SNC f d (SNC f2 Z ds)) = (SNC (FC FS (FC f f2)) (S d) ds)
 sNSucc (SNC f d1 (SNC f1 (S d2) ds)) = (SNC FS Z (SNC f d1 (SNC f1 d2 ds)))
 
 
-sNPred :: SNat (S n) -> SNat n
-sNPred (SNC FS Z SNE) = SNE  
+sNPred :: SkNat (S n) -> SkNat n
+sNPred (SNC FS Z SNE) = SNE
 sNPred (SNC FS Z (SNC f1 d SNE)) = (SNC f1 d SNE)
-sNPred (SNC (FC FS (FC f f2)) (S d) ds) = (SNC f d (SNC f2 Z ds))  
+sNPred (SNC (FC FS (FC f f2)) (S d) ds) = (SNC f d (SNC f2 Z ds))
 sNPred (SNC FS Z (SNC f d1 (SNC f1 d2 ds))) = (SNC f d1 (SNC f1 (S d2) ds))
 
 data PPF (n :: Nat) where
@@ -94,9 +94,10 @@ data PPNat (n :: Nat) where
   PPCons :: PPF n -> PPNat n' -> PPNat (n + n')
 
 ppPred :: PPNat (1+n) -> PPNat n
-ppPred (PPCons PPFS PPNil) = PPNil
+ppPred = undefined
+--ppPred (PPCons PPFS PPNil) = PPNil
 
-cero = SNE 
+cero = SNE
 uno = sNSucc cero
 
 dos = sNSucc uno
