@@ -1,4 +1,4 @@
-{-# LANGUAGE DataKinds, TypeOperators, GADTs, TypeFamilies, RecordWildCards, TemplateHaskell, FunctionalDependencies, TypeSynonymInstances, FlexibleInstances, UndecidableInstances, ExistentialQuantification, ScopedTypeVariables, PolyKinds, RankNTypes, FlexibleContexts, ConstraintKinds #-}
+{-# LANGUAGE DataKinds, TypeOperators, GADTs, TypeFamilies, RecordWildCards, TemplateHaskell, FunctionalDependencies, TypeSynonymInstances, FlexibleInstances, UndecidableInstances, ExistentialQuantification, ScopedTypeVariables, PolyKinds, RankNTypes, FlexibleContexts, ConstraintKinds, AllowAmbiguousTypes #-}
 
 import Data.Singletons.TH
 import Data.Singletons.Prelude
@@ -7,7 +7,7 @@ import Data.Singletons.Prelude.Base
 $(singletons [d|
  -- Unary naturals
  data Unary = Z | S Unary
-   deriving Show
+   deriving (Show, Eq, Ord)
  |])
 
 -- Singleton unary shared naturals
@@ -52,6 +52,11 @@ $(singletons [d|
  skewPred [Z,d]        = [d]
  skewPred (Z:d1:d2:ds) = (d1:S d2:ds)
  skewPred (S d:ds)     = (d:Z:ds)
+ |])
+
+$(promote [d|
+ skew2nat [] = Z
+ skew2nat a = S $ skew2nat $ skewPred a
  |])
 
 {-
@@ -111,10 +116,11 @@ data Vec :: * -> Unary -> * where
   VecNil :: Vec a Z
   VecCons :: a -> Vec a n -> Vec a (S n)
 
-class a :<: b
-
-unaryNth :: (m :<: n) => Vec a n -> SUnary m -> a
+unaryNth :: Compare m n ~ LT => Vec a n -> SUnary m -> a
 unaryNth (VecCons a _) SZ = a
 unaryNth (VecCons _ v) (SS n) = unaryNth v n
-unaryNth VecNil a = undefined
+
+skewNth :: Compare (Skew2nat sm) n ~ LT => Vec a n -> Sing (m::[Unary]) -> a
+skewNth (VecCons a _) SNil = a
+--skewNth (VecCons _ v) m = skewNth v (sSkewPred m) -- The type variable ‘sm0’ is ambiguous
 
