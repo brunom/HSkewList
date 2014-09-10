@@ -1,4 +1,4 @@
-{-# LANGUAGE DataKinds, TypeOperators, GADTs, TypeFamilies, RecordWildCards, TemplateHaskell, FunctionalDependencies, TypeSynonymInstances, FlexibleInstances, UndecidableInstances, ExistentialQuantification, ScopedTypeVariables, PolyKinds, RankNTypes, FlexibleContexts, ConstraintKinds, AllowAmbiguousTypes #-}
+{-# LANGUAGE DataKinds, TypeOperators, GADTs, TypeFamilies, RecordWildCards, TemplateHaskell, FunctionalDependencies, TypeSynonymInstances, FlexibleInstances, UndecidableInstances, ExistentialQuantification, ScopedTypeVariables, PolyKinds, RankNTypes, FlexibleContexts, ConstraintKinds #-}
 
 import Data.Singletons.TH
 import Data.Singletons.Prelude
@@ -9,6 +9,9 @@ $(singletons [d|
  data Unary = Z | S Unary
    deriving (Show, Eq, Ord)
  |])
+
+
+
 
 -- Singleton unary shared naturals
 data GSUnary :: Unary -> * where
@@ -23,6 +26,8 @@ gszero = GSZero (gsbuild gszero)
 gsbuild :: GSUnary n -> GSUnary (S n)
 gsbuild pred = node
   where node = GSSucc pred (gsbuild node)
+
+-- TODO explicar la invariante, etc
 
 $(singletons [d|
  -- Segmented binary naturals
@@ -59,68 +64,41 @@ $(promote [d|
  skew2nat a = S $ skew2nat $ skewPred a
  |])
 
-{-
-data SkNat (n::Unary) where
-  SNE :: SkNat Z
-  SNC :: NatFun n' n -> Unary -> SkNat n' -> SkNat n
+data Tree (n::Unary) a where
+  TreeLeaf :: a -> Tree Z a
+  TreeNode :: a -> Tree n a -> Tree n a -> Tree (S n) a
 
-instance Show (SkNat a) where
- show SNE = "SNE"
- show (SNC f u r) = "SNC ("++ show f ++ "," ++ show u ++ "," ++ show r ++ ")"
-
-data NatFun (n::Unary) (n'::Unary) where
-  FS :: NatFun n (S n)
-  FC :: NatFun n' n'' -> NatFun n n' -> NatFun n n''
-
-instance Show (NatFun n n') where
-  show FS = "FS"
-  show (FC x y) = "FC(" ++ show x  ++ "|"++ show y  ++ ")"
-
-sNSucc :: SkNat n -> SkNat (S n)
-sNSucc SNE  = SNC FS Z SNE
-sNSucc (SNC f d SNE) = SNC FS Z (SNC f d SNE)
-sNSucc (SNC f d (SNC f2 Z ds)) = (SNC (FC FS (FC f f2)) (S d) ds)
-sNSucc (SNC f d1 (SNC f1 (S d2) ds)) = (SNC FS Z (SNC f d1 (SNC f1 d2 ds)))
-
-
-sNPred :: SkNat (S n) -> SkNat n
-sNPred (SNC FS Z SNE) = SNE
-sNPred (SNC FS Z (SNC f1 d SNE)) = (SNC f1 d SNE)
-sNPred (SNC (FC FS (FC f f2)) (S d) ds) = (SNC f d (SNC f2 Z ds))
-sNPred (SNC FS Z (SNC f d1 (SNC f1 d2 ds))) = (SNC f d1 (SNC f1 (S d2) ds))
-
-data PPF (n :: Nat) where
-  PPFS :: PPF 1
-  PPFC :: PPF n -> PPF (n + n + 1)
-
-data PPNat (n :: Nat) where
-  PPNil :: PPNat 0
-  PPCons :: PPF n -> PPNat n' -> PPNat (n + n')
-
-ppPred :: PPNat (1+n) -> PPNat n
-ppPred = undefined
---ppPred (PPCons PPFS PPNil) = PPNil
-
-cero = SNE
-uno = sNSucc cero
-
-dos = sNSucc uno
-tre = sNSucc dos
-cua = sNSucc tre
-cin = sNSucc cua
-sei = sNSucc cin
--}
+data SkewList (n::[Unary]) (h::Unary) a where
+  SkewNil :: SkewList '[] h a
+  SkewCons :: Tree h a -> SkewList n (S h) a -> SkewList (h ': n) h a
 
 -- Length indexed lists
 data Vec :: * -> Unary -> * where
   VecNil :: Vec a Z
   VecCons :: a -> Vec a n -> Vec a (S n)
 
+$(singletons [d|
+ usucc n = S n
+ upred (S n) = n
+ |])
+
 unaryNth :: Compare m n ~ LT => Vec a n -> SUnary m -> a
 unaryNth (VecCons a _) SZ = a
 unaryNth (VecCons _ v) (SS n) = unaryNth v n
+--unaryNth (VecCons _ v) n = unaryNth v (sUpred n)
 
-skewNth :: Compare (Skew2nat sm) n ~ LT => Vec a n -> Sing (m::[Unary]) -> a
+type family Kompare (n::[Unary]) (m::Unary) :: Ordering where
+  Kompare '[] Z = EQ
+  Kompare a Z = GT
+  Kompare '[] (S n) = LT
+  Kompare a (S n) = Kompare (SkewPred a) n
+
+--skewNth :: Kompare m n ~ LT => Vec a n -> Sing (m::[Unary]) -> a
+skewNth :: Compare (Skew2nat m) n ~ LT => Vec a n -> Sing (m::[Unary]) -> a
 skewNth (VecCons a _) SNil = a
---skewNth (VecCons _ v) m = skewNth v (sSkewPred m) -- The type variable ‘sm0’ is ambiguous
+--skewNth (VecCons _ v) m = skewNth v (sSkewPred m)
+skewNth (VecCons _ v) (SCons SZ SNil)          = skewNth v SNil
+skewNth (VecCons _ v) (SCons SZ (SCons d SNil))        = skewNth v (SCons d SNil)
+skewNth (VecCons _ v) (SCons SZ (SCons d1 (SCons d2 ds))) = skewNth v (SCons d1 (SCons (SS d2) ds))
+skewNth (VecCons _ v) (SCons (SS d) ds) = skewNth v (SCons d (SCons SZ ds))
 
