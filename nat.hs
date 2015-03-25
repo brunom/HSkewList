@@ -94,9 +94,18 @@ $(singletons [d|
  |])
 
 $(promote [d|
+ skew2nat :: [Unary] -> Unary
  skew2nat [] = Z
  skew2nat a = S $ skew2nat $ skewPred a
  |])
+
+sSkew2nat :: Sing m -> Sing (Skew2nat m)
+sSkew2nat SNil = SZ
+sSkew2nat (SCons SZ SNil)          = SS SZ
+sSkew2nat (SCons SZ (SCons d SNil))        = SS $ sSkew2nat (SCons d SNil)
+sSkew2nat (SCons SZ (SCons d1 (SCons d2 ds))) = SS $ sSkew2nat (SCons d1 (SCons (SS d2) ds))
+sSkew2nat (SCons (SS d) ds) = SS $ sSkew2nat (SCons d (SCons SZ ds))
+
 
 data Tree (n::Unary) a where
   TreeLeaf :: a -> Tree Z a
@@ -116,10 +125,31 @@ $(singletons [d|
  upred (S n) = n
  |])
 
+mySUpred :: Sing (S n) -> Sing n
+mySUpred = sUpred
+
+type family UUKompare (n::Unary) (m::Unary) :: Ordering where
+  UUKompare Z Z = EQ
+  UUKompare (S n) Z = GT
+  UUKompare Z (S n) = LT
+  UUKompare (S m) (S n) = UUKompare m n
+
+class Less n m
+instance Less Z (S a)
+instance Less n m => Less (S n) (S m)
+
+--data PVec a n m = Vec n m
+
+--skewNth :: 
+
 unaryNth :: Compare m n ~ LT => Vec a n -> SUnary m -> a
+--unaryNth :: UUKompare m n ~ LT => Vec a n -> SUnary m -> a
+--unaryNth :: Vec a n -> SUnary m -> a
+--unaryNth :: Less m n => Vec a n -> SUnary m -> a
 unaryNth (VecCons a _) SZ = a
 unaryNth (VecCons _ v) (SS n) = unaryNth v n
 --unaryNth (VecCons _ v) n = unaryNth v (sUpred n)
+--unaryNth (VecCons _ v) n = unaryNth v (mySUpred n)
 
 type family Kompare (n::[Unary]) (m::Unary) :: Ordering where
   Kompare '[] Z = EQ
@@ -131,8 +161,8 @@ type family Kompare (n::[Unary]) (m::Unary) :: Ordering where
 --skewNth :: Compare (Skew2nat m) n ~ LT => Vec a n -> Sing (m::[Unary]) -> a
 skewNth :: Vec a n -> Sing (m::[Unary]) -> a
 skewNth (VecCons a _) SNil = a
---skewNth (VecCons _ v) m = skewNth v (sSkewPred m)
-skewNth (VecCons _ v) (SCons SZ SNil)          = skewNth v SNil
-skewNth (VecCons _ v) (SCons SZ (SCons d SNil))        = skewNth v (SCons d SNil)
-skewNth (VecCons _ v) (SCons SZ (SCons d1 (SCons d2 ds))) = skewNth v (SCons d1 (SCons (SS d2) ds))
-skewNth (VecCons _ v) (SCons (SS d) ds) = skewNth v (SCons d (SCons SZ ds))
+skewNth (VecCons _ v) m = skewNth v (sSkewPred m)
+-- skewNth (VecCons _ v) (SCons SZ SNil)          = skewNth v SNil
+-- skewNth (VecCons _ v) (SCons SZ (SCons d SNil))        = skewNth v (SCons d SNil)
+-- skewNth (VecCons _ v) (SCons SZ (SCons d1 (SCons d2 ds))) = skewNth v (SCons d1 (SCons (SS d2) ds))
+-- skewNth (VecCons _ v) (SCons (SS d) ds) = skewNth v (SCons d (SCons SZ ds))
