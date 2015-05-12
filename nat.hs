@@ -1,5 +1,9 @@
 {-# LANGUAGE DataKinds, TypeOperators, GADTs, TypeFamilies, RecordWildCards, TemplateHaskell, FunctionalDependencies, TypeSynonymInstances, FlexibleInstances, UndecidableInstances, ExistentialQuantification, ScopedTypeVariables, PolyKinds, RankNTypes, FlexibleContexts, ConstraintKinds #-}
 
+{-# OPTIONS_GHC -fprint-explicit-foralls -fprint-explicit-kinds #-}
+
+module Nat where
+
 import Data.Singletons.TH
 import Data.Singletons.Prelude
 import Data.Singletons.Prelude.Base
@@ -75,6 +79,9 @@ $(singletons [d|
  |])
 
 $(singletons [d|
+ newtype Skew = Skew [Unary]
+   deriving (Show)
+
  -- Skew binary naturals
  -- Mathematically, skew numbers are of the form Sum (dn*(2^n-1)) with dn in {0,1}
  -- but for the first nonzero d that may also be 2.
@@ -82,30 +89,35 @@ $(singletons [d|
  -- We store the difference between adjacent nonzero digits.
  -- To make the transformation injective, we cons 1 before computing the differences.
  -- To make it surjective, since digits don't repeat, we substract 1 from all positions but the first two.
- skewSucc []           = [Z]
- skewSucc [d]          = [Z,d]
- skewSucc (d:Z:ds)     = (S d:ds)
- skewSucc (d1:S d2:ds) = (Z:d1:d2:ds)
+ skewSucc (Skew [])           = Skew [Z]
+ skewSucc (Skew [d])          = Skew [Z,d]
+ skewSucc (Skew (d:Z:ds))     = Skew (S d:ds)
+ skewSucc (Skew (d1:S d2:ds)) = Skew (Z:d1:d2:ds)
 
- skewPred [Z]          = []
- skewPred [Z,d]        = [d]
- skewPred (Z:d1:d2:ds) = (d1:S d2:ds)
- skewPred (S d:ds)     = (d:Z:ds)
+ skewPred (Skew [Z])          = Skew []
+ skewPred (Skew [Z,d])        = Skew [d]
+ skewPred (Skew (Z:d1:d2:ds)) = Skew (d1:S d2:ds)
+ skewPred (Skew (S d:ds))     = Skew (d:Z:ds)
  |])
 
 $(promote [d|
- skew2nat :: [Unary] -> Unary
- skew2nat [] = Z
+ skew2nat :: Skew -> Unary
+ skew2nat (Skew []) = Z
  skew2nat a = S $ skew2nat $ skewPred a
  |])
 
-sSkew2nat :: Sing m -> Sing (Skew2nat m)
-sSkew2nat SNil = SZ
-sSkew2nat (SCons SZ SNil)          = SS SZ
-sSkew2nat (SCons SZ (SCons d SNil))        = SS $ sSkew2nat (SCons d SNil)
-sSkew2nat (SCons SZ (SCons d1 (SCons d2 ds))) = SS $ sSkew2nat (SCons d1 (SCons (SS d2) ds))
-sSkew2nat (SCons (SS d) ds) = SS $ sSkew2nat (SCons d (SCons SZ ds))
+$(singletons [d|
+ nat2skew :: Unary -> Skew
+ nat2skew Z = Skew []
+ nat2skew (S a) = skewSucc $ nat2skew a
+ |])
 
+sSkew2nat :: Sing m -> Sing (Skew2nat m)
+sSkew2nat (SSkew SNil) = SZ
+sSkew2nat (SSkew (SCons SZ SNil))          = SS SZ
+sSkew2nat (SSkew (SCons SZ (SCons d SNil)))        = SS $ sSkew2nat (SSkew (SCons d SNil))
+sSkew2nat (SSkew (SCons SZ (SCons d1 (SCons d2 ds)))) = SS $ sSkew2nat (SSkew (SCons d1 (SCons (SS d2) ds)))
+sSkew2nat (SSkew (SCons (SS d) ds)) = SS $ sSkew2nat (SSkew (SCons d (SCons SZ ds)))
 
 data Tree (n::Unary) a where
   TreeLeaf :: a -> Tree Z a
@@ -151,16 +163,16 @@ unaryNth (VecCons _ v) (SS n) = unaryNth v n
 --unaryNth (VecCons _ v) n = unaryNth v (sUpred n)
 --unaryNth (VecCons _ v) n = unaryNth v (mySUpred n)
 
-type family Kompare (n::[Unary]) (m::Unary) :: Ordering where
-  Kompare '[] Z = EQ
+type family Kompare (n::Skew) (m::Unary) :: Ordering where
+  Kompare ('Skew '[]) Z = EQ
   Kompare a Z = GT
-  Kompare '[] (S n) = LT
+  Kompare ('Skew '[]) (S n) = LT
   Kompare a (S n) = Kompare (SkewPred a) n
 
 --skewNth :: Kompare m n ~ LT => Vec a n -> Sing (m::[Unary]) -> a
 --skewNth :: Compare (Skew2nat m) n ~ LT => Vec a n -> Sing (m::[Unary]) -> a
-skewNth :: Vec a n -> Sing (m::[Unary]) -> a
-skewNth (VecCons a _) SNil = a
+skewNth :: Vec a n -> Sing (m::Skew) -> a
+skewNth (VecCons a _) (SSkew SNil) = a
 skewNth (VecCons _ v) m = skewNth v (sSkewPred m)
 -- skewNth (VecCons _ v) (SCons SZ SNil)          = skewNth v SNil
 -- skewNth (VecCons _ v) (SCons SZ (SCons d SNil))        = skewNth v (SCons d SNil)
