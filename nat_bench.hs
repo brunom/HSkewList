@@ -9,7 +9,7 @@ ghcs = ["ghc"]
 data Nat = Nat { name :: String, z :: String, s :: String, nth :: String }
 nats =
   Nat "skew" "(SSkew SNil)" "sSkewSucc" "skewNth" :
-  --Nat "unary" "SZ" "SS" "unaryNth" :
+  Nat "unary" "SZ" "SS" "unaryNth" :
   []
 iters = [1000]
 
@@ -17,15 +17,15 @@ iters = [1000]
 dir = "nat_bench/"
 
 call ghc file =
-  (system $ ghc ++ " --make " ++ file ++ " -O -fcontext-stack=9999 -ftype-function-depth=9999" ++
+  (system $ ghc ++ " --make " ++ file ++ " -O -fcontext-stack=9999 -ftype-function-depth=9999 -no-user-package-db -package-db .cabal-sandbox/x86_64-linux-ghc-7.10.1-packages.conf.d/" ++
                       " -odir " ++ dir ++ ghc ++ "_dir " ++
                       " -hidir " ++ dir ++ ghc ++ "_dir " ++
                       " >&2")
-           --            >>
-  -- (system $ ghc ++ " -prof -fprof-auto -osuf p_o --make " ++ file ++ " -O -fcontext-stack=9999 -ftype-function-depth=9999" ++
-  --                     " -odir " ++ dir ++ ghc ++ "_dir " ++
-  --                     " -hidir " ++ dir ++ ghc ++ "_dir " ++
-  --                     " >&2")
+                       >>
+   (system $ ghc ++ " -prof -fprof-auto -osuf p_o --make " ++ file ++ " -O -fcontext-stack=9999 -ftype-function-depth=9999 -no-user-package-db -package-db .cabal-sandbox/x86_64-linux-ghc-7.10.1-packages.conf.d/" ++
+                       " -odir " ++ dir ++ ghc ++ "_dir " ++
+                       " -hidir " ++ dir ++ ghc ++ "_dir " ++
+                       " >&2")
 
 bench = do
   system $ "rm -rf " ++ dir
@@ -34,7 +34,7 @@ bench = do
 
   -- precompile dependencies
   forM_ ghcs $ \ghc -> do
-    call ghc "nat.hs"
+    call ghc "Nat.hs"
 
   -- body
   forM_ iters $ \iter -> do
@@ -50,9 +50,12 @@ bench = do
 \import Data.Singletons.Prelude.Base\n\
 \import GHC.Int\n\
 \\n\
+\main = go (99999::Int) where\n\
+\    go i = if i == 0 then return() else go (i - " ++ nth nat ++" (make_list i) (make_index i))\n\ 
+\ {-\n \
 \main = return $ go2 (-1::Int64) where\n\
 \    go i = if i == 0 then 1 else go (i - " ++ nth nat ++" (make_list i) (make_index i))\n\
-\    go2 i = if i == 0 then 1 else go2 (i - go (-1::Int64))\n\
+\    go2 i = if i == 0 then 1 else go2 (i - go (-1::Int64)) -}\n\
 \\n\
 \{-# NOINLINE make_list #-}\n\
 \make_list _ = list\n\
@@ -77,7 +80,7 @@ bench = do
       hFlush stdout
 
       startRun <- getCurrentTime
-      system $ dir ++ name nat ++ "_" ++ show iter ++ "_" ++ ghc
+      system $ dir ++ name nat ++ "_" ++ show iter ++ "_" ++ ghc ++ " +RTS -t -RTS"
       endRun   <- getCurrentTime
       putStr $ show (endRun `diffUTCTime` startRun) ++ ", "
       putChar '\n'
