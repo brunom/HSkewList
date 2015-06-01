@@ -10,22 +10,20 @@ data Nat = Nat { name :: String, z :: String, s :: String, nth :: String }
 nats =
   Nat "skew" "(SSkew SNil)" "sSkewSucc" "skewNth" :
   Nat "unary" "SZ" "SS" "unaryNth" :
+  Nat "skew2unary" "(SSkew SNil)" "sSkewSucc" "(\\v -> \\s -> unaryNth v $ sSkew2nat s)" :
   []
-iters = [1000]
+iters = [100]
 
 
 dir = "nat_bench/"
 
-call ghc file =
-  (system $ ghc ++ " --make " ++ file ++ " -O -fcontext-stack=9999 -ftype-function-depth=9999 -no-user-package-db -package-db .cabal-sandbox/x86_64-linux-ghc-7.10.1-packages.conf.d/" ++
-                      " -odir " ++ dir ++ ghc ++ "_dir " ++
-                      " -hidir " ++ dir ++ ghc ++ "_dir " ++
-                      " >&2")
-                       >>
-   (system $ ghc ++ " -prof -fprof-auto -osuf p_o --make " ++ file ++ " -O -fcontext-stack=9999 -ftype-function-depth=9999 -no-user-package-db -package-db .cabal-sandbox/x86_64-linux-ghc-7.10.1-packages.conf.d/" ++
-                       " -odir " ++ dir ++ ghc ++ "_dir " ++
-                       " -hidir " ++ dir ++ ghc ++ "_dir " ++
-                       " >&2")
+call ghc file = system cmd -- >> system (cmd ++ " -prof -fprof-auto -osuf p_o ")
+  where
+    cmd = ghc ++ " --make " ++ file ++ " -O -fcontext-stack=9999 -ftype-function-depth=9999 " ++
+        " -no-user-package-db -package-db .cabal-sandbox/*-packages.conf.d/ " ++
+        " -odir " ++ dir ++ ghc ++ "_dir " ++
+        " -hidir " ++ dir ++ ghc ++ "_dir " ++
+        " >&2 > /dev/null"
 
 bench = do
   system $ "rm -rf " ++ dir
@@ -52,10 +50,6 @@ bench = do
 \\n\
 \main = go (99999::Int) where\n\
 \    go i = if i == 0 then return() else go (i - " ++ nth nat ++" (make_list i) (make_index i))\n\ 
-\ {-\n \
-\main = return $ go2 (-1::Int64) where\n\
-\    go i = if i == 0 then 1 else go (i - " ++ nth nat ++" (make_list i) (make_index i))\n\
-\    go2 i = if i == 0 then 1 else go2 (i - go (-1::Int64)) -}\n\
 \\n\
 \{-# NOINLINE make_list #-}\n\
 \make_list _ = list\n\
@@ -80,7 +74,7 @@ bench = do
       hFlush stdout
 
       startRun <- getCurrentTime
-      system $ dir ++ name nat ++ "_" ++ show iter ++ "_" ++ ghc ++ " +RTS -t -RTS"
+      system $ dir ++ name nat ++ "_" ++ show iter ++ "_" ++ ghc -- ++ " +RTS -t -RTS"
       endRun   <- getCurrentTime
       putStr $ show (endRun `diffUTCTime` startRun) ++ ", "
       putChar '\n'

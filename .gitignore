@@ -13,3 +13,7 @@ paper.pdf
 paper.hs
 dump.txt
 bench/
+.cabal-sandbox/
+cabal.sandbox.config
+nat_bench/
+
