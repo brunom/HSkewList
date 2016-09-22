@@ -5,7 +5,7 @@
 \usetikzlibrary{arrows,decorations.pathmorphing,backgrounds,positioning,fit,petri}
 \setbeamertemplate{navigation symbols}{} %remove navigation symbols
 
-\setbeameroption{show notes on second screen}
+%\setbeameroption{show notes on second screen}
 %\setbeameroption{show only notes} % to count words
 %100 words per minute * 25 minutes talk = 2500 words
 

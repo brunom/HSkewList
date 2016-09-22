@@ -1,0 +1,20 @@
+all: thesis.pdf thesis.exe
+pdf: thesis.pdf
+
+thesis.pdf: thesis.tex thesis.bib
+	latexmk -pdf -quiet thesis.tex
+
+GHC=ghc
+%GHC=ghc-7.4.2
+
+thesis.exe : thesis.hs
+	$(GHC) --make thesis.hs -o thesis.exe
+
+thesis.hs : thesis.lhs paper.lhs configuration.lhs
+	lhs2TeX thesis.lhs -o thesis.hs --newcode
+
+thesis.tex: records.lhs thesis.lhs paper.lhs
+	lhs2TeX --poly thesis.lhs -o thesis.tex
+
+clean:
+	rm -f *.aux *.bbl *blg *.log *.ptb *.tex thesis.pdf

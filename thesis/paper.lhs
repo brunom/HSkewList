@@ -1,28 +1,5 @@
-\documentclass[natbib]{sigplanconf}
-
-%\usepackage{pdfsync}
-\usepackage{color}
-\usepackage{graphicx}
-
-%\usepackage{amsmath}
-\usepackage{tikz}
-%\usepackage{pgflibraryarrows}
-%\usetikzlibrary{arrows}
-%\newcommand{\todo}[1]{}
-\newcommand{\todo}[1]{%\error                uncomment to make sure there are no todos left
- \textcolor{blue}{\mbox{$^\ast$}}\marginpar{\raggedright
- \hspace{0pt}\sffamily\tiny{\sc \textcolor{blue}{todo:}}\\ \textcolor{blue}{#1}}}
-\newcommand{\bruno}[1]{\textcolor{red}{\textbf{Bruno:}#1}}
-\newcommand{\alberto}[1]{\textcolor{red}{\textbf{Alberto: }#1}}
-\newcommand{\btext}[1]{\textcolor{blue}{#1}}
-\newcommand{\marcos}[1]{\textcolor{red}{\textbf{Marcos:}#1}}
-\renewcommand{\bruno}[1]{}
-\renewcommand{\alberto}[1]{}
-\renewcommand{\marcos}[1]{}
-%let paper = True
-
-%include lhs2TeX.fmt
-%include polycode.fmt
+\chapter{Grammar Fragments Fly First-Classqqq}
+\label{chapt.first-class-grammaqqqmr}
 
 %if style==poly
 
@@ -53,13 +30,16 @@
 {-# LANGUAGE FunctionalDependencies #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE UndecidableInstances #-}
-
+--{-# LANGUAGE TypeInType #-}
+{-# LANGUAGE GADTs #-}
+{-# OPTIONS_GHC -Wunticked-promoted-constructors #-}
 
 module Paper where
 
 import Data.Array
 import GHC.Exts
 import Unsafe.Coerce
+import Data.Kind
 
 hListUpdate a = hSkewUpdate a
 hListRemove = undefined
@@ -71,55 +51,6 @@ hListRemove = undefined
 %endif
 
 %\setlength{\parindent}{0in}
-
-\begin{document}
-
-\conferenceinfo{PEPM'13,} {January 21--22, 2013, Rome, Italy.}
-\CopyrightYear{2013}
-\copyrightdata{978-1-4503-1842-6/13/01}
-
-%\titlebanner{submitted to Haskell Symposium 2011}         % These are ignored unless
-%\preprintfooter{version of Jul 21, 2012}     % 'preprint' option specified.
-
-%\title{Fast Extensible Records In Haskell}
-\title{Just Do It While Compiling!}
-\subtitle{Fast Extensible Records In Haskell}
-
-
-\authorinfo{Bruno Martinez Aguerre}
-           {Instituto de Computaci\'{o}n \\ Universidad de la  Rep\'{u}blica\\ Montevideo, Uruguay}
-           {brunom@@fing.edu.uy}
-\authorinfo{Marcos Viera}
-           {Instituto de Computaci\'{o}n \\ Universidad de la  Rep\'{u}blica\\ Montevideo, Uruguay}
-           {mviera@@fing.edu.uy}
-\authorinfo{Alberto Pardo}
-           {Instituto de Computaci\'{o}n \\ Universidad de la  Rep\'{u}blica\\ Montevideo, Uruguay}
-           {pardo@@fing.edu.uy}
-\maketitle
-
-\begin{abstract}
-The library for strongly typed heterogeneous collections HList
-provides an implementation of extensible records in Haskell that needs
-only a few common extensions of the language. In HList, records are
-represented as linked lists of label-value pairs with a lookup
-operation that is linear-time in the number of fields. In this paper,
-we use type-level programming techniques to develop a more efficient
-representation of extensible records for HList. We propose two
-internal encodings for extensible records that improve lookup at
-runtime without needing a total order on the labels. One of the
-encodings performs lookup in constant time but at a cost of linear
-time insertion. The other one performs lookup in logarithmic time
-while preserving the fast insertion of simple linked lists. Through
-staged compilation, the required slow search for a field is moved to
-compile time in both cases.
-\end{abstract}
-
-\category{D.3.3}{Programming languages}{Language Constructs and Features}
-\category{D.1.1}{Programming techniques}{Applicative (Functional) Programming}
-\terms Design, Languages, Performance
-
-\keywords
- Extensible Records, Type-level programming, Staged Computation, Haskell, HList, Balanced Trees
 
 \section{Introduction} \label{sec:intro}
 
@@ -303,6 +234,9 @@ Heterogeneous lists can be represented with the data types |HNil| and |HCons|,
 which model the structure of lists both at the value and type level:
 
 \begin{code}
+--data HList (l::[*]) where
+--    HNil  :: HList '[]
+--    HCons :: e -> HList l -> HList (e ': l)
 data HNil       = HNil
 data HCons e l  = HCons e l
 infixr 2 `HCons`
@@ -1126,7 +1060,7 @@ instance  (  HSkewGet r l m
           HSkewUpdate l e r r'  where
     hSkewUpdate l e r =
        hSkewUpdate' (hSkewGet r l) l e r
-^
+
 class HSkewUpdate' m l e r r' | m l e r -> r' where
     hSkewUpdate' :: m -> l -> e -> r -> r'
 \end{code}
@@ -1642,15 +1576,13 @@ In that case, the |ArrayRecord| solution reduces to the standard tuple-based tec
 On the other hand, |SkewRecord| provides a novel encoding with fast lookup and insertion that would preserve its advantages
 even as a built-in solution.
 
-\bibliographystyle{plainnat}
+%\bibliographystyle{plainnat}
 
-\begin{flushleft}
-\bibliography{biblio}
-\end{flushleft}
+%\begin{flushleft}
+%\bibliography{biblio}
+%\end{flushleft}
 
 % \appendix
-
-\end{document}
 
 %%% Local Variables: **
 %%% mode: latex **

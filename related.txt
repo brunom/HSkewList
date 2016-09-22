@@ -1,0 +1,13 @@
+Type extension through polymorphism - F. Burton - 1990
+Modularity Meets Inheritance - G. Bracha and G. Lindstrom - 1992
+A Polymorphic Record Calculus and Its Compilation - ATSUSHI OHORI - 1995
+A Polymorphic Type System for Extensible Records and Variants - Benedict R. Gaster, Mark P. Jones - 1996
+Lightweight Extensible Records for Haskell - Mark P. Jones, Simon Peyton Jones - 1999
+Type-indexed rows - M. Shields , E. Meijer - 2001
+A proposal for records in Haskell - S. Peyton Jones and G. Morrisett. 2003
+Strongly Typed Heterogeneous - Oleg Kiselyov , Ralf Lammel , Keean Schupke - 2004
+Extensible records with scoped labels - Daan Leijen - 2005
+10, 31, 29
+6, 30 sml
+5, 24 calculi
+14 rel algebra

@@ -1,18 +1,18 @@
 import Data.Time
-import System.Cmd
+import System.Process
 import System.IO
 import Control.Monad
 
 main = bench_update
 --ghcs = ["ghc-7.4.2", "ghc-7.6.1"]
-ghcs = ["ghc-7.6.1"]
---iters = [0]
-iters = [0, 25..200]
+ghcs = ["ghc"]
+iters = [0]
+--iters = [0, 25..200]
 
 data Record = Record { name :: String, cons :: String, nil :: String, get :: String, update :: String }
 records = [Record "Record" "HCons" "HNil" "hListGet" "hListUpdate"
-          ,Record "ArrayRecord" "hArrayExtend" "emptyArrayRecord" "hArrayGet" "hArrayUpdate"           
-          ,Record "SkewRecord" "hSkewExtend" "emptySkewRecord" "\\r f -> case hSkewGet r f of HJust b -> b" "hSkewUpdate"          
+          --,Record "ArrayRecord" "hArrayExtend" "emptyArrayRecord" "hArrayGet" "hArrayUpdate"           
+          --,Record "SkewRecord" "hSkewExtend" "emptySkewRecord" "\\r f -> case hSkewGet r f of HJust b -> b" "hSkewUpdate"          
           ] 
 dir = "bench/"
 

@@ -1,0 +1,104 @@
+@inproceedings{kiselyov2004strongly,
+  title={Strongly typed heterogeneous collections},
+  author={Kiselyov, Oleg and L{\"a}mmel, Ralf and Schupke, Keean},
+  booktitle={Proceedings of the 2004 ACM SIGPLAN workshop on Haskell},
+  pages={96--107},
+  year={2004},
+  organization={ACM}
+}
+HLIST
+
+@inproceedings{chlipala2010ur,
+  title={Ur: statically-typed metaprogramming with type-level record computation},
+  author={Chlipala, Adam},
+  booktitle={ACM Sigplan Notices},
+  volume={45},
+  number={6},
+  pages={122--133},
+  year={2010},
+  organization={ACM}
+}
+cites HLIST
+dependent types
+first class records and names
+row types
+mapping with fold
+
+@inproceedings{lienhardt2012row,
+  title={Row types for delta-oriented programming},
+  author={Lienhardt, Michael and Clarke, Dave},
+  booktitle={Proceedings of the Sixth International Workshop on Variability Modeling of Software-Intensive Systems},
+  pages={121--128},
+  year={2012},
+  organization={ACM}
+}
+application
+software product lines
+
+@book{remy1993type,
+  title={Type inference for records in a natural extension of ML},
+  author={R{\'e}my, Didier},
+  year={1993},
+  publisher={Theoretical Aspects Of Object-Oriented Programming. Types, Semantics and Language Design. MIT Press}
+}
+
+@article{gaster1996polymorphic,
+  title={A polymorphic type system for extensible records and variants},
+  author={Gaster, Benedict R and Jones, Mark P},
+  year={1996},
+  publisher={Technical Report NOTTCS-TR-96-3, Department of Computer Science, University of Nottingham}
+}
+jones es tutor de haster
+@phdthesis{gaster1998records,
+  title={Records, variants and qualified types},
+  author={Gaster, Benedict R},
+  year={1998},
+  school={University of Nottingham}
+}
+@inproceedings{meijer1997design,
+  title={The design and implementation of Mondrian},
+  author={Meijer, Erik and Claessen, Koen and van Dijk, Joost and van Yzendoorn, Arjan},
+  booktitle={Haskell Workshop},
+  year={1997},
+  organization={Citeseer}
+}
+
+
+record applications:
+database schema
+linq
+
+design space:
+repeated (non distincts) fields
+first class labels
+polymorphic extension (when the type of r is not fully known)
+checkedness
+run-time tagging
+
+operations:
+CRUD
+remove field
+add field
+read field
+update
+rename
+casting
+
+facts:
+f# records are not extensible
+Damas Milner son 3 papers que etan el la tesis de gaster
+records = labeled products
+
+TODO
+stalkear a Remy
+Ohori95
+leer enfoques tabla de gaster thesis
+quien es tutor, gaster o jones? jones es tutor
+arreglar referencias
+reescribir paper nuestro con promotions, etc.
+scholar row types
+scholar hlist
+los papers de richard eisenberg sobre kinds
+ver trabajos recientes de hlist y records
+buscar applications en otros papers
+

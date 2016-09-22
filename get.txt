@@ -1,0 +1,45 @@
+bench_get = do
+  system "make paper.hs >&2"
+  system $ "rm -rf " ++ dir
+  system $ "mkdir " ++ dir
+  
+
+  -- precompile dependencies
+  forM_ ghcs $ \ghc -> do
+    call ghc "paper.hs"
+    
+    -- headers
+  putStr "iterations"
+  forM_ ghcs $ \ghc -> forM_ records $ \record ->
+      putStr $ ", " ++ ghc ++ " " ++ name record
+  putChar '\n'
+  
+  -- body
+  forM_ iters $ \iter -> do
+    putStr $ show iter ++ ", "
+    forM_  ghcs $ \ghc -> forM_ records $ \record -> do
+      let run = dir ++ "get_" ++ show iter ++ "_" ++ ghc ++ "_" ++ name record ++ ".hs"
+      writeFile run $ "\
+\{-# LANGUAGE NoMonomorphismRestriction #-}\n\
+\import Paper\n\
+\\n\
+\main = go (99999::Int) where\n\
+\    go i = if i == 0 then return() else go (i - get (make i) L2)\n\
+\\n\
+\{-# NOINLINE make #-}\n\
+\make i = list\n\
+\\n\
+\list =\n" ++
+        concat (replicate iter " cons (L1 .=. (0::Int)) $\n") ++
+        " cons (L2 .=. (1::Int)) nil" ++
+        "\ncons = " ++ cons record ++
+        "\nnil = " ++ nil record ++
+        "\nget = " ++ get record ++ "\n"
+      system $ "rm " ++ dir ++ ghc ++ "_dir/Main.*" -- workaround http://hackage.haskell.org/trac/ghc/ticket/7038
+      call ghc run
+      start <- getCurrentTime
+      system $ dir ++ "get_" ++ show iter ++ "_" ++ ghc ++ "_" ++ name record
+      end   <- getCurrentTime
+      putStr $ show (end `diffUTCTime` start) ++ ", "
+      hFlush stdout
+    putChar '\n'
