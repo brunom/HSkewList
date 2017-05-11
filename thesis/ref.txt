@@ -63,6 +63,7 @@ jones es tutor de haster
   organization={Citeseer}
 }
 
+https://ghc.haskell.org/trac/ghc/ticket/8779#comment:54
 
 record applications:
 database schema
@@ -74,6 +75,8 @@ first class labels
 polymorphic extension (when the type of r is not fully known)
 checkedness
 run-time tagging
+closed universe as in vinyl
+
 
 operations:
 CRUD
@@ -86,14 +89,17 @@ casting
 
 facts:
 f# records are not extensible
-Damas Milner son 3 papers que etan el la tesis de gaster
+Damas Milner son 3 papers que estan el la tesis de gaster
 records = labeled products
+vinyl tiene odered records
+jones es tutor de gaster
+
 
 TODO
+caso de estudio: Frames con fast vinyl
 stalkear a Remy
 Ohori95
 leer enfoques tabla de gaster thesis
-quien es tutor, gaster o jones? jones es tutor
 arreglar referencias
 reescribir paper nuestro con promotions, etc.
 scholar row types

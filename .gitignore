@@ -22,4 +22,6 @@ bench/
 .cabal-sandbox/
 cabal.sandbox.config
 nat_bench/
+dist/
+dist-newstyle/
 

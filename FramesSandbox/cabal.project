@@ -1,0 +1,8 @@
+packages:
+ Frames/
+ vinyl/
+package Frames
+ flags: +demos
+ benchmarks: True
+jobs: 4
+
