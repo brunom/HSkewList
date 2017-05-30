@@ -30,7 +30,7 @@
 {-# LANGUAGE FunctionalDependencies #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE UndecidableInstances #-}
---{-# LANGUAGE TypeInType #-}
+{-# LANGUAGE TypeInType #-}
 {-# LANGUAGE GADTs #-}
 {-# OPTIONS_GHC -Wunticked-promoted-constructors #-}
 
@@ -40,6 +40,7 @@ import Data.Array
 import GHC.Exts
 import Unsafe.Coerce
 import Data.Kind
+import Data.Singletons
 
 hListUpdate a = hSkewUpdate a
 hListRemove = undefined
@@ -164,8 +165,8 @@ Since we are only interested in type-level computations, we define empty
 types |HTrue| and |HFalse| corresponding to each boolean value.
 
 \begin{code}
-data   HTrue   ; hTrue   = undefined :: HTrue
-data   HFalse  ; hFalse  = undefined :: HFalse
+--data   HTrue   ; hTrue   = undefined :: HTrue
+--data   HFalse  ; hFalse  = undefined :: HFalse
 \end{code}
 
 The inhabitants |hTrue| and |hFalse| of those types are defined solely
@@ -175,8 +176,8 @@ referring to the types of such expressions.
 Type-level functions can be described using multi-parameter classes with functional dependencies.
 For example, we can encode type-level negation by defining the following class:
 \begin{code}
-class HNot t t' | t -> t' where
-  hNot :: t -> t'
+--class HNot t t' | t -> t' where
+--  hNot :: t -> t'
 \end{code}
 The functional dependency |t -> t'| expresses that the parameter |t|
 uniquely determines the parameter |t'|.
@@ -187,8 +188,8 @@ Whereas the class definition describes the type signature of the type-level func
 the function itself is defined by the following instance declarations:
 
 \begin{code}
-instance HNot  HFalse  HTrue   where hNot _ = hTrue
-instance HNot  HTrue   HFalse  where hNot _ = hFalse
+--instance HNot  HFalse  HTrue   where hNot _ = hTrue
+--instance HNot  HTrue   HFalse  where hNot _ = hFalse
 \end{code}
 If we write the expression |(hNot hFalse)|, then we know that |t| is |HFalse|.
 So, the first instance of |hNot| is selected and thus |t'| is inferred to be |HTrue|.
@@ -208,11 +209,11 @@ we define the following multi-parameter class. The parameter |v| specifies the t
 of the values to be contained by a |HJust|.
 
 \begin{code}
-class HMakeMaybe b v m | b v -> m where
-    hMakeMaybe :: b -> v -> m
-instance HMakeMaybe HFalse v HNothing where
+class HMakeMaybe (b::Bool) v m | b v -> m where
+    hMakeMaybe :: Sing b -> v -> m
+instance HMakeMaybe 'False v HNothing where
     hMakeMaybe b v = HNothing
-instance HMakeMaybe HTrue v (HJust v) where
+instance HMakeMaybe 'True v (HJust v) where
     hMakeMaybe b v = HJust v
 \end{code}
 
@@ -318,8 +319,8 @@ The type equality predicate |HEq| results in |HTrue| in case the compared types 
 Thus, when comparing two types in other type-level functions (like |HListGet| below),
 these two cases can be discriminated without using overlapping instances.
 \begin{code}
-class HEq x y b | x y -> b
-hEq :: HEq x y b => x -> y -> b
+class HEq x y (b::Bool) | x y -> b
+hEq :: HEq x y b => x -> y -> Sing b
 hEq = undefined
 \end{code}
 %
@@ -328,8 +329,8 @@ For completeness, here is one that suffices for our purposes.
 For a more complete discussion about type equality in Haskell
 we refer to \cite{type-eq}.
 \begin{code}
-instance {-# OVERLAPPING  #-}  HEq x x HTrue
-instance b ~ HFalse =>         HEq x y b
+instance {-# OVERLAPPING  #-}  HEq x x True
+instance b ~ False =>         HEq x y b
 \end{code}
 %if False
 \begin{code}
@@ -358,17 +359,17 @@ instance
 |HListGet'| has two instances, for the cases |HTrue| and |HFalse|.
 
 \begin{code}
-class HListGet' b v' r' l v | b v' r' l -> v where
-    hListGet':: b -> v' -> r' -> l -> v
+class HListGet' (b::Bool) v' r' l v | b v' r' l -> v where
+    hListGet':: Sing b -> v' -> r' -> l -> v
 
 instance
-    HListGet' HTrue v r' l v
+    HListGet' 'True v r' l v
     where
     hListGet' _ v _ _ = v
 
 instance
     HListGet r' l v =>
-    HListGet' HFalse v' r' l v where
+    HListGet' 'False v' r' l v where
     hListGet' _ _ r' l = hListGet r' l
 \end{code}
 
@@ -533,16 +534,16 @@ and nothing will be computed at run time.
 %
 \begin{code}
 arrayFind' ::  ArrayFind' b v' r l v n
-               => b -> v' -> r -> l -> n
+               => Sing b -> v' -> r -> l -> n
 arrayFind' = undefined
 
 data HZero
 data HSucc n
 
-class ArrayFind' b v' r l v n | b v' r l -> v n
-instance ArrayFind' HTrue v r l v HZero
+class ArrayFind' (b::Bool) v' r l v n | b v' r l -> v n
+instance ArrayFind' True v r l v HZero
 instance (HEq l l' b, ArrayFind' b v' r l v n)
-         => ArrayFind'  HFalse v'' (HCons (Field l' v') r) l
+         => ArrayFind'  False v'' (HCons (Field l' v') r) l
                         v (HSucc n)
 \end{code}
 %
@@ -629,11 +630,11 @@ Otherwise, we increase the index by one and continue searching.
 class HFind' b v' r l v | b v' r l -> v where
     hFind':: b -> v' -> r -> l -> Int
 instance
-    HFind' HTrue v r l v
+    HFind' True v r l v
     where
       hFind' _ _ _ _ = 0
 instance
-    HFind r l v => HFind' HFalse v' r l v
+    HFind r l v => HFind' False v' r l v
     where
       hFind' _ _ r l = 1 + hFind r l
 \end{code}
@@ -837,24 +838,24 @@ In the numerical representation of data structures,
 adding an item is incrementing the number.
 If each top level tree is a digit,
 building a new taller tree is a form of carry,
-so |HSkewCarry| returns |HTrue|.
+so |HSkewCarry| returns |True|.
 %
 \begin{code}
-class HSkewCarry l b | l -> b
+class HSkewCarry l (b::Bool) | l -> b
 
-hSkewCarry :: HSkewCarry l b => l -> b
+hSkewCarry :: HSkewCarry l b => l -> Sing b
 hSkewCarry = undefined
 \end{code}
 %
-If the spine has none or one single tree we return |HFalse|.
+If the spine has none or one single tree we return |False|.
 \begin{code}
-instance HSkewCarry HNil HFalse
-instance HSkewCarry (HCons t HNil) HFalse
+instance HSkewCarry HNil False
+instance HSkewCarry (HCons t HNil) False
 \end{code}
 %
 In case the spine has more than one tree,
-we return |HTrue| if the first two trees are of equal size and
-|HFalse| otherwise.
+we return |True| if the first two trees are of equal size and
+|False| otherwise.
 %
 \begin{code}
 instance
@@ -885,30 +886,30 @@ instance
     hSkewExtend f r =
         hSkewExtend' (hSkewCarry r) f r
 
-class HSkewExtend' b f r r' | b f r -> r' where
-    hSkewExtend' :: b -> f -> r -> r'
+class HSkewExtend' (b::Bool) f r r' | b f r -> r' where
+    hSkewExtend' :: Sing b -> f -> r -> r'
 \end{code}
 \noindent
-Here |HFalse| means that we should not add up the first two trees of the spine.
+Here |False| means that we should not add up the first two trees of the spine.
 Either the size of the two leading trees are different, or the spine is empty or a singleton.
 We just use |HLeaf| to insert a new tree at the beginning of the spine.
 \begin{code}
 instance
     HSkewExtend'
-        HFalse
+        False
         f
         r
         (HCons (HLeaf f) r) where
     hSkewExtend' _ f r = HCons (hLeaf f) r
 \end{code}
 %
-When |HSkewCarry| returns |HTrue|, however, we build a new tree reusing the two trees that were at the start of the spine.
+When |HSkewCarry| returns |True|, however, we build a new tree reusing the two trees that were at the start of the spine.
 The length of the spine is reduced in one, since we take two elements but only add one.
 %
 \begin{code}
 instance
     HSkewExtend'
-        HTrue
+        True
         f
         (HCons t (HCons t' r))
         (HCons (HNode f t t') r) where

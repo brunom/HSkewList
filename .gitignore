@@ -25,3 +25,4 @@ nat_bench/
 dist/
 dist-newstyle/
 
+thesis/thesis.hs
