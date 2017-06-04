@@ -253,7 +253,7 @@ They are modeled by an |HList| containing a heterogeneous list of fields.
 A field with label |l| and value of type |v| is represented by the type:
 
 \begin{code}
-newtype Field l v   =   Field { value :: v }
+newtype Field (l :: *) v   =   Field { value :: v }
 (.=.)               ::  l -> v -> Field l v
 _  .=.  v           =   Field v
 \end{code}
@@ -329,8 +329,8 @@ For completeness, here is one that suffices for our purposes.
 For a more complete discussion about type equality in Haskell
 we refer to \cite{type-eq}.
 \begin{code}
-instance {-# OVERLAPPING  #-}  HEq x x True
-instance b ~ False =>         HEq x y b
+instance {-# OVERLAPPING  #-}  HEq x x 'True
+instance b ~ 'False =>         HEq x y b
 \end{code}
 %if False
 \begin{code}
@@ -541,9 +541,9 @@ data HZero
 data HSucc n
 
 class ArrayFind' (b::Bool) v' r l v n | b v' r l -> v n
-instance ArrayFind' True v r l v HZero
+instance ArrayFind' 'True v r l v HZero
 instance (HEq l l' b, ArrayFind' b v' r l v n)
-         => ArrayFind'  False v'' (HCons (Field l' v') r) l
+         => ArrayFind' 'False v'' (HCons (Field l' v') r) l
                         v (HSucc n)
 \end{code}
 %
@@ -849,8 +849,8 @@ hSkewCarry = undefined
 %
 If the spine has none or one single tree we return |False|.
 \begin{code}
-instance HSkewCarry HNil False
-instance HSkewCarry (HCons t HNil) False
+instance HSkewCarry HNil 'False
+instance HSkewCarry (HCons t HNil) 'False
 \end{code}
 %
 In case the spine has more than one tree,
@@ -896,7 +896,7 @@ We just use |HLeaf| to insert a new tree at the beginning of the spine.
 \begin{code}
 instance
     HSkewExtend'
-        False
+        'False
         f
         r
         (HCons (HLeaf f) r) where
@@ -909,7 +909,7 @@ The length of the spine is reduced in one, since we take two elements but only a
 \begin{code}
 instance
     HSkewExtend'
-        True
+        'True
         f
         (HCons t (HCons t' r))
         (HCons (HNode f t t') r) where
