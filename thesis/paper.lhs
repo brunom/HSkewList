@@ -176,7 +176,7 @@ referring to the types of such expressions.
 Type-level functions can be described using multi-parameter classes with functional dependencies.
 For example, we can encode type-level negation by defining the following class:
 \begin{code}
---class HNot t t' | t -> t' where
+--class HNot t t' || t -> t' where
 --  hNot :: t -> t'
 \end{code}
 The functional dependency |t -> t'| expresses that the parameter |t|
