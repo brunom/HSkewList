@@ -319,9 +319,13 @@ The type equality predicate |HEq| results in |HTrue| in case the compared types 
 Thus, when comparing two types in other type-level functions (like |HListGet| below),
 these two cases can be discriminated without using overlapping instances.
 \begin{code}
-class HEq x y (b::Bool) | x y -> b
-hEq :: HEq x y b => x -> y -> Sing b
+type family HEq x y :: Bool where
+  HEq x x = 'True
+  HEq x y = 'False
+
+hEq :: HEq x y ~ b => x -> y -> Sing b
 hEq = undefined
+
 \end{code}
 %
 We will not delve into the different possible definitions for |HEq|.
@@ -329,8 +333,6 @@ For completeness, here is one that suffices for our purposes.
 For a more complete discussion about type equality in Haskell
 we refer to \cite{type-eq}.
 \begin{code}
-instance {-# OVERLAPPING  #-}  HEq x x 'True
-instance b ~ 'False =>         HEq x y b
 \end{code}
 %if False
 \begin{code}
@@ -349,8 +351,7 @@ or the search must continue to the next node.
 
 \begin{code}
 instance
-    (  HEq l l' b
-    ,  HListGet' b v' r' l v) =>
+    (  HListGet' (HEq l l') v' r' l v) =>
        HListGet (HCons (Field l' v') r') l v where
     hListGet (HCons f'@(Field v') r') l =
         hListGet' (hEq l (label f')) v' r' l
@@ -518,8 +519,7 @@ using |HEq| to discriminate the cases of
 the label of the current field, which may match or not the searched one.
 %
 \begin{code}
-instance  (  HEq l l' b
-          ,  ArrayFind' b v' r l v n
+instance  (  ArrayFind' (HEq l l') v' r l v n
           ,  ToValue n) =>
    ArrayFind (HCons (Field l' v') r) l v where
      arrayFind (HCons f r) l =
@@ -542,7 +542,7 @@ data HSucc n
 
 class ArrayFind' (b::Bool) v' r l v n | b v' r l -> v n
 instance ArrayFind' 'True v r l v HZero
-instance (HEq l l' b, ArrayFind' b v' r l v n)
+instance (ArrayFind' (HEq l l') v' r l v n)
          => ArrayFind' 'False v'' (HCons (Field l' v') r) l
                         v (HSucc n)
 \end{code}
@@ -616,8 +616,7 @@ the label of the current field, which may match or not the searched one.
 class HFind r l v | r l -> v where
   hFind :: r -> l -> Int
 instance
-    (  HEq l l' b
-    ,  HFind' b v' r' l v) =>
+    (  HFind' (HEq l l') v' r' l v) =>
        HFind (HCons (Field l' v') r') l v where
     hFind ~(HCons f'@(Field v') r') l =
         hFind' (hEq l (label f')) v' r' l
@@ -823,10 +822,9 @@ emptySkewRecord = HNil
 We will use it to detect the case of two leading equal height trees in the spine.
 %
 \begin{code}
-class HHeight t h | t -> h
-instance  HHeight HEmpty HZero
-instance  HHeight t h =>
-          HHeight (HNode e t t') (HSucc h)
+type family HHeight t :: * where
+  HHeight HEmpty = HZero
+  HHeight (HNode e t t') = (HSucc (HHeight t))
 \end{code}
 
 \noindent
@@ -841,16 +839,17 @@ building a new taller tree is a form of carry,
 so |HSkewCarry| returns |True|.
 %
 \begin{code}
-class HSkewCarry l (b::Bool) | l -> b
-
-hSkewCarry :: HSkewCarry l b => l -> Sing b
+type family HSkewCarry l :: Bool where
+  HSkewCarry HNil = 'False
+  HSkewCarry (HCons t HNil) = 'False
+  HSkewCarry (HCons t (HCons t' ts)) = HEq (HHeight t) (HHeight t')
+ 
+hSkewCarry :: HSkewCarry l ~ b => l -> Sing b
 hSkewCarry = undefined
 \end{code}
 %
 If the spine has none or one single tree we return |False|.
 \begin{code}
-instance HSkewCarry HNil 'False
-instance HSkewCarry (HCons t HNil) 'False
 \end{code}
 %
 In case the spine has more than one tree,
@@ -858,11 +857,6 @@ we return |True| if the first two trees are of equal size and
 |False| otherwise.
 %
 \begin{code}
-instance
-    (  HHeight t h
-    ,  HHeight t' h'
-    ,  HEq h h' b) =>
-       HSkewCarry (HCons t (HCons t' ts)) b
 \end{code}
 
 All these pieces allow us to define |HSkewExtend|,
@@ -880,9 +874,8 @@ while |HListGet| used |HEq| on the two labels.
 
 \begin{code}
 instance
-    (  HSkewCarry r b
-    ,  HSkewExtend' b  f r r') =>
-       HSkewExtend     f r r' where
+    (  HSkewExtend' (HSkewCarry r)  f r r') =>
+       HSkewExtend                  f r r' where
     hSkewExtend f r =
         hSkewExtend' (hSkewCarry r) f r
 
@@ -997,8 +990,7 @@ and |HNothing| or |HJust| is returned as appropriate.
 %
 \begin{code}
 instance
-    (  HEq l l' b
-    ,  HMakeMaybe b v m) =>
+    (  HMakeMaybe (HEq l l') v m) =>
        HSkewGet (Field l' v) l m where
     hSkewGet f l =
         hMakeMaybe
