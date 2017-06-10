@@ -41,6 +41,8 @@ import GHC.Exts
 import Unsafe.Coerce
 import Data.Kind
 import Data.Singletons
+import Data.Singletons.TypeLits
+import GHC.TypeLits
 
 hListUpdate a = hSkewUpdate a
 hListRemove = undefined
@@ -253,7 +255,7 @@ They are modeled by an |HList| containing a heterogeneous list of fields.
 A field with label |l| and value of type |v| is represented by the type:
 
 \begin{code}
-newtype Field (l :: *) v   =   Field { value :: v }
+newtype Field (l :: Type) v   =   Field { value :: v }
 (.=.)               ::  l -> v -> Field l v
 _  .=.  v           =   Field v
 \end{code}
@@ -491,7 +493,11 @@ Lookup is done as a two step operation.
 First, the ordinal of a certain label in the record, and the type (|v|) of its stored element, are found with |ArrayFind|.
 %
 \begin{code}
-class ArrayFind r l v | r l -> v where
+type family ArrayFindType r l :: Type where
+  ArrayFindType (HCons (Field l v) t) l = v
+  ArrayFindType (HCons h t) l = ArrayFindType t l
+
+class ArrayFind r l where
   arrayFind :: r -> l -> Int
 \end{code}
 %
@@ -499,7 +505,7 @@ Second, function |hArrayGet| uses the index to obtain the element from the array
 type (|v|) to coerce that element to its correct type.
 %
 \begin{code}
-hArrayGet :: ArrayFind r l v => ArrayRecord r -> l -> v
+hArrayGet :: ArrayFind r l => ArrayRecord r -> l -> ArrayFindType r l
 hArrayGet (ArrayRecord r a) l =
   unsafeCoerce (a ! arrayFind r l)
 \end{code}
@@ -519,11 +525,6 @@ using |HEq| to discriminate the cases of
 the label of the current field, which may match or not the searched one.
 %
 \begin{code}
-instance  (  ArrayFind' (HEq l l') v' r l v n
-          ,  ToValue n) =>
-   ArrayFind (HCons (Field l' v') r) l v where
-     arrayFind (HCons f r) l =
-       toValue (arrayFind' (hEq l (label f)) (value f) r l)
 \end{code}
 %
 A difference with |HListGet| is that the work of searching the label,
@@ -533,18 +534,10 @@ observe that |arrayFind'| is just an undefined value
 and nothing will be computed at run time.
 %
 \begin{code}
-arrayFind' ::  ArrayFind' b v' r l v n
-               => Sing b -> v' -> r -> l -> n
-arrayFind' = undefined
-
-data HZero
-data HSucc n
-
-class ArrayFind' (b::Bool) v' r l v n | b v' r l -> v n
-instance ArrayFind' 'True v r l v HZero
-instance (ArrayFind' (HEq l l') v' r l v n)
-         => ArrayFind' 'False v'' (HCons (Field l' v') r) l
-                        v (HSucc n)
+instance {-# OVERLAPPING  #-} ArrayFind (HCons (Field l v) t) l where
+  arrayFind _ _ = 0
+instance ArrayFind t l => ArrayFind (HCons h t) l where
+  arrayFind (HCons h t) l = 1 + arrayFind t l
 \end{code}
 %
 The types |HZero| and |HSucc| implement naturals at type-level.
@@ -555,20 +548,11 @@ in order to use this value as the index of the array.
 This is done by the function |toValue|.
 %
 \begin{code}
-class ToValue n where
-  toValue :: n -> Int
 \end{code}
 %
 To perform this conversion in constant time, we have to provide
 one specific instance of |ToValue| for every type-level natural we use.
 \begin{spec}
-instance ToValue HZero where
-  toValue _ = 0
-instance ToValue (HSucc HZero) where
-  toValue _ = 1
-instance ToValue (HSucc (HSucc HZero)) where
-  toValue _ = 2
-...
 \end{spec}
 
 In this implementation of |ArrayFind| it is very easy to distinguish the two phases
@@ -579,14 +563,6 @@ boilerplate. Although these instances can be automatically generated using Templ
 %(and any ohter competent compiler)
 %
 \begin{code}
-instance ToValue HZero where
-  toValue _ = 0
-
-hPrev :: HSucc n -> n
-hPrev = undefined
-
-instance ToValue n => ToValue (HSucc n) where
-  toValue n = 1 + toValue (hPrev n)
 \end{code}
 %
 %Based on these optimizations the computation of the index, which would be linear time, is performed at compile time.
@@ -822,9 +798,9 @@ emptySkewRecord = HNil
 We will use it to detect the case of two leading equal height trees in the spine.
 %
 \begin{code}
-type family HHeight t :: * where
-  HHeight HEmpty = HZero
-  HHeight (HNode e t t') = (HSucc (HHeight t))
+type family HHeight t :: Nat where
+  HHeight HEmpty = 0
+  HHeight (HNode e t t') = 1 + HHeight t
 \end{code}
 
 \noindent
