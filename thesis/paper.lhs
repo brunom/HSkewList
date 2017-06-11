@@ -32,9 +32,8 @@
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE TypeInType #-}
 {-# LANGUAGE GADTs #-}
+{-# LANGUAGE ScopedTypeVariables  #-}
 {-# OPTIONS_GHC -Wunticked-promoted-constructors #-}
-
-module Paper where
 
 import Data.Array
 import GHC.Exts
@@ -43,6 +42,8 @@ import Data.Kind
 import Data.Singletons
 import Data.Singletons.TypeLits
 import GHC.TypeLits
+
+main = undefined
 
 hListUpdate a = hSkewUpdate a
 hListRemove = undefined
@@ -496,18 +497,19 @@ First, the ordinal of a certain label in the record, and the type (|v|) of its s
 type family ArrayFindType r l :: Type where
   ArrayFindType (HCons (Field l v) t) l = v
   ArrayFindType (HCons h t) l = ArrayFindType t l
+type family ArrayFindIndex r l :: Nat where
+  ArrayFindIndex (HCons (Field l v) t) l = 0
+  ArrayFindIndex (HCons h t) l = 1 + ArrayFindIndex t l
 
-class ArrayFind r l where
-  arrayFind :: r -> l -> Int
 \end{code}
 %
 Second, function |hArrayGet| uses the index to obtain the element from the array and the
 type (|v|) to coerce that element to its correct type.
 %
 \begin{code}
-hArrayGet :: ArrayFind r l => ArrayRecord r -> l -> ArrayFindType r l
+hArrayGet :: forall r l. SingI (ArrayFindIndex r l) => ArrayRecord r -> l -> ArrayFindType r l
 hArrayGet (ArrayRecord r a) l =
-  unsafeCoerce (a ! arrayFind r l)
+  unsafeCoerce (a ! (fromInteger $ fromSing (sing :: Sing (ArrayFindIndex r l))))
 \end{code}
 
 Figure~\ref{fig:search-array} shows a graphical representation of this process.
@@ -534,10 +536,6 @@ observe that |arrayFind'| is just an undefined value
 and nothing will be computed at run time.
 %
 \begin{code}
-instance {-# OVERLAPPING  #-} ArrayFind (HCons (Field l v) t) l where
-  arrayFind _ _ = 0
-instance ArrayFind t l => ArrayFind (HCons h t) l where
-  arrayFind (HCons h t) l = 1 + arrayFind t l
 \end{code}
 %
 The types |HZero| and |HSucc| implement naturals at type-level.
