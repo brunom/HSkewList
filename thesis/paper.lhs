@@ -21,6 +21,9 @@
 %endif
 
 %if style==newcode
+
+%format !!! = "''"
+
 \begin{code}
 {-# LANGUAGE EmptyDataDecls #-}
 {-# LANGUAGE FlexibleContexts #-}
@@ -42,6 +45,7 @@ import Data.Kind
 import Data.Singletons
 import Data.Singletons.TypeLits
 import GHC.TypeLits
+import Data.Type.List
 
 main = undefined
 
@@ -485,8 +489,8 @@ Items are then |unsafeCoerce|d on the way in and out based on the type informati
 %
 %
 \begin{code}
-data ArrayRecord r =
-  ArrayRecord r (Array Int Any)
+newtype ArrayRecord (fs :: [(l,v)]) =
+  ArrayRecord (Array Int Any)
 \end{code}
 
 \subsubsection{Lookup}
@@ -494,12 +498,9 @@ Lookup is done as a two step operation.
 First, the ordinal of a certain label in the record, and the type (|v|) of its stored element, are found with |ArrayFind|.
 %
 \begin{code}
-type family ArrayFindType r l :: Type where
-  ArrayFindType (HCons (Field l v) t) l = v
-  ArrayFindType (HCons h t) l = ArrayFindType t l
-type family ArrayFindIndex r l :: Nat where
-  ArrayFindIndex (HCons (Field l v) t) l = 0
-  ArrayFindIndex (HCons h t) l = 1 + ArrayFindIndex t l
+type family ArrayFindIndex fs l :: Nat where
+  ArrayFindIndex (!!!(l,v) ': _) l = 0
+  ArrayFindIndex (_ ': t) l = 1 + ArrayFindIndex t l
 
 \end{code}
 %
@@ -507,9 +508,9 @@ Second, function |hArrayGet| uses the index to obtain the element from the array
 type (|v|) to coerce that element to its correct type.
 %
 \begin{code}
-hArrayGet :: forall r l. SingI (ArrayFindIndex r l) => ArrayRecord r -> l -> ArrayFindType r l
-hArrayGet (ArrayRecord r a) l =
-  unsafeCoerce (a ! (fromInteger $ fromSing (sing :: Sing (ArrayFindIndex r l))))
+hArrayGet :: forall fs l. SingI (ArrayFindIndex fs l) => ArrayRecord fs -> l -> Lookup l fs
+hArrayGet (ArrayRecord a) l =
+  unsafeCoerce (a ! (fromInteger $ fromSing (sing :: Sing (ArrayFindIndex fs l))))
 \end{code}
 
 Figure~\ref{fig:search-array} shows a graphical representation of this process.
@@ -636,19 +637,22 @@ hArrayGet (ArrayRecord r a) l =
 An empty |ArrayRecord| consists of an empty heterogeneous list and an empty array.
 %
 \begin{code}
+emptyArrayRecord :: ArrayRecord !!! []
 emptyArrayRecord =
-  ArrayRecord HNil (array (0, -1) [])
+  ArrayRecord (array (0, -1) [])
 \end{code}
 %
 Function |hArrayExtend| adds a field to an array record.
 %
 \begin{code}
-hArrayExtend f = hArrayModifyList (HCons f)
+hArrayExtend :: Field l v -> ArrayRecord ls -> ArrayRecord ('(l, v) ': ls)
+hArrayExtend (Field v) (ArrayRecord a) = ArrayRecord $ listArray (0, 1 + snd (bounds a)) (unsafeCoerce v : elems a)
 
-hArrayModifyList hc (ArrayRecord r _) =
-  let  r'  = hc r
-       fs  = hMapAny r'
-  in   ArrayRecord r' (listArray (0, length fs - 1) fs)
+
+-- hArrayModifyList hc (ArrayRecord r _) =
+  -- let  r'  = hc r
+       -- fs  = hMapAny r'
+  -- in   ArrayRecord r' (listArray (0, length fs - 1) fs)
 \end{code}
 %
 %if False
@@ -673,16 +677,6 @@ The function |hMapAny| iterates over the heterogeneous list \emph{coercing} its 
 of type |Any|.
 %
 \begin{code}
-class HMapAny r where
-  hMapAny :: r -> [Any]
-instance HMapAny HNil where
-  hMapAny _ = []
-instance
-  HMapAny r =>
-  HMapAny (HCons (Field l v) r)
-  where
-  hMapAny (HCons (Field v) r) =
-    unsafeCoerce v : hMapAny r
 \end{code}
 
 
@@ -695,11 +689,6 @@ We use the respective functions |hListUpdate| and |hListRemove| from the HList
 implementation of records.
 %
 \begin{code}
-hArrayUpdate l e
-   = hArrayModifyList (hListUpdate l e)
-
-hArrayRemove l
-   = hArrayModifyList (hListRemove l)
 \end{code}
 %
 With |HArrayUpdate| we change a field of some label with a new field with possibly new label and value.
