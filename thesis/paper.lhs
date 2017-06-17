@@ -35,6 +35,7 @@
 {-# LANGUAGE UndecidableInstances #-}
 {-# LANGUAGE TypeInType #-}
 {-# LANGUAGE GADTs #-}
+{-# LANGUAGE DataKinds #-}
 {-# LANGUAGE ScopedTypeVariables  #-}
 {-# OPTIONS_GHC -Wunticked-promoted-constructors #-}
 
@@ -44,8 +45,9 @@ import Unsafe.Coerce
 import Data.Kind
 import Data.Singletons
 import Data.Singletons.TypeLits
+import Data.Singletons.Prelude
+import Data.Singletons.Prelude.Maybe
 import GHC.TypeLits
-import Data.Type.List
 
 main = undefined
 
@@ -260,8 +262,8 @@ They are modeled by an |HList| containing a heterogeneous list of fields.
 A field with label |l| and value of type |v| is represented by the type:
 
 \begin{code}
-newtype Field (l :: Type) v   =   Field { value :: v }
-(.=.)               ::  l -> v -> Field l v
+newtype Field l v   =   Field { value :: v }
+(.=.)               ::  Sing l -> v -> Field l v
 _  .=.  v           =   Field v
 \end{code}
 
@@ -271,33 +273,24 @@ We can retrieve the label value by using the function |label|, which exposes
 the phantom type parameter:
 
 \begin{code}
-label  ::  Field l v -> l
+label  ::  Field l v -> Sing l
 label  =   undefined
 \end{code}
 
 We define separate types and constructors for labels.
 
-\begin{code}
-data L1 = L1
-data L2 = L2
-data L3 = L3
-data L4 = L4
-data L5 = L5
-data L6 = L6
-data L7 = L7
-\end{code}
 
 Thus, the following defines a record (|rList|) with seven fields:
 
 \begin{code}
 rList =
-  (L1  .=.  True     )  `HCons`
-  (L2  .=.  9        )  `HCons`
-  (L3  .=.  "bla"    )  `HCons`
-  (L4  .=.  'c'      )  `HCons`
-  (L5  .=.  Nothing  )  `HCons`
-  (L6  .=.  [4,5]    )  `HCons`
-  (L7  .=.  "last"   )  `HCons`
+  ((sing :: Sing "L1")  .=.  True     )  `HCons`
+  ((sing :: Sing "L2")  .=.  9        )  `HCons`
+  ((sing :: Sing "L3")  .=.  "bla"    )  `HCons`
+  ((sing :: Sing "L4")  .=.  'c'      )  `HCons`
+  ((sing :: Sing "L5")  .=.  Nothing  )  `HCons`
+  ((sing :: Sing "L6")  .=.  [4,5]    )  `HCons`
+  ((sing :: Sing "L7")  .=.  "last"   )  `HCons`
   HNil
 \end{code}
 
@@ -306,7 +299,7 @@ corresponding to a specific label:
 
 \begin{code}
 class HListGet r l v | r l -> v where
-    hListGet :: r -> l -> v
+    hListGet :: r -> Sing l -> v
 \end{code}
 
 \noindent
@@ -316,7 +309,7 @@ At value-level |hListGet| returns the value of type |v|.
 For example, the following expression returns the string |"last"|:
 
 \begin{code}
-lastList = hListGet rList L7
+lastList = hListGet rList (sing :: Sing "L7")
 \end{code}
 
 Instead of polluting the definitions of type-level functions
@@ -330,7 +323,7 @@ type family HEq x y :: Bool where
   HEq x x = 'True
   HEq x y = 'False
 
-hEq :: HEq x y ~ b => x -> y -> Sing b
+hEq :: HEq x y ~ b => Sing x -> Sing y -> Sing b
 hEq = undefined
 
 \end{code}
@@ -353,6 +346,7 @@ At this point we can see that the use of overlapping instances is unavoidable. T
 the implementation of HList is based on type classes and functional dependencies instead of \emph{type families} \cite{Chak05,1086397,Schrijvers2008} (which do not support overlapping instances).
 
 |HListGet| uses |HEq| to discriminate the two possible cases.
+
 Either the label of the current field matches |l|,
 or the search must continue to the next node.
 
@@ -368,7 +362,7 @@ instance
 
 \begin{code}
 class HListGet' (b::Bool) v' r' l v | b v' r' l -> v where
-    hListGet':: Sing b -> v' -> r' -> l -> v
+    hListGet':: Sing b -> v' -> r' -> Sing l -> v
 
 instance
     HListGet' 'True v r' l v
@@ -498,9 +492,9 @@ Lookup is done as a two step operation.
 First, the ordinal of a certain label in the record, and the type (|v|) of its stored element, are found with |ArrayFind|.
 %
 \begin{code}
-type family ArrayFindIndex fs l :: Nat where
-  ArrayFindIndex (!!!(l,v) ': _) l = 0
-  ArrayFindIndex (_ ': t) l = 1 + ArrayFindIndex t l
+type family ArrayFindIndex l fs :: Nat where
+  ArrayFindIndex l (!!!(l,v) ': _) = 0
+  ArrayFindIndex l (_ ': t) = 1 + ArrayFindIndex l t
 
 \end{code}
 %
@@ -508,9 +502,13 @@ Second, function |hArrayGet| uses the index to obtain the element from the array
 type (|v|) to coerce that element to its correct type.
 %
 \begin{code}
-hArrayGet :: forall fs l. SingI (ArrayFindIndex fs l) => ArrayRecord fs -> l -> Lookup l fs
-hArrayGet (ArrayRecord a) l =
-  unsafeCoerce (a ! (fromInteger $ fromSing (sing :: Sing (ArrayFindIndex fs l))))
+hArrayGet :: forall fs l. SingI (ArrayFindIndex l fs) => ArrayRecord fs -> Sing l -> FromJust (Lookup l fs)
+hArrayGet (ArrayRecord a) _ =
+  unsafeCoerce (a ! (fromInteger $ fromSing (sing :: Sing (ArrayFindIndex l fs))))
+
+data N = CN deriving Eq
+ar = (sing :: Sing "age") .=. 42 `hArrayExtend` emptyArrayRecord
+hi = hArrayGet ar (sing :: Sing "age")
 \end{code}
 
 Figure~\ref{fig:search-array} shows a graphical representation of this process.
@@ -763,10 +761,10 @@ The following declarations define a skew list with the elements of the fourth st
 
 \begin{code}
 four =
-    HCons  (hLeaf  (L4  .=.  'c')) $
-    HCons  (HNode  (L5  .=.  Nothing)
-                   (hLeaf (L6  .=.  [4,5]))
-                   (hLeaf (L7  .=.  "last"))) $
+    HCons  (hLeaf  ((sing :: Sing "L4")  .=.  'c')) $
+    HCons  (HNode  ((sing :: Sing "L5")  .=.  Nothing)
+                   (hLeaf ((sing :: Sing "L6")  .=.  [4,5]))
+                   (hLeaf ((sing :: Sing "L7")  .=.  "last"))) $
     HNil
 \end{code}
 
@@ -882,7 +880,7 @@ but follows only the right one at run time.
 
 \begin{code}
 class HSkewGet r l v | r l -> v where
-    hSkewGet :: r -> l -> v
+    hSkewGet :: r -> Sing l -> v
 \end{code}
 Deciding on the path to the desired field
 is now more involved.
@@ -969,16 +967,16 @@ but constructing a |SkewRecord| instead of an |HList|:
 %
 \begin{code}
 rSkew =
-  (L1  .=.  True     )  `hSkewExtend`
-  (L2  .=.  9        )  `hSkewExtend`
-  (L3  .=.  "bla"    )  `hSkewExtend`
-  (L4  .=.  'c'      )  `hSkewExtend`
-  (L5  .=.  Nothing  )  `hSkewExtend`
-  (L6  .=.  [4,5]    )  `hSkewExtend`
-  (L7  .=.  "last"   )  `hSkewExtend`
+  ((sing :: Sing "L1")  .=.  True     )  `hSkewExtend`
+  ((sing :: Sing "L2")  .=.  9        )  `hSkewExtend`
+  ((sing :: Sing "L3")  .=.  "bla"    )  `hSkewExtend`
+  ((sing :: Sing "L4")  .=.  'c'      )  `hSkewExtend`
+  ((sing :: Sing "L5")  .=.  Nothing  )  `hSkewExtend`
+  ((sing :: Sing "L6")  .=.  [4,5]    )  `hSkewExtend`
+  ((sing :: Sing "L7")  .=.  "last"   )  `hSkewExtend`
   emptySkewRecord
 
-lastSkew = hSkewGet rSkew L7
+lastSkew = hSkewGet rSkew (sing :: Sing "L7")
 \end{code}
 the resulting core code is:
 
@@ -1004,7 +1002,7 @@ a field of some label with a new field with possibly new label and value.
 %
 \begin{code}
 class HSkewUpdate l e r r' | l e r -> r' where
-    hSkewUpdate :: l -> e -> r -> r'
+    hSkewUpdate :: Sing l -> e -> r -> r'
 \end{code}
 %
 We use the lookup operation |HSkewGet| to discriminate at type-level
@@ -1018,7 +1016,7 @@ instance  (  HSkewGet r l m
        hSkewUpdate' (hSkewGet r l) l e r
 
 class HSkewUpdate' m l e r r' | m l e r -> r' where
-    hSkewUpdate' :: m -> l -> e -> r -> r'
+    hSkewUpdate' :: m -> Sing l -> e -> r -> r'
 \end{code}
 %
 In case the label is not present we have nothing to do than just returning the
