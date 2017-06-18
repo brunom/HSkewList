@@ -37,6 +37,8 @@
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE ScopedTypeVariables  #-}
+{-# LANGUAGE TemplateHaskell  #-}
+{-# LANGUAGE PartialTypeSignatures #-}
 {-# OPTIONS_GHC -Wunticked-promoted-constructors #-}
 
 import Data.Array
@@ -47,6 +49,8 @@ import Data.Singletons
 import Data.Singletons.TypeLits
 import Data.Singletons.Prelude
 import Data.Singletons.Prelude.Maybe
+import Data.Singletons.Prelude.List
+import Data.Singletons.TH
 import GHC.TypeLits
 
 main = undefined
@@ -492,19 +496,16 @@ Lookup is done as a two step operation.
 First, the ordinal of a certain label in the record, and the type (|v|) of its stored element, are found with |ArrayFind|.
 %
 \begin{code}
-type family ArrayFindIndex l fs :: Nat where
-  ArrayFindIndex l (!!!(l,v) ': _) = 0
-  ArrayFindIndex l (_ ': t) = 1 + ArrayFindIndex l t
-
 \end{code}
 %
 Second, function |hArrayGet| uses the index to obtain the element from the array and the
 type (|v|) to coerce that element to its correct type.
 %
 \begin{code}
-hArrayGet :: forall fs l. SingI (ArrayFindIndex l fs) => ArrayRecord fs -> Sing l -> FromJust (Lookup l fs)
+-- TODO Partial type signatures
+hArrayGet :: forall fs l. SingI (FromJust (ElemIndex l (Map FstSym0 fs))) => ArrayRecord fs -> Sing l -> FromJust (Lookup l fs)
 hArrayGet (ArrayRecord a) _ =
-  unsafeCoerce (a ! (fromInteger $ fromSing (sing :: Sing (ArrayFindIndex l fs))))
+  unsafeCoerce (a ! (fromInteger $ fromSing (sing :: Sing (FromJust (ElemIndex l (Map FstSym0 fs))))))
 
 data N = CN deriving Eq
 ar = (sing :: Sing "age") .=. 42 `hArrayExtend` emptyArrayRecord
