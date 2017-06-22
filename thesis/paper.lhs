@@ -39,6 +39,7 @@
 {-# LANGUAGE ScopedTypeVariables  #-}
 {-# LANGUAGE TemplateHaskell  #-}
 {-# LANGUAGE PartialTypeSignatures #-}
+{-# LANGUAGE ConstraintKinds #-}
 {-# OPTIONS_GHC -Wunticked-promoted-constructors #-}
 
 import Data.Array
@@ -503,9 +504,10 @@ type (|v|) to coerce that element to its correct type.
 %
 \begin{code}
 -- TODO Partial type signatures
-hArrayGet :: forall fs l. SingI (FromJust (ElemIndex l (Map FstSym0 fs))) => ArrayRecord fs -> Sing l -> FromJust (Lookup l fs)
+-- TODO discutir Just vs FromJust
+hArrayGet :: forall fs l s. (Just i ~ ElemIndex l (Map FstSym0 fs), SingI i) => ArrayRecord fs -> Sing l -> FromJust (Lookup l fs)
 hArrayGet (ArrayRecord a) _ =
-  unsafeCoerce (a ! (fromInteger $ fromSing (sing :: Sing (FromJust (ElemIndex l (Map FstSym0 fs))))))
+  unsafeCoerce (a ! (fromInteger $ fromSing (sing :: Sing i)))
 
 data N = CN deriving Eq
 ar = (sing :: Sing "age") .=. 42 `hArrayExtend` emptyArrayRecord
