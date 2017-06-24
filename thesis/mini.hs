@@ -29,8 +29,12 @@ data HList (l:: [Type]) where
    HNil  :: HList '[]
    HCons :: e -> HList l -> HList (e ': l)
 infixr 2 `HCons`
-newtype ListRecord fs = ListRecord (HList (Map SndSym0 fs))
-
+data ListRecord ls vs where
+ LNil :: ListRecord '[] '[]
+ LCons :: v -> ListRecord ls vs -> ListRecord (l ': ls) (v ': vs)
+ 
+-- TODO primero con nuestras propias type funcs pero sin clases
+ 
 -- todo partial types fail
 -- get :: forall fl fv fs l fs1 v. (fs ~ ('(fl, fv) ': fs1), SingI (l :== fl), 'Just v ~ Lookup l fs) => ListRecord fs -> Sing l -> v
 -- get (ListRecord (HCons v vs)) l =
@@ -38,21 +42,27 @@ newtype ListRecord fs = ListRecord (HList (Map SndSym0 fs))
     -- (STrue) -> v
     -- (SFalse) -> get (ListRecord vs :: ListRecord fs) l
 
--- get ::
-    -- forall m fs v l. (
-    -- m ~ Map ((:==$$) l) (Map FstSym0 fs),
-    -- SingI m,
-    -- 'Just v ~ Lookup l fs) =>
-    -- ListRecord fs ->
-    -- Sing l ->
-    -- v
--- get (ListRecord (HCons vv vs)) l =
-    -- case (sing :: Sing m) of
-    -- (SCons STrue _) -> vv
+
+type family Look l ls vs where
+ Look l (l' ': ls) (v ': vs) = If (l :== l') v (Look l ls vs)
+
+get ::
+    SingI (Map ((:==$$) l) ls) =>
+    ListRecord ls vs ->
+    Sing l ->
+    Look l ls vs
+get = work sing where
+    work ::
+        Sing (Map ((:==$$) l) ls) ->
+        ListRecord ls vs ->
+        Sing l ->
+        Look l ls vs
+    work (SCons STrue  _) (LCons v _ ) = const v
+    work (SCons SFalse m) (LCons _ vs) = work m vs
 
 l1 = sing :: Sing "L1"
 l2 = sing :: Sing "L2"
 l3 = sing :: Sing "L3"
 
-r :: ListRecord '[ '("L1", Int), '("L2", String)]
-r = ListRecord (HCons 42 (HCons "hi" HNil))
+r :: ListRecord ["L1", "L2"] [Int, String]
+r = LCons 42 (LCons "hi" LNil)
