@@ -56,8 +56,8 @@ import GHC.TypeLits
 
 main = undefined
 
-hListUpdate a = hSkewUpdate a
-hListRemove = undefined
+--hListUpdate a = hSkewUpdate a
+--hListRemove = undefined
 
 \end{code}
 
@@ -179,8 +179,6 @@ Since we are only interested in type-level computations, we define empty
 types |HTrue| and |HFalse| corresponding to each boolean value.
 
 \begin{code}
---data   HTrue   ; hTrue   = undefined :: HTrue
---data   HFalse  ; hFalse  = undefined :: HFalse
 \end{code}
 
 The inhabitants |hTrue| and |hFalse| of those types are defined solely
@@ -255,6 +253,12 @@ which model the structure of lists both at the value and type level:
 data HNil       = HNil
 data HCons e l  = HCons e l
 infixr 2 `HCons`
+
+data ListRecord fs where
+ LNil :: ListRecord '[]
+ LCons :: v -> ListRecord fs -> ListRecord ('(l,v) !!! : fs)
+infixr 2 `LCons`
+
 \end{code}
 
 For example, the value |HCons True (HCons 'a' HNil)| is a heterogeneous list of type |HCons Bool (HCons Char HNil)|.
@@ -278,8 +282,8 @@ We can retrieve the label value by using the function |label|, which exposes
 the phantom type parameter:
 
 \begin{code}
-label  ::  Field l v -> Sing l
-label  =   undefined
+label  :: SingI l => Field l v -> Sing l
+label f =   sing
 \end{code}
 
 We define separate types and constructors for labels.
@@ -288,24 +292,23 @@ We define separate types and constructors for labels.
 Thus, the following defines a record (|rList|) with seven fields:
 
 \begin{code}
+hListExtend :: Field l v -> ListRecord fs -> ListRecord ('(l, v) ': fs)
+hListExtend (Field v) r = LCons v r
+infixr 2 `hListExtend`
+
 rList =
-  ((sing :: Sing "L1")  .=.  True     )  `HCons`
-  ((sing :: Sing "L2")  .=.  9        )  `HCons`
-  ((sing :: Sing "L3")  .=.  "bla"    )  `HCons`
-  ((sing :: Sing "L4")  .=.  'c'      )  `HCons`
-  ((sing :: Sing "L5")  .=.  Nothing  )  `HCons`
-  ((sing :: Sing "L6")  .=.  [4,5]    )  `HCons`
-  ((sing :: Sing "L7")  .=.  "last"   )  `HCons`
-  HNil
+  ((sing :: Sing "L1")  .=.  True     )  `hListExtend`
+  ((sing :: Sing "L2")  .=.  9        )  `hListExtend`
+  ((sing :: Sing "L3")  .=.  "bla"    )  `hListExtend`
+  ((sing :: Sing "L4")  .=.  'c'      )  `hListExtend`
+  ((sing :: Sing "L5")  .=.  Nothing  )  `hListExtend`
+  ((sing :: Sing "L6")  .=.  [4,5]    )  `hListExtend`
+  ((sing :: Sing "L7")  .=.  "last"   )  `hListExtend`
+  LNil
 \end{code}
 
 The class |HListGet| retrieves from a record the value part
 corresponding to a specific label:
-
-\begin{code}
-class HListGet r l v | r l -> v where
-    hListGet :: r -> Sing l -> v
-\end{code}
 
 \noindent
 At the type-level it is statically checked that the record |r| indeed has
@@ -328,8 +331,8 @@ type family HEq x y :: Bool where
   HEq x x = 'True
   HEq x y = 'False
 
-hEq :: HEq x y ~ b => Sing x -> Sing y -> Sing b
-hEq = undefined
+hEq :: SingI (HEq x y) => Sing x -> Sing y -> Sing (HEq x y)
+hEq x y = sing
 
 \end{code}
 %
@@ -356,28 +359,24 @@ Either the label of the current field matches |l|,
 or the search must continue to the next node.
 
 \begin{code}
-instance
-    (  HListGet' (HEq l l') v' r' l v) =>
-       HListGet (HCons (Field l' v') r') l v where
-    hListGet (HCons f'@(Field v') r') l =
-        hListGet' (hEq l (label f')) v' r' l
+hListGet ::
+    SingI (Map ((:==$$) l) (Map FstSym0 fs)) =>
+    ListRecord fs ->
+    Sing l ->
+    FromJust (Lookup l fs)
+hListGet = work sing where
+    work ::
+        Sing (Map ((:==$$) l) (Map FstSym0 fs)) ->
+        ListRecord fs ->
+        Sing l ->
+        FromJust (Lookup l fs)
+    work (SCons STrue  _) (LCons v _ ) l = v
+    work (SCons SFalse m) (LCons _ vs) l = work m vs l
 \end{code}
 
 |HListGet'| has two instances, for the cases |HTrue| and |HFalse|.
 
 \begin{code}
-class HListGet' (b::Bool) v' r' l v | b v' r' l -> v where
-    hListGet':: Sing b -> v' -> r' -> Sing l -> v
-
-instance
-    HListGet' 'True v r' l v
-    where
-    hListGet' _ v _ _ = v
-
-instance
-    HListGet r' l v =>
-    HListGet' 'False v' r' l v where
-    hListGet' _ _ r' l = hListGet r' l
 \end{code}
 
 \noindent
@@ -397,13 +396,13 @@ For example, this is the GHC core of the example:
 
 \begin{code}
 lastListCore = case rList of
-  HCons _ rs1 -> case rs1 of
-    HCons _  rs2 -> case rs2 of
-      HCons _  rs3 -> case rs3 of
-        HCons _ rs4 -> case rs4 of
-          HCons _ rs5 -> case rs5 of
-            HCons _ rs6 -> case rs6 of
-              HCons e _ -> e
+  LCons _ rs1 -> case rs1 of
+    LCons _  rs2 -> case rs2 of
+      LCons _  rs3 -> case rs3 of
+        LCons _ rs4 -> case rs4 of
+          LCons _ rs5 -> case rs5 of
+            LCons _ rs6 -> case rs6 of
+              LCons e _ -> e
 \end{code}
 
 \section{Faster Extensible Records}\label{sec:faster}
@@ -505,7 +504,7 @@ type (|v|) to coerce that element to its correct type.
 \begin{code}
 -- TODO Partial type signatures
 -- TODO discutir Just vs FromJust
-hArrayGet :: forall fs l s. (Just i ~ ElemIndex l (Map FstSym0 fs), SingI i) => ArrayRecord fs -> Sing l -> FromJust (Lookup l fs)
+hArrayGet :: forall fs l i. (!!!Just i ~ ElemIndex l (Map FstSym0 fs), SingI i) => ArrayRecord fs -> Sing l -> FromJust (Lookup l fs)
 hArrayGet (ArrayRecord a) _ =
   unsafeCoerce (a ! (fromInteger $ fromSing (sing :: Sing i)))
 
@@ -808,8 +807,8 @@ type family HSkewCarry l :: Bool where
   HSkewCarry (HCons t HNil) = 'False
   HSkewCarry (HCons t (HCons t' ts)) = HEq (HHeight t) (HHeight t')
  
-hSkewCarry :: HSkewCarry l ~ b => l -> Sing b
-hSkewCarry = undefined
+hSkewCarry :: SingI (HSkewCarry l) => l -> Sing (HSkewCarry l)
+hSkewCarry l = sing
 \end{code}
 %
 If the spine has none or one single tree we return |False|.
@@ -838,7 +837,8 @@ while |HListGet| used |HEq| on the two labels.
 
 \begin{code}
 instance
-    (  HSkewExtend' (HSkewCarry r)  f r r') =>
+    (  HSkewExtend' (HSkewCarry r)  f r r',
+       SingI (HSkewCarry r)) =>
        HSkewExtend                  f r r' where
     hSkewExtend f r =
         hSkewExtend' (hSkewCarry r) f r
@@ -954,7 +954,9 @@ and |HNothing| or |HJust| is returned as appropriate.
 %
 \begin{code}
 instance
-    (  HMakeMaybe (HEq l l') v m) =>
+    (  HMakeMaybe (HEq l l') v m
+    ,  SingI (HEq l l')
+    ,  SingI l') =>
        HSkewGet (Field l' v) l m where
     hSkewGet f l =
         hMakeMaybe
