@@ -85,44 +85,39 @@ data HTree t where
     HEmpty :: HTree 'Empty
     HNode :: e -> HTree t1 -> HTree t2 -> HTree ('Node e t1 t2) 
 
-newtype SkewRecord fs = SkewRecord (HList (Map (TyCon1 HTree) (Skew (Map SndSym0 fs))))
+newtype SkewRecord fs = SkewRecord (HList (Map (TyCon1 HTree) (L fs (Skew (Length fs)))))
+-- type SkewRecord fs =  (HList (Map (TyCon1 HTree) (L fs (Skew (Length fs)))))
+
 skewNil :: SkewRecord '[]
 skewNil = SkewRecord HNil
+-- skewNil = HNil
 
-type family Skew fs where
-    Skew '[] = '[]
-    Skew (x ': xs) = Skew2 x (Skew xs)
+type family Skew n where
+    Skew 0 = '[]
+    Skew n = Skew2 (Skew (n-1))
 
-type family Skew2 x ts where
-    Skew2 x '[] = '[Leaf x]
-    Skew2 x '[a] = '[Leaf x, a]
-    Skew2 x (a ': b ': ts) = If (Height a :== Height b)
-        (('Node x a b) ': ts)
-        ((Leaf x) ': a ': b ': ts)
+type family Skew2 hs where
+    Skew2 '[] = '[1]
+    Skew2 '[a] = '[1, a]
+    Skew2 (a ': b ': ts) = If (a :== b)
+        ((a+1) ': ts)
+        (1 ': a ': b ': ts)
+type family L fs hs where
+    L '[] '[] = '[]
+    L fs (h ': hs) = L2 (T fs h) hs
+type family L2 t_fs hs where
+    L2 '(t, fs) hs = (t ': (L fs hs))
+type family T fs h where
+    T fs 0 = '( 'Empty, fs)
+    T ('(l, v) : fs) n = T2 v n (T fs (n-1))
+type family T2 v n left_fs where
+    T2 v n '(left, fs) = T3 v left (T fs (n-1))
+type family T3 v left right_fs where
+    T3 v left '(right, fs) = '( 'Node v left right, fs)
 
--- data Dis ts where
-    -- DNone :: Dis '[]
-    -- DOne :: Dis '[a]
-    -- DEqual :: (Height a :== Height b) ~ True => Dis (a ': b ': ts)
-    -- DDiff :: (Height a :== Height b) ~ False => Dis (a ': b ': ts)
-
-$(singletons [d|
-    data E = E0 | E1 | E2 | E3
-    |])
-type family Dis ts where
-    Dis '[] = 'E0
-    Dis '[a] = 'E1
-    Dis (a ': b ': ts) = If (Height a :== Height b) 'E2 'E3
-    
--- data Dis ts where
-    -- DNone :: Dis '[]
-    -- DOne :: Dis '[a]
-    -- DEqual :: (Height a :== Height b) ~ True => Dis (a ': b ': ts)
-    -- DDiff :: (Height a :== Height b) ~ False => Dis (a ': b ': ts)
-
--- skewCons :: forall l v fs s. (s ~ (Skew (Map SndSym0 fs)), SingI s) => Field l v -> SkewRecord fs -> SkewRecord ('(l, v) : fs)
--- skewCons (Field v) = case sing :: Sing s of
-    -- SNil -> \(SkewRecord HNil) -> SkewRecord $ HNode v HEmpty HEmpty `HCons` HNil
+skewCons :: forall l v fs s. (s ~ (Skew (Length fs)), SingI s) => Field l v -> SkewRecord fs -> SkewRecord ('(l, v) : fs)
+skewCons (Field v) = case sing :: Sing s of
+   SNil -> \(SkewRecord HNil) -> SkewRecord $ HNode v HEmpty HEmpty `HCons` HNil
     -- (SCons _ SNil) -> \(SkewRecord vs) -> SkewRecord (HCons (HNode v HEmpty HEmpty) vs)
     -- (SCons ta (SCons tb ts)) -> \(SkewRecord (va `HCons` vb `HCons` vs)) -> case sHeight ta %:== sHeight tb of
         -- STrue -> SkewRecord (HNode v va vb `HCons` vs)
