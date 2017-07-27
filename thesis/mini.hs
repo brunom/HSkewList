@@ -85,43 +85,42 @@ data HTree t where
     HEmpty :: HTree 'Empty
     HNode :: e -> HTree t1 -> HTree t2 -> HTree ('Node e t1 t2) 
 
-newtype SkewRecord fs = SkewRecord (HList (Map (TyCon1 HTree) (L fs (Skew (Length fs)))))
--- type SkewRecord fs =  (HList (Map (TyCon1 HTree) (L fs (Skew (Length fs)))))
+newtype SkewRecord fs = SkewRecord (HList (Map (TyCon1 HTree) (L fs (Skew (Map FstSym0 fs)))))
+type SR fs =  (HList (Map (TyCon1 HTree) (L fs (Skew (Map FstSym0 fs)))))
 
 skewNil :: SkewRecord '[]
 skewNil = SkewRecord HNil
--- skewNil = HNil
 
 type family Skew n where
-    Skew 0 = '[]
-    Skew n = Skew2 (Skew (n-1))
+    Skew '[] = '[]
+    Skew (_ ': n) = Skew2 (Skew n)
 
 type family Skew2 hs where
-    Skew2 '[] = '[1]
-    Skew2 '[a] = '[1, a]
+    Skew2 '[] = '[ '[ '() ] ]
+    Skew2 '[a] = '[ '[ '() ], a]
     Skew2 (a ': b ': ts) = If (a :== b)
-        ((a+1) ': ts)
-        (1 ': a ': b ': ts)
+        ( ( '() ': a) ': ts)
+        ('[ '() ] ': a ': b ': ts)
 type family L fs hs where
     L '[] '[] = '[]
     L fs (h ': hs) = L2 (T fs h) hs
 type family L2 t_fs hs where
     L2 '(t, fs) hs = (t ': (L fs hs))
 type family T fs h where
-    T fs 0 = '( 'Empty, fs)
-    T ('(l, v) : fs) n = T2 v n (T fs (n-1))
+    T fs '[] = '( 'Empty, fs)
+    T ('(l, v) : fs) (_ ': n) = T2 v ('() ': n) (T fs n)
 type family T2 v n left_fs where
-    T2 v n '(left, fs) = T3 v left (T fs (n-1))
+    T2 v (_ ': n) '(left, fs) = T3 v left (T fs n)
 type family T3 v left right_fs where
     T3 v left '(right, fs) = '( 'Node v left right, fs)
 
-skewCons :: forall l v fs s. (s ~ (Skew (Length fs)), SingI s) => Field l v -> SkewRecord fs -> SkewRecord ('(l, v) : fs)
+skewCons :: forall l v fs s. (s ~ (Skew (Map FstSym0 fs)), SingI s) => Field l v -> SkewRecord fs -> SkewRecord ('(l, v) : fs)
 skewCons (Field v) = case sing :: Sing s of
    SNil -> \(SkewRecord HNil) -> SkewRecord $ HNode v HEmpty HEmpty `HCons` HNil
-    -- (SCons _ SNil) -> \(SkewRecord vs) -> SkewRecord (HCons (HNode v HEmpty HEmpty) vs)
-    -- (SCons ta (SCons tb ts)) -> \(SkewRecord (va `HCons` vb `HCons` vs)) -> case sHeight ta %:== sHeight tb of
-        -- STrue -> SkewRecord (HNode v va vb `HCons` vs)
-        -- SFalse -> SkewRecord ((HNode v HEmpty HEmpty) `HCons` va `HCons` vb `HCons` vs)
+   (SCons _ SNil) -> \(SkewRecord vs) -> SkewRecord (HCons (HNode v HEmpty HEmpty) vs)
+   (SCons ha (SCons hb ts)) -> \(SkewRecord (va `HCons` vb `HCons` vs)) -> case ha %:== hb of
+        STrue -> SkewRecord ((HNode v va vb) `HCons` vs)
+        SFalse -> SkewRecord ((HNode v HEmpty HEmpty) `HCons` va `HCons` vb `HCons` vs)
 
 -- TODO discuss order of cases in:
 -- foo :: Sing f -> Sing ls -> (Map f ls :~: '[]) -> ls :~: '[]
