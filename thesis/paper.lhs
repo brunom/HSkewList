@@ -568,7 +568,6 @@ boilerplate. Although these instances can be automatically generated using Templ
 Based on inlining and constant folding, the computation of the index, which is linear time, is performed at compile time.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%if False
 Lookup is done as a two step operation.
 First the ordinal of a certain label in the record is found with |HFind|.
 Second the index obtained is used
@@ -587,32 +586,10 @@ Dashed arrow represents the compile time search of the field in the heterogeneou
 using |HEq| to discriminate the cases of
 the label of the current field, which may match or not the searched one.
 %
-\begin{code}
-class HFind r l v | r l -> v where
-  hFind :: r -> l -> Int
-instance
-    (  HFind' (HEq l l') v' r' l v) =>
-       HFind (HCons (Field l' v') r') l v where
-    hFind ~(HCons f'@(Field v') r') l =
-        hFind' (hEq l (label f')) v' r' l
-\end{code}
 %
 If the label is found, then the index 0 is returned.
 Otherwise, we increase the index by one and continue searching.
-%
-\begin{code}
-class HFind' b v' r l v | b v' r l -> v where
-    hFind':: b -> v' -> r -> l -> Int
-instance
-    HFind' True v r l v
-    where
-      hFind' _ _ _ _ = 0
-instance
-    HFind r l v => HFind' False v' r l v
-    where
-      hFind' _ _ r l = 1 + hFind r l
-\end{code}
-%
+%%
 The function |hFind| returns both the type of the field value (at type-level)
 and the index of the field in the record (at value-level).
 Note that the input is not examined at the value level.
@@ -623,13 +600,6 @@ For this to work, the |HCons| pattern must be lazy, or code needs to be generate
 In |hArrayGet|, we use the index to obtain the element from the array and the
 type (|v|) to coerce the element to its correct type.
 %
-\begin{code}
-hArrayGet :: HFind r l v =>
-  ArrayRecord r -> l -> v
-hArrayGet (ArrayRecord r a) l =
-  unsafeCoerce (a ! hFind r l)
-\end{code}
-%endif
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 \subsubsection{Construction}
