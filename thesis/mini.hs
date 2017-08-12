@@ -27,6 +27,8 @@ import Data.Singletons.Prelude.List
 import Data.Singletons.Prelude.Maybe
 import GHC.TypeLits
 
+main = undefined
+
 data Field l v where
  Field:: SingI l => { value :: v } -> Field l v
 (.=.)               ::  Sing l -> v -> Field l v
@@ -50,14 +52,14 @@ type family Lookup2 l fs where
     Lookup2 l ((Field l' v) : fs) = If (l :== l') v (Lookup2 l fs)
 
 -- No deberíamos necesitar SEq, porque si no se puede comparar tampoco se va a poder evaluar Lookup
-get :: forall k (l::k) fs.
+listGet :: forall k (l::k) fs.
     SEq k =>
     ListRecord fs ->
     Sing l ->
     FromJust (Lookup l fs)
-get (LCons f fs) l = case (l %:== (label f)) of -- careful with the order of params to eq
+listGet (LCons f fs) l = case (l %:== (label f)) of -- careful with the order of params to eq
     STrue -> value f
-    SFalse -> get fs l
+    SFalse -> listGet fs l
 
 -- data Tree h where
     -- Empty :: Tree 0
@@ -76,10 +78,21 @@ $(singletons [d|
         |  Node e (Tree e) (Tree e)
     |])
 
-$(singletons [d|
+$(promote [d|
     height :: Tree e -> Nat
     height Empty = 0
     height (Node _ _ t) = 1 + height t
+
+    lookupTree :: Eq l => l -> Tree (l, a) -> Maybe a
+    lookupTree l Empty = Nothing
+    lookupTree l (Node (l2, v) t1 t2) = (if l == l2 then Just v else Nothing) <|> lookupTree l t1 <|> lookupTree l t2
+
+    lookupList l [] = Nothing
+    lookupList l (t : ts) = lookupTree l t <|> lookupList l ts
+        
+    -- <|> not already available at the type level
+    Just a <|> _ = Just a
+    Nothing <|> a = a
     |])
 type Leaf e = 'Node e 'Empty 'Empty
 data HTree t where
