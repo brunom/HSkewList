@@ -111,23 +111,23 @@ skewNil = SkewRecord TLNil
 
 type family Skew fs where
     Skew '[] = '[]
-    Skew ( '(l, v) ': fs) = Skew2 v (Skew fs)
+    Skew ( '(l, v) ': fs) = Skew2 (Field l v) (Skew fs)
 
 type family Skew2 v ts where
-    Skew2 v '[] = '[ Leaf v ]
-    Skew2 v '[a] = '[ Leaf v, a]
-    Skew2 v (a ': b ': ts) = If (Height a :== Height b)
-        ( 'Node v a b ': ts)
-        ( Leaf v ': a ': b ': ts)
+    Skew2 f '[] = '[ Leaf f ]
+    Skew2 f '[a] = '[ Leaf f, a]
+    Skew2 f (a ': b ': ts) = If (Height a :== Height b)
+        ( 'Node f a b ': ts)
+        ( Leaf f ': a ': b ': ts)
 
 skewCons :: forall l v fs s. (s ~ (Map HeightSym0 (Skew fs)), SingI s) => Field l v -> SkewRecord fs -> SkewRecord ('(l, v) : fs)
-skewCons (Field v) = \case
-    (SkewRecord TLNil) -> SkewRecord $ HNode v HEmpty HEmpty `TLCons` TLNil
-    (SkewRecord (a `TLCons` TLNil)) -> SkewRecord (HNode v HEmpty HEmpty `TLCons` a `TLCons` TLNil)
-    (SkewRecord (va `TLCons` vb `TLCons` vs)) -> case sing :: Sing s of
+skewCons f = \case
+    (SkewRecord TLNil) -> SkewRecord $ HNode f HEmpty HEmpty `TLCons` TLNil
+    (SkewRecord (a `TLCons` TLNil)) -> SkewRecord (HNode f HEmpty HEmpty `TLCons` a `TLCons` TLNil)
+    (SkewRecord (fa `TLCons` fb `TLCons` vs)) -> case sing :: Sing s of
         (ha `SCons` (hb `SCons` _)) -> case ha %:== hb of
-            STrue -> SkewRecord (HNode v va vb `TLCons` vs)
-            SFalse -> SkewRecord (HNode v HEmpty HEmpty `TLCons` va `TLCons` vb `TLCons` vs)
+            STrue -> SkewRecord (HNode f fa fb `TLCons` vs)
+            SFalse -> SkewRecord (HNode f HEmpty HEmpty `TLCons` fa `TLCons` fb `TLCons` vs)
 
 -- TODO discuss order of cases in:
 -- foo :: Sing f -> Sing ls -> (Map f ls :~: '[]) -> ls :~: '[]
@@ -138,15 +138,23 @@ skewCons (Field v) = \case
 foo :: Sing f -> Sing ls -> (Map f ls :~: '[]) -> ls :~: '[]
 foo f ls Refl = case ls of SNil -> Refl
 
+data PathList = PathTail PathList | PathHead PathTree
+data PathTree = PathRoot | PathLeft PathTree | PathRight PathTree
 
--- skewCons :: forall l v fs. Field l v -> SkewRecord fs -> SkewRecord ('(l, v) : fs)
--- skewCons (Field v) r = case r of
-   -- (SkewRecord HNil) -> SkewRecord $ HNode v HEmpty HEmpty `HCons` HNil
-    --(SkewRecord vs@(HCons _ HNil)) -> SkewRecord (HCons (HNode v HEmpty HEmpty) vs)
-    -- (SCons ta (SCons tb ts)) -> \(SkewRecord (va `HCons` vb `HCons` vs)) -> case sHeight ta %:== sHeight tb of
-        -- STrue -> SkewRecord (HNode v va vb `HCons` vs)
-        -- SFalse -> SkewRecord ((HNode v HEmpty HEmpty) `HCons` va `HCons` vb `HCons` vs)
-
+skewGet ::
+    SingI (Map ((:==$$) l) (Map FstSym0 fs)) =>
+    SkewRecord fs ->
+    Sing l ->
+    FromJust (LookupList l (Skew fs))
+skewGet = undefined
+-- skewGet = work sing where
+    -- work ::
+        -- Sing (Map ((:==$$) l) (Map FstSym0 fs)) ->
+        -- ListRecord fs ->
+        -- Sing l ->
+        -- FromJust (Lookup l fs)
+    -- work (SCons STrue  _) (LCons v _ ) l = v
+    -- work (SCons SFalse m) (LCons _ vs) l = work m vs l
         
 l1 = sing :: Sing "L1"
 l2 = sing :: Sing "L2"
