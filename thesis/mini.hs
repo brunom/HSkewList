@@ -83,32 +83,30 @@ $(promote [d|
     height Empty = 0
     height (Node _ _ t) = 1 + height t
 
-    data PathList = PathTail PathList | PathHead PathTree | PathNil
-    data PathTree = PathRoot | PathLeft PathTree | PathRight PathTree | PathEmpty
+    data PathList = PathTail PathList | PathHead PathTree
+    data PathTree = PathRoot | PathLeft PathTree | PathRight PathTree
 
-    searchTree :: Eq l => l -> Tree (l, v) -> PathTree
-    searchTree l Empty = PathEmpty
-    searchTree l (Node (l2, v) t1 t2) = if l == l2 then PathRoot else tPlus (searchTree l t1) (searchTree l t2)
-    tPlus PathEmpty PathEmpty = PathEmpty
-    tPlus PathEmpty a = PathRight a
-    tPlus a _ = PathRight a
+    searchTree :: Eq l => l -> Tree (l, v) -> Maybe PathTree
+    searchTree l Empty = Nothing
+    searchTree l (Node (l2, v) t1 t2) = if l == l2 then Just PathRoot else tPlus (searchTree l t1) (searchTree l t2)
+    tPlus Nothing Nothing = Nothing
+    tPlus Nothing (Just a) = Just $ PathRight a
+    tPlus (Just a) _ = Just $ PathRight a
 
-    searchList l [] = PathNil
+    searchList l [] = Nothing
     searchList l (t : ts) = lPlus (searchTree l t) (searchList l ts)
-    lPlus PathEmpty PathNil = PathNil
-    lPlus PathEmpty a = PathTail a
-    lPlus a _ = PathHead a
+    lPlus Nothing Nothing = Nothing
+    lPlus Nothing (Just a) = Just $ PathTail a
+    lPlus (Just a) _ = Just $ PathHead a
         
-    lookupTree :: Eq l => l -> Tree (l, a) -> Maybe a
-    lookupTree l t = lookupTree' t (searchTree l t)
-    lookupTree' :: Tree (l, v) -> PathTree -> Maybe v
-    lookupTree' _ PathEmpty = Nothing
-    lookupTree' (Node (l,v) t1 t2) PathRoot = Just v
+    lookupTree' :: Tree (l, v) -> PathTree -> v
+    lookupTree' (Node (l,v) t1 t2) PathRoot = v
     lookupTree' (Node (l,v) t1 t2) (PathLeft p) = lookupTree' t1 p
     lookupTree' (Node (l,v) t1 t2) (PathRight p) = lookupTree' t2 p
 
-    lookupList l ts = lookupList' ts (searchList l ts)
-    lookupList' _ PathNil = Nothing
+    lookupList l ts = case (searchList l ts) of
+        Nothing -> Nothing
+        Just p -> Just $ lookupList' ts p
     lookupList' (t : ts) (PathHead p) = lookupTree' t p
     lookupList' (t : ts) (PathTail p) = lookupList' ts p
         
