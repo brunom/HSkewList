@@ -359,6 +359,7 @@ Either the label of the current field matches |l|,
 or the search must continue to the next node.
 
 \begin{code}
+-- TODO use ((:==$$) l) :. FstSym0)
 hListGet ::
     SingI (Map ((:==$$) l) (Map FstSym0 fs)) =>
     ListRecord fs ->
