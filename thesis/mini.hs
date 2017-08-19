@@ -113,12 +113,18 @@ $(promote [d|
     -- <|> not already available at the type level
     Just a <|> _ = Just a
     Nothing <|> a = a
+    
+    leaf e = Node e Empty Empty
+
+    --skew ts = foldr skew2 [] ts
+    skew [] = []
+    skew (f : fs) = skew2 f (skew fs)
+
+    skew2 f [] = [leaf f]
+    skew2 f [a] = [leaf  f, a]
+    skew2 f (a:b:ts) = if (height a == height b) then (Node f a b : ts) else (leaf f:a:b:ts)
     |])
 
-    
-    
-    
-type Leaf e = 'Node e 'Empty 'Empty
 data HTree t where
     HEmpty :: HTree 'Empty
     HNode :: v -> HTree t1 -> HTree t2 -> HTree ('Node '(l, v) t1 t2) 
@@ -132,17 +138,6 @@ newtype SkewRecord fs = SkewRecord (TreeList (Skew fs))
 
 skewNil :: SkewRecord '[]
 skewNil = SkewRecord TLNil
-
-type family Skew fs where
-    Skew '[] = '[]
-    Skew ( f ': fs) = Skew2 f (Skew fs)
-
-type family Skew2 v ts where
-    Skew2 f '[] = '[ Leaf f ]
-    Skew2 f '[a] = '[ Leaf f, a]
-    Skew2 f (a ': b ': ts) = If (Height a :== Height b)
-        ( 'Node f a b ': ts)
-        ( Leaf f ': a ': b ': ts)
 
 skewCons :: forall l v fs s. (s ~ (Map HeightSym0 (Skew fs)), SingI s) => Field l v -> SkewRecord fs -> SkewRecord ('(l, v) : fs)
 skewCons (Field v) = \case
