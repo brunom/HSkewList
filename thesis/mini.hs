@@ -76,6 +76,7 @@ $(singletons [d|
     data Tree e
         =  Empty
         |  Node e (Tree e) (Tree e)
+        deriving Show
     |])
 
 $(promote [d|
@@ -116,7 +117,11 @@ $(promote [d|
     
     leaf e = Node e Empty Empty
 
-    --skew ts = foldr skew2 [] ts
+    -- TODO find out why skew1 doesn't work like skew
+    skew1 :: [e] -> [Tree e]
+    skew1 ts = foldr skew2 [] ts
+
+    skew :: [e] -> [Tree e]
     skew [] = []
     skew (f : fs) = skew2 f (skew fs)
 
