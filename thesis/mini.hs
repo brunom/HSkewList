@@ -77,15 +77,15 @@ $(singletons [d|
         =  Empty
         |  Node e (Tree e) (Tree e)
         deriving Show
+
+    data PathList = PathTail PathList | PathHead PathTree
+    data PathTree = PathRoot | PathLeft PathTree | PathRight PathTree
     |])
 
 $(promote [d|
     height :: Tree e -> Nat
     height Empty = 0
     height (Node _ _ t) = 1 + height t
-
-    data PathList = PathTail PathList | PathHead PathTree
-    data PathTree = PathRoot | PathLeft PathTree | PathRight PathTree
 
     searchTree :: Eq l => l -> Tree (l, v) -> Maybe PathTree
     searchTree l Empty = Nothing
@@ -100,15 +100,15 @@ $(promote [d|
     lPlus Nothing (Just a) = Just $ PathTail a
     lPlus (Just a) _ = Just $ PathHead a
         
-    lookupTree' :: Tree (l, v) -> PathTree -> v
-    lookupTree' (Node (l,v) t1 t2) PathRoot = v
-    lookupTree' (Node (l,v) t1 t2) (PathLeft p) = lookupTree' t1 p
-    lookupTree' (Node (l,v) t1 t2) (PathRight p) = lookupTree' t2 p
+    lookupTree :: Tree (l, v) -> PathTree -> v
+    lookupTree (Node (l,v) t1 t2) PathRoot = v
+    lookupTree (Node (l,v) t1 t2) (PathLeft p) = lookupTree t1 p
+    lookupTree (Node (l,v) t1 t2) (PathRight p) = lookupTree t2 p
 
     lookupList l ts = case (searchList l ts) of
         Nothing -> Nothing
         Just p -> Just $ lookupList' ts p
-    lookupList' (t : ts) (PathHead p) = lookupTree' t p
+    lookupList' (t : ts) (PathHead p) = lookupTree t p
     lookupList' (t : ts) (PathTail p) = lookupList' ts p
         
     -- <|> not already available at the type level
@@ -153,21 +153,22 @@ skewCons (Field v) = \case
             STrue -> SkewRecord (HNode v fa fb `TLCons` vs)
             SFalse -> SkewRecord (HNode v HEmpty HEmpty `TLCons` fa `TLCons` fb `TLCons` vs)
 
--- skewGet ::
-    -- SingI (Map (LookupTreeSym1 l) (Skew fs)) =>
-    -- SkewRecord fs ->
-    -- Sing l ->
-    -- FromJust (LookupList l (Skew fs))
--- skewGet = undefined
--- skewGet = work sing where
-    -- work ::
-        -- Sing (Map (LookupTreeSym1 l) (Skew fs)) ->
-        -- SkewRecord fs ->
-        -- Sing l ->
-        -- FromJust (LookupList l (Skew fs))
--- --    work = undefined
-    -- --work (SCons STrue  _) (LCons v _ ) l = v
-    -- work (SCons SFalse m) (LCons _ vs) l = work m vs l
+skewGet ::
+    forall s fs l r.
+    ('Just s ~ (SearchList l (Skew fs))
+    ,'Just r ~ (LookupList l (Skew fs))
+    ,SingI s) =>
+    SkewRecord fs ->
+    Sing l ->
+    r
+skewGet (SkewRecord ts) l = walkList (sing :: Sing s) ts where
+    walkList :: Sing (p :: PathList) -> TreeList ts -> LookupList' ts p
+    walkList (SPathTail p) (t `TLCons` ts) = walkList p ts
+    walkList (SPathHead p) (t `TLCons` ts) = walkTree p t
+    walkTree :: Sing (p :: PathTree) -> HTree t -> LookupTree t p
+    walkTree SPathRoot (HNode v left right) = v
+    walkTree (SPathLeft p) (HNode v left right) = walkTree p left
+    walkTree (SPathRight p) (HNode v left right) = walkTree p right
 
 
 -- TODO discuss order of cases in:
