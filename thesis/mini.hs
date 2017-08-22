@@ -92,7 +92,7 @@ $(promote [d|
     searchTree l (Node (l2, v) t1 t2) = if l == l2 then Just PathRoot else tPlus (searchTree l t1) (searchTree l t2)
     tPlus Nothing Nothing = Nothing
     tPlus Nothing (Just a) = Just $ PathRight a
-    tPlus (Just a) _ = Just $ PathRight a
+    tPlus (Just a) _ = Just $ PathLeft a
 
     searchList l [] = Nothing
     searchList l (t : ts) = lPlus (searchTree l t) (searchList l ts)
@@ -104,12 +104,8 @@ $(promote [d|
     lookupTree (Node (l,v) t1 t2) PathRoot = v
     lookupTree (Node (l,v) t1 t2) (PathLeft p) = lookupTree t1 p
     lookupTree (Node (l,v) t1 t2) (PathRight p) = lookupTree t2 p
-
-    lookupList l ts = case (searchList l ts) of
-        Nothing -> Nothing
-        Just p -> Just $ lookupList' ts p
-    lookupList' (t : ts) (PathHead p) = lookupTree t p
-    lookupList' (t : ts) (PathTail p) = lookupList' ts p
+    lookupList (t : ts) (PathHead p) = lookupTree t p
+    lookupList (t : ts) (PathTail p) = lookupList ts p
         
     -- <|> not already available at the type level
     Just a <|> _ = Just a
@@ -154,15 +150,14 @@ skewCons (Field v) = \case
             SFalse -> SkewRecord (HNode v HEmpty HEmpty `TLCons` fa `TLCons` fb `TLCons` vs)
 
 skewGet ::
-    forall s fs l r.
+    forall s fs l.
     ('Just s ~ (SearchList l (Skew fs))
-    ,'Just r ~ (LookupList l (Skew fs))
     ,SingI s) =>
     SkewRecord fs ->
     Sing l ->
-    r
+    LookupList (Skew fs) s
 skewGet (SkewRecord ts) l = walkList (sing :: Sing s) ts where
-    walkList :: Sing (p :: PathList) -> TreeList ts -> LookupList' ts p
+    walkList :: Sing (p :: PathList) -> TreeList ts -> LookupList ts p
     walkList (SPathTail p) (t `TLCons` ts) = walkList p ts
     walkList (SPathHead p) (t `TLCons` ts) = walkTree p t
     walkTree :: Sing (p :: PathTree) -> HTree t -> LookupTree t p
@@ -183,6 +178,9 @@ foo f ls Refl = case ls of SNil -> Refl
 l1 = sing :: Sing "L1"
 l2 = sing :: Sing "L2"
 l3 = sing :: Sing "L3"
+l4 = sing :: Sing "L4"
+l5 = sing :: Sing "L5"
+l6 = sing :: Sing "L6"
 
 
 -- cons = LCons
@@ -196,8 +194,8 @@ cons = skewCons
 infixr 2 `cons`
 nil = skewNil
 
-r :: Record '[ '("L1", Int), '("L2", String)]
-r = (Field 42) `cons` (Field "hi") `cons` nil
+r :: Record '[ '("L1", Int), '("L2", String), '("L3", [Int])]
+r = (Field 42) `cons` (Field "hi") `cons` (Field [9]) `cons` nil
 
 -- r :: Record '[ '("L2", String)]
 -- r = (Field "hi") `cons` nil
