@@ -7,11 +7,11 @@ exe: thesis.exe
 thesis.pdf: thesis.tex thesis.bib
 	latexmk -pdf -quiet thesis.tex
 
-GHC=ghc
+GHC=ghc-8.2.1
 %GHC=ghc-7.4.2
 
 thesis.exe : thesis.hs
-	$(GHC) --make thesis.hs -o thesis.exe
+	$(GHC) --make thesis.hs -o thesis.exe -freverse-errors
 
 thesis.hs : thesis.lhs paper.lhs configuration.lhs
 	lhs2TeX thesis.lhs -o thesis.hs --newcode
