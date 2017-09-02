@@ -13,7 +13,7 @@ name is a text and salary an amount.
 
 The elements of a record are called fields.
 A field has a label and a type.
-When labels are natural numbers,
+When labels are {0, 1, 2, ..., n},
 a record is called a tuple.
 Many programming languages make tuples more convenient than records,
 allowing for instance a function to return a tuple
@@ -30,7 +30,7 @@ Statically typed programming languages check before running a program
 that all fields read or written really exist
 in the corresponding record or tuple.
 Field names are discarded from compiled programs.
-Records and tuples essentially become the same thing.
+Records and tuples essentially become the same thing at runtime.
 On the other hand, dynamic programming languages
 that don't track the type of variables
 somewhat erase the distinction between tuples and lists,

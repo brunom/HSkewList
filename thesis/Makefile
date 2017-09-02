@@ -20,5 +20,5 @@ thesis.tex: records.lhs thesis.lhs paper.lhs
 	lhs2TeX --poly thesis.lhs -o thesis.tex
 
 clean:
-	rm -f *.aux *.bbl *blg *.log *.ptb *.tex *.fls *.out *.fdb_latexmk thesis.pdf
-	rm -f *.hi *.o
+	rm -f *.aux *.bbl *blg *.log *.ptb *.tex *.fls *.out *.fdb_latexmk thesis.pdf thesis.hs
+	rm -f *.hi *.o *.dyn_hi *.dyn_o

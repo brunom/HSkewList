@@ -199,10 +199,6 @@ In other words, the relation between |t| and |t'| is actually a function.
 Whereas the class definition describes the type signature of the type-level function,
 the function itself is defined by the following instance declarations:
 
-\begin{code}
---instance HNot  HFalse  HTrue   where hNot _ = hTrue
---instance HNot  HTrue   HFalse  where hNot _ = hFalse
-\end{code}
 If we write the expression |(hNot hFalse)|, then we know that |t| is |HFalse|.
 So, the first instance of |hNot| is selected and thus |t'| is inferred to be |HTrue|.
 Observe that the computation is completely at the type-level;
@@ -620,10 +616,6 @@ hArrayExtend :: Field l v -> ArrayRecord ls -> ArrayRecord ('(l, v) ': ls)
 hArrayExtend (Field v) (ArrayRecord a) = ArrayRecord $ listArray (0, 1 + snd (bounds a)) (unsafeCoerce v : elems a)
 
 
--- hArrayModifyList hc (ArrayRecord r _) =
-  -- let  r'  = hc r
-       -- fs  = hMapAny r'
-  -- in   ArrayRecord r' (listArray (0, length fs - 1) fs)
 \end{code}
 %
 %if False
