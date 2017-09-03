@@ -55,11 +55,6 @@ import Data.Singletons.Prelude.List
 import Data.Singletons.TH
 import GHC.TypeLits
 
-main = return ()
-
-hListUpdate a = hSkewUpdate a
-hListRemove = undefined
-
 \end{code}
 
 %format ^ =
@@ -202,8 +197,9 @@ Another example is the type-level representation of the maybe type.
 In this case we are interested in manipulating a value-level value associated with each type constructor.
 
 \begin{code}
-data HNothing  = HNothing
-data HJust e   = HJust e deriving Show
+data HMaybe m where
+    HNothing :: HMaybe 'Nothing
+    HJust :: e -> HMaybe ('Just e)
 \end{code}
 
 We aim to construct a type-level value of the maybe type from a boolean. For this purpose
@@ -211,11 +207,16 @@ we define the following multi-parameter class. The parameter |v| specifies the t
 of the values to be contained by a |HJust|.
 
 \begin{code}
-class HMakeMaybe (b::Bool) v m | b v -> m where
-    hMakeMaybe :: Sing b -> v -> m
-instance HMakeMaybe 'False v HNothing where
+$(singletons [d|
+    makeMaybe False v = Nothing
+    makeMaybe True v = Just v
+    |])
+
+class HMakeMaybe (b::Bool) where
+    hMakeMaybe :: Sing b -> v -> HMaybe (MakeMaybe b v)
+instance HMakeMaybe 'False where
     hMakeMaybe b v = HNothing
-instance HMakeMaybe 'True v (HJust v) where
+instance HMakeMaybe 'True where
     hMakeMaybe b v = HJust v
 \end{code}
 
@@ -223,11 +224,15 @@ Another operation that will be of interest on this type is the one that combines
 two values of type maybe.
 
 \begin{code}
-class HPlus a b c | a b -> c where
-    hPlus :: a -> b -> c
-instance HPlus (HJust a) b (HJust a) where
+$(singletons [d|
+    plus Nothing b = b
+    plus (Just a) b = Just a
+    |])
+class HPlus a where
+    hPlus :: HMaybe a -> HMaybe b -> HMaybe (Plus a b)
+instance HPlus ('Just a) where
     hPlus a  _ = a
-instance HPlus HNothing b b where
+instance HPlus 'Nothing where
     hPlus _  b = b
 \end{code}
 
@@ -931,7 +936,7 @@ but follows only the right one at run time.
 
 \begin{code}
 class HSkewGet r l v | r l -> v where
-    hSkewGet :: r -> Sing l -> v
+    hSkewGet :: r -> Sing l -> HMaybe v
 \end{code}
 Deciding on the path to the desired field
 is now more involved.
@@ -949,9 +954,9 @@ We will run |HSkewGet| on both the spine and each tree, so we have two base case
 |HNil| is encountered at the end of the spine, and |HEmpty| at the bottom of trees.
 In both cases, the field was not found, so we return |HNothing|.
 \begin{code}
-instance HSkewGet HNil l HNothing where
+instance HSkewGet HNil l 'Nothing where
     hSkewGet _ _ = HNothing
-instance HSkewGet HEmpty l HNothing where
+instance HSkewGet HEmpty l 'Nothing where
     hSkewGet _ _ = HNothing
 \end{code}
 The |HCons| case must consider that the field may be found on the current tree or further down the spine.
@@ -963,7 +968,8 @@ If the field is found in the current tree,
 instance
     (  HSkewGet r   l vr
     ,  HSkewGet r'  l vr'
-    ,  HPlus vr vr' v) =>
+    ,  HPlus vr
+    ,  Plus vr vr' ~ v) =>
        HSkewGet (HCons r r') l v where
     hSkewGet (HCons r r') l =
         hSkewGet r l `hPlus` hSkewGet r' l
@@ -984,8 +990,10 @@ instance
     (  HSkewGet f   l vf
     ,  HSkewGet r   l vr
     ,  HSkewGet r'  l vr'
-    ,  HPlus vf   vr     vfr
-    ,  HPlus vfr  vr'  v) =>
+    ,  HPlus vf
+    ,  Plus vf vr ~    vfr
+    ,  HPlus vfr
+    ,  Plus vfr  vr'  ~ v) =>
        HSkewGet (HNode f r r') l v where
     hSkewGet (HNode f r r') l =
         hSkewGet f l
@@ -1003,7 +1011,8 @@ and |HNothing| or |HJust| is returned as appropriate.
 \begin{code}
 instance
     (  HEq l l' b
-    ,  HMakeMaybe b v m) =>
+    ,  HMakeMaybe b
+    ,  MakeMaybe b v ~ m) =>
        HSkewGet (Field l' v) l m where
     hSkewGet f l =
         hMakeMaybe
@@ -1068,14 +1077,14 @@ instance  (  HSkewGet r l m
        hSkewUpdate' (hSkewGet r l) l e r
 
 class HSkewUpdate' m l e r r' | m l e r -> r' where
-    hSkewUpdate' :: m -> Sing l -> e -> r -> r'
+    hSkewUpdate' :: HMaybe m -> Sing l -> e -> r -> r'
 \end{code}
 %
 In case the label is not present we have nothing to do than just returning the
 structure unchanged.
 %
 \begin{code}
-instance HSkewUpdate' HNothing l e r r  where
+instance HSkewUpdate' 'Nothing l e r r  where
     hSkewUpdate' _ l e r = r
 \end{code}
 %
@@ -1087,7 +1096,7 @@ We start the process in the spine.
 instance
     (  HSkewUpdate l e t t'
     ,  HSkewUpdate l e ts ts') =>
-    HSkewUpdate' (HJust v) l e  (HCons t ts)
+    HSkewUpdate' ('Just v) l e  (HCons t ts)
                                 (HCons t' ts')
     where
     hSkewUpdate' _ l e (HCons t ts) =
@@ -1102,7 +1111,7 @@ instance
     (  HSkewUpdate l e e' e''
     ,  HSkewUpdate l e tl tl'
     ,  HSkewUpdate l e tr tr') =>
-    HSkewUpdate' (HJust v) l e  (HNode e' tl tr)
+    HSkewUpdate' ('Just v) l e  (HNode e' tl tr)
                                 (HNode e'' tl' tr')
     where
     hSkewUpdate' _ l e (HNode e' tl tr) =
@@ -1116,7 +1125,7 @@ are searching for (because we are considering the case |HJust v|), we simply ret
 %
 \begin{code}
 instance
-    HSkewUpdate' (HJust v) l e (Field l v) e
+    HSkewUpdate' ('Just v) l e (Field l v) e
      where
        hSkewUpdate' _ l e e' = e
 \end{code}
@@ -1597,3 +1606,10 @@ even as a built-in solution.
 %%% TeX-default-extension: "lhs" **
 %%% TeX-region: "_region_" **
 %%% End: **
+
+\begin{code}
+main = return ()
+
+hListUpdate a = hSkewUpdate a
+hListRemove = undefined
+\end{code}
