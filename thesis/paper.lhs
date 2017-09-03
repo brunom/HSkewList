@@ -33,9 +33,10 @@
 {-# LANGUAGE FunctionalDependencies #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE UndecidableInstances #-}
-{-# LANGUAGE TypeInType #-}
+--{-# LANGUAGE TypeInType #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE DataKinds #-}
+{-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE ScopedTypeVariables  #-}
 {-# LANGUAGE TemplateHaskell  #-}
 {-# LANGUAGE PartialTypeSignatures #-}
@@ -54,10 +55,10 @@ import Data.Singletons.Prelude.List
 import Data.Singletons.TH
 import GHC.TypeLits
 
-main = undefined
+main = return ()
 
---hListUpdate a = hSkewUpdate a
---hListRemove = undefined
+hListUpdate a = hSkewUpdate a
+hListRemove = undefined
 
 \end{code}
 
@@ -178,19 +179,12 @@ will be used later in the paper. We start with a type-level representation of bo
 Since we are only interested in type-level computations, we define empty
 types |HTrue| and |HFalse| corresponding to each boolean value.
 
-\begin{code}
-\end{code}
-
 The inhabitants |hTrue| and |hFalse| of those types are defined solely
 to be used in value-level expressions to construct type-level values by
 referring to the types of such expressions.
 
 Type-level functions can be described using multi-parameter classes with functional dependencies.
 For example, we can encode type-level negation by defining the following class:
-\begin{code}
---class HNot t t' || t -> t' where
---  hNot :: t -> t'
-\end{code}
 The functional dependency |t -> t'| expresses that the parameter |t|
 uniquely determines the parameter |t'|.
 Therefore, once |t| is instantiated,
@@ -250,10 +244,6 @@ data HNil       = HNil
 data HCons e l  = HCons e l
 infixr 2 `HCons`
 
-data ListRecord fs where
- LNil :: ListRecord '[]
- LCons :: v -> ListRecord fs -> ListRecord ('(l,v) !!! : fs)
-infixr 2 `LCons`
 
 \end{code}
 
@@ -278,34 +268,44 @@ We can retrieve the label value by using the function |label|, which exposes
 the phantom type parameter:
 
 \begin{code}
-label  :: SingI l => Field l v -> Sing l
-label f =   sing
+label  ::  Field l v -> Sing l
+label  =   undefined
 \end{code}
 
 We define separate types and constructors for labels.
 
+\begin{code}
+l1 = sing :: Sing "L1"
+l2 = sing :: Sing "L2"
+l3 = sing :: Sing "L3"
+l4 = sing :: Sing "L4"
+l5 = sing :: Sing "L5"
+l6 = sing :: Sing "L6"
+l7 = sing :: Sing "L7"
+\end{code}
 
 Thus, the following defines a record (|rList|) with seven fields:
 
 \begin{code}
-hListExtend :: Field l v -> ListRecord fs -> ListRecord ('(l, v) ': fs)
-hListExtend (Field v) r = LCons v r
-infixr 2 `hListExtend`
 
 rList =
-  ((sing :: Sing "L1")  .=.  True     )  `hListExtend`
-  ((sing :: Sing "L2")  .=.  9        )  `hListExtend`
-  ((sing :: Sing "L3")  .=.  "bla"    )  `hListExtend`
-  ((sing :: Sing "L4")  .=.  'c'      )  `hListExtend`
-  ((sing :: Sing "L5")  .=.  Nothing  )  `hListExtend`
-  ((sing :: Sing "L6")  .=.  [4,5]    )  `hListExtend`
-  ((sing :: Sing "L7")  .=.  "last"   )  `hListExtend`
-  LNil
+  (l1  .=.  True     )  `HCons`
+  (l2  .=.  9        )  `HCons`
+  (l3  .=.  "bla"    )  `HCons`
+  (l4  .=.  'c'      )  `HCons`
+  (l5  .=.  Nothing  )  `HCons`
+  (l6  .=.  [4,5]    )  `HCons`
+  (l7  .=.  "last"   )  `HCons`
+  HNil
 \end{code}
 
 The class |HListGet| retrieves from a record the value part
 corresponding to a specific label:
 
+\begin{code}
+class HListGet r l v | r l -> v where
+    hListGet :: r -> Sing l -> v
+\end{code}
 \noindent
 At the type-level it is statically checked that the record |r| indeed has
 a field with label |l| associated with a value of the type |v|.
@@ -313,7 +313,7 @@ At value-level |hListGet| returns the value of type |v|.
 For example, the following expression returns the string |"last"|:
 
 \begin{code}
-lastList = hListGet rList (sing :: Sing "L7")
+lastList = hListGet rList l7
 \end{code}
 
 Instead of polluting the definitions of type-level functions
@@ -323,13 +323,9 @@ The type equality predicate |HEq| results in |HTrue| in case the compared types 
 Thus, when comparing two types in other type-level functions (like |HListGet| below),
 these two cases can be discriminated without using overlapping instances.
 \begin{code}
-type family HEq x y :: Bool where
-  HEq x x = 'True
-  HEq x y = 'False
-
-hEq :: SingI (HEq x y) => Sing x -> Sing y -> Sing (HEq x y)
-hEq x y = sing
-
+class HEq x y (b::Bool) | x y -> b
+hEq :: HEq x y b => Sing x -> Sing y -> Sing b
+hEq = undefined
 \end{code}
 %
 We will not delve into the different possible definitions for |HEq|.
@@ -337,13 +333,15 @@ For completeness, here is one that suffices for our purposes.
 For a more complete discussion about type equality in Haskell
 we refer to \cite{type-eq}.
 \begin{code}
+instance {-# OVERLAPPING  #-}  HEq x x 'True
+instance b ~ 'False =>         HEq x y b
 \end{code}
 %if False
 \begin{code}
 class TypeCast x y | x -> y, y -> x
 instance TypeCast x x
-instance TypeCast b HFalse => HEq x y b
-instance TypeCast b HTrue => HEq x x b
+instance TypeCast b 'False => HEq x y b
+instance TypeCast b 'True => HEq x x b
 \end{code}
 %endif
 At this point we can see that the use of overlapping instances is unavoidable. This explains why
@@ -355,25 +353,29 @@ Either the label of the current field matches |l|,
 or the search must continue to the next node.
 
 \begin{code}
--- TODO use ((:==$$) l) :. FstSym0)
-hListGet ::
-    SingI (Map ((:==$$) l) (Map FstSym0 fs)) =>
-    ListRecord fs ->
-    Sing l ->
-    FromJust (Lookup l fs)
-hListGet = work sing where
-    work ::
-        Sing (Map ((:==$$) l) (Map FstSym0 fs)) ->
-        ListRecord fs ->
-        Sing l ->
-        FromJust (Lookup l fs)
-    work (SCons STrue  _) (LCons v _ ) l = v
-    work (SCons SFalse m) (LCons _ vs) l = work m vs l
+instance
+    (  HEq l l' b
+    ,  HListGet' b v' r' l v) =>
+       HListGet (HCons (Field l' v') r') l v where
+    hListGet (HCons f'@(Field v') r') l =
+        hListGet' (hEq l (label f')) v' r' l
 \end{code}
 
 |HListGet'| has two instances, for the cases |HTrue| and |HFalse|.
 
 \begin{code}
+class HListGet' (b::Bool) v' r' l v | b v' r' l -> v where
+    hListGet':: Sing b -> v' -> r' -> Sing l -> v
+
+instance
+    HListGet' 'True v r' l v
+    where
+    hListGet' _ v _ _ = v
+
+instance
+    HListGet r' l v =>
+    HListGet' 'False v' r' l v where
+    hListGet' _ _ r' l = hListGet r' l
 \end{code}
 
 \noindent
@@ -393,13 +395,13 @@ For example, this is the GHC core of the example:
 
 \begin{code}
 lastListCore = case rList of
-  LCons _ rs1 -> case rs1 of
-    LCons _  rs2 -> case rs2 of
-      LCons _  rs3 -> case rs3 of
-        LCons _ rs4 -> case rs4 of
-          LCons _ rs5 -> case rs5 of
-            LCons _ rs6 -> case rs6 of
-              LCons e _ -> e
+  HCons _ rs1 -> case rs1 of
+    HCons _  rs2 -> case rs2 of
+     HCons _  rs3 -> case rs3 of
+       HCons _ rs4 -> case rs4 of
+          HCons _ rs5 -> case rs5 of
+            HCons _ rs6 -> case rs6 of
+              HCons e _ -> e
 \end{code}
 
 \section{Faster Extensible Records}\label{sec:faster}
@@ -484,8 +486,8 @@ Items are then |unsafeCoerce|d on the way in and out based on the type informati
 %
 %
 \begin{code}
-newtype ArrayRecord (fs :: [(l,v)]) =
-  ArrayRecord (Array Int Any)
+data ArrayRecord r =
+  ArrayRecord r (Array Int Any)
 \end{code}
 
 \subsubsection{Lookup}
@@ -493,21 +495,17 @@ Lookup is done as a two step operation.
 First, the ordinal of a certain label in the record, and the type (|v|) of its stored element, are found with |ArrayFind|.
 %
 \begin{code}
+class ArrayFind r l v | r l -> v where
+  arrayFind :: r -> Sing l -> Int
 \end{code}
 %
 Second, function |hArrayGet| uses the index to obtain the element from the array and the
 type (|v|) to coerce that element to its correct type.
 %
 \begin{code}
--- TODO Partial type signatures
--- TODO discutir Just vs FromJust
-hArrayGet :: forall fs l i. (!!!Just i ~ ElemIndex l (Map FstSym0 fs), SingI i) => ArrayRecord fs -> Sing l -> FromJust (Lookup l fs)
-hArrayGet (ArrayRecord a) _ =
-  unsafeCoerce (a ! (fromInteger $ fromSing (sing :: Sing i)))
-
-data N = CN deriving Eq
-ar = (sing :: Sing "age") .=. 42 `hArrayExtend` emptyArrayRecord
-hi = hArrayGet ar (sing :: Sing "age")
+hArrayGet :: ArrayFind r l v => ArrayRecord r -> Sing l -> v
+hArrayGet (ArrayRecord r a) l =
+  unsafeCoerce (a ! arrayFind r l)
 \end{code}
 
 Figure~\ref{fig:search-array} shows a graphical representation of this process.
@@ -525,6 +523,12 @@ using |HEq| to discriminate the cases of
 the label of the current field, which may match or not the searched one.
 %
 \begin{code}
+instance  (  HEq l l' b
+          ,  ArrayFind' b v' r l v n
+          ,  ToValue n) =>
+   ArrayFind (HCons (Field l' v') r) l v where
+     arrayFind (HCons f r) l =
+       toValue (arrayFind' (hEq l (label f)) (value f) r l)
 \end{code}
 %
 A difference with |HListGet| is that the work of searching the label,
@@ -534,6 +538,18 @@ observe that |arrayFind'| is just an undefined value
 and nothing will be computed at run time.
 %
 \begin{code}
+arrayFind' ::  ArrayFind' b v' r l v n
+               => Sing b -> v' -> r -> Sing l -> Sing n
+arrayFind' = undefined
+
+data HZero
+data HSucc n
+
+class ArrayFind' (b::Bool) v' r l v n | b v' r l -> v n
+instance ArrayFind' 'True v r l v HZero
+instance (HEq l l' b, ArrayFind' b v' r l v n)
+         => ArrayFind' 'False v'' (HCons (Field l' v') r) l
+                        v (HSucc n)
 \end{code}
 %
 The types |HZero| and |HSucc| implement naturals at type-level.
@@ -544,11 +560,20 @@ in order to use this value as the index of the array.
 This is done by the function |toValue|.
 %
 \begin{code}
+class ToValue n where
+  toValue :: Sing n -> Int
 \end{code}
 %
 To perform this conversion in constant time, we have to provide
 one specific instance of |ToValue| for every type-level natural we use.
 \begin{spec}
+instance ToValue HZero where
+  toValue _ = 0
+instance ToValue (HSucc HZero) where
+  toValue _ = 1
+instance ToValue (HSucc (HSucc HZero)) where
+  toValue _ = 2
+...
 \end{spec}
 
 In this implementation of |ArrayFind| it is very easy to distinguish the two phases
@@ -559,12 +584,21 @@ boilerplate. Although these instances can be automatically generated using Templ
 %(and any ohter competent compiler)
 %
 \begin{code}
+instance ToValue HZero where
+  toValue _ = 0
+
+hPrev :: Sing (HSucc n) -> Sing n
+hPrev = undefined
+
+instance ToValue n => ToValue (HSucc n) where
+  toValue n = 1 + toValue (hPrev n)
 \end{code}
 %
 %Based on these optimizations the computation of the index, which would be linear time, is performed at compile time.
 Based on inlining and constant folding, the computation of the index, which is linear time, is performed at compile time.
 
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
+%if False
 Lookup is done as a two step operation.
 First the ordinal of a certain label in the record is found with |HFind|.
 Second the index obtained is used
@@ -583,10 +617,33 @@ Dashed arrow represents the compile time search of the field in the heterogeneou
 using |HEq| to discriminate the cases of
 the label of the current field, which may match or not the searched one.
 %
+\begin{code}
+class HFind r l v | r l -> v where
+  hFind :: r -> l -> Int
+instance
+    (  HEq l l' b
+    ,  HFind' b v' r' l v) =>
+       HFind (HCons (Field l' v') r') l v where
+    hFind ~(HCons f'@(Field v') r') l =
+        hFind' (hEq l (label f')) v' r' l
+\end{code}
 %
 If the label is found, then the index 0 is returned.
 Otherwise, we increase the index by one and continue searching.
-%%
+%
+\begin{code}
+class HFind' b v' r l v | b v' r l -> v where
+    hFind':: b -> v' -> r -> l -> Int
+instance
+    HFind' 'True v r l v
+    where
+      hFind' _ _ _ _ = 0
+instance
+    HFind r l v => HFind' 'False v' r l v
+    where
+      hFind' _ _ r l = 1 + hFind r l
+\end{code}
+%
 The function |hFind| returns both the type of the field value (at type-level)
 and the index of the field in the record (at value-level).
 Note that the input is not examined at the value level.
@@ -597,6 +654,13 @@ For this to work, the |HCons| pattern must be lazy, or code needs to be generate
 In |hArrayGet|, we use the index to obtain the element from the array and the
 type (|v|) to coerce the element to its correct type.
 %
+\begin{code}
+hArrayGet :: HFind r l v =>
+  ArrayRecord r -> l -> v
+hArrayGet (ArrayRecord r a) l =
+  unsafeCoerce (a ! hFind r l)
+\end{code}
+%endif
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 \subsubsection{Construction}
@@ -604,18 +668,19 @@ type (|v|) to coerce the element to its correct type.
 An empty |ArrayRecord| consists of an empty heterogeneous list and an empty array.
 %
 \begin{code}
-emptyArrayRecord :: ArrayRecord !!! []
 emptyArrayRecord =
-  ArrayRecord (array (0, -1) [])
+  ArrayRecord HNil (array (0, -1) [])
 \end{code}
 %
 Function |hArrayExtend| adds a field to an array record.
 %
 \begin{code}
-hArrayExtend :: Field l v -> ArrayRecord ls -> ArrayRecord ('(l, v) ': ls)
-hArrayExtend (Field v) (ArrayRecord a) = ArrayRecord $ listArray (0, 1 + snd (bounds a)) (unsafeCoerce v : elems a)
+hArrayExtend f = hArrayModifyList (HCons f)
 
-
+hArrayModifyList hc (ArrayRecord r _) =
+  let  r'  = hc r
+       fs  = hMapAny r'
+  in   ArrayRecord r' (listArray (0, length fs - 1) fs)
 \end{code}
 %
 %if False
@@ -640,6 +705,16 @@ The function |hMapAny| iterates over the heterogeneous list \emph{coercing} its 
 of type |Any|.
 %
 \begin{code}
+class HMapAny r where
+  hMapAny :: r -> [Any]
+instance HMapAny HNil where
+  hMapAny _ = []
+instance
+  HMapAny r =>
+  HMapAny (HCons (Field l v) r)
+  where
+  hMapAny (HCons (Field v) r) =
+    unsafeCoerce v : hMapAny r
 \end{code}
 
 
@@ -652,6 +727,11 @@ We use the respective functions |hListUpdate| and |hListRemove| from the HList
 implementation of records.
 %
 \begin{code}
+hArrayUpdate l e
+   = hArrayModifyList (hListUpdate l e)
+
+hArrayRemove l
+   = hArrayModifyList (hListRemove l)
 \end{code}
 %
 With |HArrayUpdate| we change a field of some label with a new field with possibly new label and value.
@@ -726,10 +806,10 @@ The following declarations define a skew list with the elements of the fourth st
 
 \begin{code}
 four =
-    HCons  (hLeaf  ((sing :: Sing "L4")  .=.  'c')) $
-    HCons  (HNode  ((sing :: Sing "L5")  .=.  Nothing)
-                   (hLeaf ((sing :: Sing "L6")  .=.  [4,5]))
-                   (hLeaf ((sing :: Sing "L7")  .=.  "last"))) $
+    HCons  (hLeaf  (l4  .=.  'c')) $
+    HCons  (HNode  (l5  .=.  Nothing)
+                   (hLeaf (l6  .=.  [4,5]))
+                   (hLeaf (l7  .=.  "last"))) $
     HNil
 \end{code}
 
@@ -748,9 +828,10 @@ emptySkewRecord = HNil
 We will use it to detect the case of two leading equal height trees in the spine.
 %
 \begin{code}
-type family HHeight t :: Nat where
-  HHeight HEmpty = 0
-  HHeight (HNode e t t') = 1 + HHeight t
+class HHeight t h | t -> h
+instance  HHeight HEmpty HZero
+instance  HHeight t h =>
+          HHeight (HNode e t t') (HSucc h)
 \end{code}
 
 \noindent
@@ -762,27 +843,31 @@ In the numerical representation of data structures,
 adding an item is incrementing the number.
 If each top level tree is a digit,
 building a new taller tree is a form of carry,
-so |HSkewCarry| returns |True|.
+so |HSkewCarry| returns |HTrue|.
 %
 \begin{code}
-type family HSkewCarry l :: Bool where
-  HSkewCarry HNil = 'False
-  HSkewCarry (HCons t HNil) = 'False
-  HSkewCarry (HCons t (HCons t' ts)) = HEq (HHeight t) (HHeight t')
- 
-hSkewCarry :: SingI (HSkewCarry l) => l -> Sing (HSkewCarry l)
-hSkewCarry l = sing
+class HSkewCarry l (b::Bool) | l -> b
+
+hSkewCarry :: HSkewCarry l b => l -> Sing b
+hSkewCarry = undefined
 \end{code}
 %
-If the spine has none or one single tree we return |False|.
+If the spine has none or one single tree we return |HFalse|.
 \begin{code}
+instance HSkewCarry HNil 'False
+instance HSkewCarry (HCons t HNil) 'False
 \end{code}
 %
 In case the spine has more than one tree,
-we return |True| if the first two trees are of equal size and
-|False| otherwise.
+we return |HTrue| if the first two trees are of equal size and
+|HFalse| otherwise.
 %
 \begin{code}
+instance
+    (  HHeight t h
+    ,  HHeight t' h'
+    ,  HEq h h' b) =>
+       HSkewCarry (HCons t (HCons t' ts)) b
 \end{code}
 
 All these pieces allow us to define |HSkewExtend|,
@@ -800,9 +885,9 @@ while |HListGet| used |HEq| on the two labels.
 
 \begin{code}
 instance
-    (  HSkewExtend' (HSkewCarry r)  f r r',
-       SingI (HSkewCarry r)) =>
-       HSkewExtend                  f r r' where
+    (  HSkewCarry r b
+    ,  HSkewExtend' b  f r r') =>
+       HSkewExtend     f r r' where
     hSkewExtend f r =
         hSkewExtend' (hSkewCarry r) f r
 
@@ -810,7 +895,7 @@ class HSkewExtend' (b::Bool) f r r' | b f r -> r' where
     hSkewExtend' :: Sing b -> f -> r -> r'
 \end{code}
 \noindent
-Here |False| means that we should not add up the first two trees of the spine.
+Here |HFalse| means that we should not add up the first two trees of the spine.
 Either the size of the two leading trees are different, or the spine is empty or a singleton.
 We just use |HLeaf| to insert a new tree at the beginning of the spine.
 \begin{code}
@@ -823,7 +908,7 @@ instance
     hSkewExtend' _ f r = HCons (hLeaf f) r
 \end{code}
 %
-When |HSkewCarry| returns |True|, however, we build a new tree reusing the two trees that were at the start of the spine.
+When |HSkewCarry| returns |HTrue|, however, we build a new tree reusing the two trees that were at the start of the spine.
 The length of the spine is reduced in one, since we take two elements but only add one.
 %
 \begin{code}
@@ -917,9 +1002,8 @@ and |HNothing| or |HJust| is returned as appropriate.
 %
 \begin{code}
 instance
-    (  HMakeMaybe (HEq l l') v m
-    ,  SingI (HEq l l')
-    ,  SingI l') =>
+    (  HEq l l' b
+    ,  HMakeMaybe b v m) =>
        HSkewGet (Field l' v) l m where
     hSkewGet f l =
         hMakeMaybe
@@ -935,16 +1019,16 @@ but constructing a |SkewRecord| instead of an |HList|:
 %
 \begin{code}
 rSkew =
-  ((sing :: Sing "L1")  .=.  True     )  `hSkewExtend`
-  ((sing :: Sing "L2")  .=.  9        )  `hSkewExtend`
-  ((sing :: Sing "L3")  .=.  "bla"    )  `hSkewExtend`
-  ((sing :: Sing "L4")  .=.  'c'      )  `hSkewExtend`
-  ((sing :: Sing "L5")  .=.  Nothing  )  `hSkewExtend`
-  ((sing :: Sing "L6")  .=.  [4,5]    )  `hSkewExtend`
-  ((sing :: Sing "L7")  .=.  "last"   )  `hSkewExtend`
+  (l1  .=.  True     )  `hSkewExtend`
+  (l2  .=.  9        )  `hSkewExtend`
+  (l3  .=.  "bla"    )  `hSkewExtend`
+  (l4  .=.  'c'      )  `hSkewExtend`
+  (l5  .=.  Nothing  )  `hSkewExtend`
+  (l6  .=.  [4,5]    )  `hSkewExtend`
+  (l7  .=.  "last"   )  `hSkewExtend`
   emptySkewRecord
 
-lastSkew = hSkewGet rSkew (sing :: Sing "L7")
+lastSkew = hSkewGet rSkew l7
 \end{code}
 the resulting core code is:
 

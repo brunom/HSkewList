@@ -40,10 +40,10 @@ escapeinside={\%*}{*)}
 %%           , breaklinks, colorlinks
            , pdftitle={Fast Extensible Records In Haskell}
            , pdfsubject={}
-           , pdfkeywords={haskell,attribute grammars, typed transformations, extensible languages, type-level programming}
+           , pdfkeywords={haskell,records, type-level programming}
            , pdfcreator={LaTeX with Lhs2TeX}
            , pdfproducer={pdflatex}
-           , pdfauthor={Marcos Viera}
+           , pdfauthor={Bruno Martinez}
            , linkcolor=black
            , citecolor=black
            , filecolor=black
