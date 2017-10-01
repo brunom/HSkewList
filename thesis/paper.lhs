@@ -795,12 +795,19 @@ data Tree a
 data HTree t where
     HEmpty :: HTree 'Empty
     HNode :: e -> HTree t -> HTree t' -> HTree ('Node e t t')
+leaf e = Node e Empty Empty
+type Leaf e = Node e Empty Empty
 type  HLeaf  e         =  HTree (Node e Empty Empty)
 \end{code}
 and a smart constructor for leaves:
 \begin{code}
 hLeaf :: e -> HLeaf e
 hLeaf        e         =  HNode e HEmpty HEmpty
+
+data TreeList ts where
+    TLNil :: TreeList '[]
+    TLCons :: HTree t -> TreeList ts -> TreeList (t ': ts)
+
 \end{code}
 
 \noindent
@@ -814,11 +821,11 @@ The following declarations define a skew list with the elements of the fourth st
 
 \begin{code}
 four =
-    HCons  (hLeaf  (l4  .=.  'c')) $
-    HCons  (HNode  (l5  .=.  Nothing)
+    TLCons  (hLeaf  (l4  .=.  'c')) $
+    TLCons  (HNode  (l5  .=.  Nothing)
                    (hLeaf (l6  .=.  [4,5]))
                    (hLeaf (l7  .=.  "last"))) $
-    HNil
+    TLNil
 \end{code}
 
 %% $ fix emacs color highlighting
@@ -828,7 +835,7 @@ four =
 We define a smart constructor |emptySkewRecord| for empty skew lists, i.e. an empty list of trees.
 
 \begin{code}
-emptySkewRecord = HNil
+emptySkewRecord = TLNil
 \end{code}
 
 %\noindent
@@ -855,7 +862,7 @@ so |HSkewCarry| returns |HTrue|.
 \begin{code}
 class HSkewCarry l (b::Bool) | l -> b
 
-hSkewCarry :: HSkewCarry r b => HList r -> Sing b
+hSkewCarry :: HSkewCarry r b => TreeList r -> Sing b
 hSkewCarry = undefined
 \end{code}
 %
@@ -881,7 +888,7 @@ All these pieces allow us to define |HSkewExtend|,
 which resembles the |HCons| constructor.
 \begin{code}
 class HSkewExtend f r r' | f r -> r'
-    where hSkewExtend :: f -> HList r -> HList r'
+    where hSkewExtend :: f -> TreeList r -> TreeList r'
 infixr 2 `hSkewExtend`
 \end{code}
 |HSkewExtend| looks like |HListGet| shown earlier.
@@ -899,7 +906,7 @@ instance
         hSkewExtend' (hSkewCarry r) f r
 
 class HSkewExtend' (b::Bool) f r r' | b f r -> r' where
-    hSkewExtend' :: Sing b -> f -> HList r -> HList r'
+    hSkewExtend' :: Sing b -> f -> TreeList r -> TreeList r'
 \end{code}
 \noindent
 Here |HFalse| means that we should not add up the first two trees of the spine.
@@ -911,8 +918,8 @@ instance
         'False
         f
         r
-        (HLeaf f ': r) where
-    hSkewExtend' _ f r = HCons (hLeaf f) r
+        (Leaf f ': r) where
+    hSkewExtend' _ f r = TLCons (hLeaf f) r
 \end{code}
 %
 When |HSkewCarry| returns |HTrue|, however, we build a new tree reusing the two trees that were at the start of the spine.
@@ -923,10 +930,10 @@ instance
     HSkewExtend'
         'True
         f
-        (HTree t ': HTree t' ': r)
-        (HTree (Node f t t') ': r) where
-    hSkewExtend' _ f (HCons t (HCons t' r)) =
-        (HCons (HNode f t t') r)
+        (t ': t' ': r)
+        (Node f t t' ': r) where
+    hSkewExtend' _ f (TLCons t (TLCons t' r)) =
+        (TLCons (HNode f t t') r)
 \end{code}
 
 \subsubsection{Lookup}
@@ -938,7 +945,7 @@ but follows only the right one at run time.
 
 \begin{code}
 class HSkewGet r l v | r l -> v where
-    hSkewGet :: HList r -> Sing l -> HMaybe v
+    hSkewGet :: TreeList r -> Sing l -> HMaybe v
 class HSkewGetTree r l v | r l -> v where
     hSkewGetTree :: HTree r -> Sing l -> HMaybe v
 class HSkewGetField r l v | r l -> v where
@@ -976,8 +983,8 @@ instance
     ,  HSkewGet r'  l vr'
     ,  HPlus vr
     ,  Plus vr vr' ~ v) =>
-       HSkewGet (HTree r ': r') l v where
-    hSkewGet (HCons r r') l =
+       HSkewGet (r ': r') l v where
+    hSkewGet (TLCons r r') l =
         hSkewGetTree r l `hPlus` hSkewGet r' l
 \end{code}
 %
@@ -1069,7 +1076,11 @@ a field of some label with a new field with possibly new label and value.
 %
 \begin{code}
 class HSkewUpdate l e r r' | l e r -> r' where
-    hSkewUpdate :: Sing l -> e -> r -> r'
+    hSkewUpdate :: Sing l -> e -> TreeList r -> TreeList r'
+class HSkewUpdateTree l e r r' | l e r -> r' where
+    hSkewUpdateTree :: Sing l -> e -> HTree r -> HTree r'
+class HSkewUpdateField l e r r' | l e r -> r' where
+    hSkewUpdateField :: Sing l -> e -> r -> r'
 \end{code}
 %
 We use the lookup operation |HSkewGet| to discriminate at type-level
@@ -1077,13 +1088,17 @@ whether the field with the searched label is present or not in the skew list.
 %
 \begin{code}
 instance  (  HSkewGet r l m
-          ,  HSkewUpdate' m l e (HList r) (HList r')) =>
-          HSkewUpdate l e (HList r) (HList r')  where
+          ,  HSkewUpdate' m l e r r') =>
+          HSkewUpdate l e r r'  where
     hSkewUpdate l e r =
        hSkewUpdate' (hSkewGet r l) l e r
 
 class HSkewUpdate' m l e r r' | m l e r -> r' where
-    hSkewUpdate' :: HMaybe m -> Sing l -> e -> r -> r'
+    hSkewUpdate' :: HMaybe m -> Sing l -> e -> TreeList r -> TreeList r'
+class HSkewUpdateTree' m l e r r' | m l e r -> r' where
+    hSkewUpdateTree' :: HMaybe m -> Sing l -> e -> HTree r -> HTree r'
+class HSkewUpdateField' m l e r r' | m l e r -> r' where
+    hSkewUpdateField' :: HMaybe m -> Sing l -> e -> r -> r'
 \end{code}
 %
 In case the label is not present we have nothing to do than just returning the
@@ -1100,13 +1115,13 @@ We start the process in the spine.
 %
 \begin{code}
 instance
-    (  HSkewUpdate l e t t'
-    ,  HSkewUpdate l e (HList ts) (HList ts')) =>
-    HSkewUpdate' ('Just v) l e  (HList (t ': ts))
-                                (HList (t' ': ts'))
+    (  HSkewUpdateTree l e t t'
+    ,  HSkewUpdate l e ts ts') =>
+    HSkewUpdate' ('Just v) l e  (t ': ts)
+                                (t' ': ts')
     where
-    hSkewUpdate' _ l e (HCons t ts) =
-        HCons  (hSkewUpdate l e t)
+    hSkewUpdate' _ l e (TLCons t ts) =
+        TLCons  (hSkewUpdateTree l e t)
                (hSkewUpdate l e ts)
 \end{code}
 %
@@ -1114,16 +1129,16 @@ On a |HNode|, |hSkewUpdate| is recursively called on
 the left and right sub-trees as well as on the element of the node.
 \begin{code}
 instance
-    (  HSkewUpdate l e e' e''
-    ,  HSkewUpdate l e (HTree tl) (HTree tl')
-    ,  HSkewUpdate l e (HTree tr) (HTree tr')) =>
-    HSkewUpdate' ('Just v) l e  (HTree (Node e' tl tr))
-                                (HTree (Node e'' tl' tr'))
+    (  HSkewUpdateField l e e' e''
+    ,  HSkewUpdateTree l e tl tl'
+    ,  HSkewUpdateTree l e tr tr') =>
+    HSkewUpdateTree' ('Just v) l e  (Node e' tl tr)
+                                (Node e'' tl' tr')
     where
-    hSkewUpdate' _ l e (HNode e' tl tr) =
-        HNode  (hSkewUpdate l e e')
-               (hSkewUpdate l e tl)
-               (hSkewUpdate l e tr)
+    hSkewUpdateTree' _ l e (HNode e' tl tr) =
+        HNode  (hSkewUpdateField l e e')
+               (hSkewUpdateTree l e tl)
+               (hSkewUpdateTree l e tr)
 \end{code}
 %
 Finally, when we arrive to a |Field| and we know the label is the one we
@@ -1131,9 +1146,9 @@ are searching for (because we are considering the case |HJust v|), we simply ret
 %
 \begin{code}
 instance
-    HSkewUpdate' ('Just v) l e (Field l v) e
+    HSkewUpdateField' ('Just v) l e (Field l v) e
      where
-       hSkewUpdate' _ l e e' = e
+       hSkewUpdateField' _ l e e' = e
 \end{code}
 
 At run time, this implementation of |hSkewUpdate| only
@@ -1153,7 +1168,7 @@ First, we need a helper to remove the first element of a skew list.
 %
 \begin{code}
 class HSkewTail ts ts' | ts -> ts' where
-    hSkewTail :: HList ts -> HList ts'
+    hSkewTail :: TreeList ts -> TreeList ts'
 \end{code}
 
 \noindent
@@ -1170,8 +1185,8 @@ we can find.
 The easy case is when the spine begins with a leaf.
 We just return the tail of the spine list.
 \begin{code}
-instance HSkewTail (HLeaf e : ts) ts where
-    hSkewTail (HCons _ ts) = ts
+instance HSkewTail (Leaf e : ts) ts where
+    hSkewTail (TLCons _ ts) = ts
 \end{code}
 
 \noindent
@@ -1185,11 +1200,11 @@ In this case we grow the spine with the sub-trees, throwing away the root.
 \begin{code}
 instance
     HSkewTail
-        (HTree (Node e t (Node e' t' t'')) ': ts)
-        (HTree t ': HTree (Node e' t' t'') ': ts)
+        (Node e t (Node e' t' t'') ': ts)
+        (t ': Node e' t' t'' ': ts)
     where
-    hSkewTail (HCons (HNode _ t t') ts) =
-        HCons t (HCons t' ts)
+    hSkewTail (TLCons (HNode _ t t') ts) =
+        TLCons t (TLCons t' ts)
 \end{code}
 
 
@@ -1198,10 +1213,10 @@ to duplicate it where the label we want gone was.
 Then |hSkewTail| removes the original occurrence,
 at the start of the list.
 \begin{code}
-hSkewRemove :: (HSkewUpdate l e (HList (HTree (Node e t t') ': ts)) (HList ts'), HSkewTail ts' ts'') => Sing l -> HList (HTree (Node e t t') ': ts) -> HList ts''
-hSkewRemove l (HCons (HNode e t t') ts) =
-    hSkewTail $
-    hSkewUpdate l e (HCons (HNode e t t') ts)
+-- hSkewRemove :: (HSkewUpdate l e (HList (HTree (Node e t t') ': ts)) (HList ts'), HSkewTail ts' ts'') => Sing l -> HList (HTree (Node e t t') ': ts) -> HList ts''
+-- hSkewRemove l (HCons (HNode e t t') ts) =
+    -- hSkewTail $
+    -- hSkewUpdate l e (HCons (HNode e t t') ts)
 \end{code}
 
 %% $ fix emacs color highlighting
@@ -1617,6 +1632,6 @@ even as a built-in solution.
 \begin{code}
 main = return ()
 
-hListUpdate a = hSkewUpdate a
+hListUpdate a = undefined
 hListRemove = undefined
 \end{code}
