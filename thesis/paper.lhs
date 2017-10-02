@@ -23,6 +23,7 @@
 %if style==newcode
 
 %format !!! = "''"
+%format !!!: = "'':"
 
 \begin{code}
 {-# LANGUAGE EmptyDataDecls #-}
@@ -33,7 +34,7 @@
 {-# LANGUAGE FunctionalDependencies #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE UndecidableInstances #-}
---{-# LANGUAGE TypeInType #-}
+{-# LANGUAGE TypeInType #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE PolyKinds #-}
@@ -242,12 +243,10 @@ Heterogeneous lists can be represented with the data types |HNil| and |HCons|,
 which model the structure of lists both at the value and type level:
 
 \begin{code}
-data HList (l::[*]) where
-   HNil  :: HList '[]
-   HCons :: e -> HList l -> HList (e ': l)
+data HList (fs :: [(l, Type)]) where
+   HNil  :: HList !!![]
+   HCons :: Field l v -> HList fs -> HList ( !!!(l,v) !!!: fs)
 infixr 2 `HCons`
-
-
 \end{code}
 
 For example, the value |HCons True (HCons 'a' HNil)| is a heterogeneous list of type |HCons Bool (HCons Char HNil)|.
@@ -359,7 +358,7 @@ or the search must continue to the next node.
 instance
     (  HEq l l' b
     ,  HListGet' b v' r' l v) =>
-       HListGet (Field l' v' ': r') l v where
+       HListGet ('( l', v') ': r') l v where
     hListGet (HCons f'@(Field v') r') l =
         hListGet' (hEq l (label f')) v' r' l
 \end{code}
@@ -529,7 +528,7 @@ the label of the current field, which may match or not the searched one.
 instance  (  HEq l l' b
           ,  ArrayFind' b v' r l v n
           ,  ToValue n) =>
-   ArrayFind (Field l' v' ': r) l v where
+   ArrayFind ('(l', v') ': r) l v where
      arrayFind (HCons f r) l =
        toValue (arrayFind' (hEq l (label f)) (value f) r l)
 \end{code}
@@ -548,10 +547,10 @@ arrayFind' = undefined
 data HZero
 data HSucc n
 
-class ArrayFind' (b::Bool) v' (r :: [*]) l v n | b v' r l -> v n
+class ArrayFind' (b::Bool) v' (r :: [(l, Type)]) l' v n | b v' r l' -> v n
 instance ArrayFind' 'True v r l v HZero
 instance (HEq l l' b, ArrayFind' b v' r l v n)
-         => ArrayFind' 'False v'' (Field l' v' : r) l
+         => ArrayFind' 'False v'' ('(l', v') : r) l
                         v (HSucc n)
 \end{code}
 %
@@ -714,7 +713,7 @@ instance HMapAny !!![] where
   hMapAny _ = []
 instance
   HMapAny r =>
-  HMapAny (Field l v : r)
+  HMapAny (!!!(l, v) : r)
   where
   hMapAny (HCons (Field v) r) =
     unsafeCoerce v : hMapAny r
@@ -796,8 +795,8 @@ data HTree t where
     HEmpty :: HTree 'Empty
     HNode :: e -> HTree t -> HTree t' -> HTree ('Node e t t')
 leaf e = Node e Empty Empty
-type Leaf e = Node e Empty Empty
-type  HLeaf  e         =  HTree (Node e Empty Empty)
+type Leaf e = !!!Node e !!!Empty !!!Empty
+type  HLeaf  e         =  HTree (!!!Node e !!!Empty !!!Empty)
 \end{code}
 and a smart constructor for leaves:
 \begin{code}
@@ -844,8 +843,8 @@ We will use it to detect the case of two leading equal height trees in the spine
 %
 \begin{code}
 type family Height t where
-    Height Empty = HZero
-    Height (Node e t t') = HSucc (Height t)
+    Height !!!Empty = HZero
+    Height (!!!Node e t t') = HSucc (Height t)
 \end{code}
 
 \noindent
@@ -931,7 +930,7 @@ instance
         'True
         f
         (t ': t' ': r)
-        (Node f t t' ': r) where
+        ('Node f t t' ': r) where
     hSkewExtend' _ f (TLCons t (TLCons t' r)) =
         (TLCons (HNode f t t') r)
 \end{code}
@@ -967,9 +966,9 @@ We will run |HSkewGet| on both the spine and each tree, so we have two base case
 |HNil| is encountered at the end of the spine, and |HEmpty| at the bottom of trees.
 In both cases, the field was not found, so we return |HNothing|.
 \begin{code}
-instance HSkewGet !!![] l 'Nothing where
+instance HSkewGet '[] l 'Nothing where
     hSkewGet _ _ = HNothing
-instance HSkewGetTree Empty l 'Nothing where
+instance HSkewGetTree 'Empty l 'Nothing where
     hSkewGetTree _ _ = HNothing
 \end{code}
 The |HCons| case must consider that the field may be found on the current tree or further down the spine.
@@ -1007,7 +1006,7 @@ instance
     ,  Plus vf vr ~    vfr
     ,  HPlus vfr
     ,  Plus vfr  vr'  ~ v) =>
-       HSkewGetTree (Node f r r') l v where
+       HSkewGetTree ('Node f r r') l v where
     hSkewGetTree (HNode f r r') l =
         hSkewGetField f l
             `hPlus` hSkewGetTree r l
@@ -1132,8 +1131,8 @@ instance
     (  HSkewUpdateField l e e' e''
     ,  HSkewUpdateTree l e tl tl'
     ,  HSkewUpdateTree l e tr tr') =>
-    HSkewUpdateTree' ('Just v) l e  (Node e' tl tr)
-                                (Node e'' tl' tr')
+    HSkewUpdateTree' ('Just v) l e  ('Node e' tl tr)
+                                ('Node e'' tl' tr')
     where
     hSkewUpdateTree' _ l e (HNode e' tl tr) =
         HNode  (hSkewUpdateField l e e')
@@ -1200,8 +1199,8 @@ In this case we grow the spine with the sub-trees, throwing away the root.
 \begin{code}
 instance
     HSkewTail
-        (Node e t (Node e' t' t'') ': ts)
-        (t ': Node e' t' t'' ': ts)
+        ('Node e t ('Node e' t' t'') ': ts)
+        (t ': 'Node e' t' t'' ': ts)
     where
     hSkewTail (TLCons (HNode _ t t') ts) =
         TLCons t (TLCons t' ts)
