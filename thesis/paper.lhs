@@ -219,6 +219,11 @@ instance HMakeMaybe 'False where
     hMakeMaybe b v = HNothing
 instance HMakeMaybe 'True where
     hMakeMaybe b v = HJust v
+
+hMakeMaybe2 :: Sing b -> v -> HMaybe (MakeMaybe b v)
+hMakeMaybe2 SFalse v = HNothing
+hMakeMaybe2 STrue  v = HJust v
+
 \end{code}
 
 Another operation that will be of interest on this type is the one that combines
