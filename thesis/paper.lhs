@@ -952,8 +952,8 @@ class HSkewGet r l v | r l -> v where
     hSkewGet :: TreeList r -> Sing l -> HMaybe v
 class HSkewGetTree r l v | r l -> v where
     hSkewGetTree :: HTree r -> Sing l -> HMaybe v
-class HSkewGetField r l v | r l -> v where
-    hSkewGetField :: r -> Sing l -> HMaybe v
+class HSkewGetField l' v' l v | l' v' l -> v where
+    hSkewGetField :: Field l' v' -> Sing l -> HMaybe v
 \end{code}
 Deciding on the path to the desired field
 is now more involved.
@@ -1004,14 +1004,14 @@ Thus two |HPlus| calls are needed to combine the result.
 %
 \begin{code}
 instance
-    (  HSkewGetField f   l vf
+    (  HSkewGetField l' v'   l vf
     ,  HSkewGetTree r   l vr
     ,  HSkewGetTree r'  l vr'
     ,  HPlus vf
     ,  Plus vf vr ~    vfr
     ,  HPlus vfr
     ,  Plus vfr  vr'  ~ v) =>
-       HSkewGetTree ('Node f r r') l v where
+       HSkewGetTree ('Node (Field l' v') r r') l v where
     hSkewGetTree (HNode f r r') l =
         hSkewGetField f l
             `hPlus` hSkewGetTree r l
@@ -1030,7 +1030,7 @@ instance
     (  HEq l l' b
     ,  HMakeMaybe b
     ,  MakeMaybe b v ~ m) =>
-       HSkewGetField (Field l' v) l m where
+       HSkewGetField l' v l m where
     hSkewGetField f l =
         hMakeMaybe
             (hEq l (label f))
