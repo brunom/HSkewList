@@ -201,6 +201,9 @@ In this case we are interested in manipulating a value-level value associated wi
 data HMaybe m where
     HNothing :: HMaybe 'Nothing
     HJust :: e -> HMaybe ('Just e)
+instance Show m => Show (HMaybe (!!!Just m)) where
+    ---show HNothing = "HNothing"
+    show (HJust a) = "(HJust " ++ show a ++ ")"
 \end{code}
 
 We aim to construct a type-level value of the maybe type from a boolean. For this purpose
@@ -240,6 +243,9 @@ instance HPlus ('Just a) where
     hPlus a  _ = a
 instance HPlus 'Nothing where
     hPlus _  b = b
+hPlus2 :: HMaybe a -> HMaybe b -> HMaybe (Plus a b)
+hPlus2 (HJust a) _ = HJust a
+hPlus2 HNothing b = b
 \end{code}
 
 \subsection{Heterogeneous Lists}
@@ -330,8 +336,7 @@ The type equality predicate |HEq| results in |HTrue| in case the compared types 
 Thus, when comparing two types in other type-level functions (like |HListGet| below),
 these two cases can be discriminated without using overlapping instances.
 \begin{code}
-class HEq x y (b::Bool) | x y -> b
-hEq :: HEq x y b => Sing x -> Sing y -> Sing b
+hEq :: Sing x -> Sing y -> Sing (x :== y)
 hEq = undefined
 \end{code}
 %
@@ -339,10 +344,6 @@ We will not delve into the different possible definitions for |HEq|.
 For completeness, here is one that suffices for our purposes.
 For a more complete discussion about type equality in Haskell
 we refer to \cite{type-eq}.
-\begin{code}
-instance {-# OVERLAPPING  #-}  HEq x x 'True
-instance b ~ 'False =>         HEq x y b
-\end{code}
 %if False
 \begin{code}
 class TypeCast x y | x -> y, y -> x
@@ -361,8 +362,7 @@ or the search must continue to the next node.
 
 \begin{code}
 instance
-    (  HEq l l' b
-    ,  HListGet' b v' r' l v) =>
+    (  HListGet' (l :== l') v' r' l v) =>
        HListGet ('( l', v') ': r') l v where
     hListGet (f'@(Field v') `HCons` r') l =
         hListGet' (hEq l (label f')) v' r' l
@@ -530,8 +530,7 @@ using |HEq| to discriminate the cases of
 the label of the current field, which may match or not the searched one.
 %
 \begin{code}
-instance  (  HEq l l' b
-          ,  ArrayFind' b v' r l v n
+instance  (  ArrayFind' (l :== l') v' r l v n
           ,  ToValue n) =>
    ArrayFind ('(l', v') ': r) l v where
      arrayFind (f `HCons` r) l =
@@ -554,7 +553,7 @@ data HSucc n
 
 class ArrayFind' (b::Bool) v' (r :: [(l, Type)]) l' v n | b v' r l' -> v n
 instance ArrayFind' 'True v r l v HZero
-instance (HEq l l' b, ArrayFind' b v' r l v n)
+instance (ArrayFind' (l :== l') v' r l v n)
          => ArrayFind' 'False v'' ('(l', v') : r) l
                         v (HSucc n)
 \end{code}
@@ -628,8 +627,7 @@ the label of the current field, which may match or not the searched one.
 class HFind r l v | r l -> v where
   hFind :: r -> l -> Int
 instance
-    (  HEq l l' b
-    ,  HFind' b v' r' l v) =>
+    (  HFind' (l :== l') v' r' l v) =>
        HFind (Field l' v' `HCons` r') l v where
     hFind ~(f'@(Field v') `HCons` r') l =
         hFind' (hEq l (label f')) v' r' l
@@ -734,11 +732,11 @@ We use the respective functions |hListUpdate| and |hListRemove| from the HList
 implementation of records.
 %
 \begin{code}
-hArrayUpdate l e
-   = hArrayModifyList (hListUpdate l e)
+-- hArrayUpdate l e
+   -- = hArrayModifyList (hListUpdate l e)
 
-hArrayRemove l
-   = hArrayModifyList (hListRemove l)
+-- hArrayRemove l
+   -- = hArrayModifyList (hListRemove l)
 \end{code}
 %
 With |HArrayUpdate| we change a field of some label with a new field with possibly new label and value.
@@ -846,12 +844,7 @@ emptySkewRecord = TLNil
 |HHeight| returns the height of a tree.
 We will use it to detect the case of two leading equal height trees in the spine.
 %
-\begin{code}
-type family Height t where
-    Height !!!Empty = HZero
-    Height (!!!Node e t t') = HSucc (Height t)
-\end{code}
-
+    
 \noindent
 |HSkewCarry| finds out if a skew list |l| is in case (1) or (2).
 This will be used for insertion to decide whether we need to take the two leading existing trees
@@ -864,29 +857,27 @@ building a new taller tree is a form of carry,
 so |HSkewCarry| returns |HTrue|.
 %
 \begin{code}
-class HSkewCarry l (b::Bool) | l -> b
+$(promote [d|
+    height :: Tree e -> Nat
+    height Empty = 0
+    height (Node _ _ t) = 1 + height t
 
-hSkewCarry :: HSkewCarry r b => TreeList r -> Sing b
+    skewCarry [] = False
+    skewCarry [_] = False
+    skewCarry (t : t' : _) = height t == height t'
+    |])
+
+
+hSkewCarry :: TreeList r -> Sing (SkewCarry r)
 hSkewCarry = undefined
 \end{code}
 %
 If the spine has none or one single tree we return |HFalse|.
-\begin{code}
-instance HSkewCarry '[] 'False
-instance HSkewCarry '[t] 'False
-\end{code}
 %
 In case the spine has more than one tree,
 we return |HTrue| if the first two trees are of equal size and
 |HFalse| otherwise.
 %
-\begin{code}
-instance
-    (  Height t  ~ h
-    ,  Height t' ~  h'
-    ,  HEq h h' b) =>
-       HSkewCarry (t ': t' : ts) b
-\end{code}
 
 All these pieces allow us to define |HSkewExtend|,
 which resembles the |HCons| constructor.
@@ -903,8 +894,7 @@ while |HListGet| used |HEq| on the two labels.
 
 \begin{code}
 instance
-    (  HSkewCarry r b
-    ,  HSkewExtend' b  f r r') =>
+    (  HSkewExtend' (SkewCarry r)  f r r') =>
        HSkewExtend     f r r' where
     hSkewExtend f r =
         hSkewExtend' (hSkewCarry r) f r
@@ -985,11 +975,10 @@ If the field is found in the current tree,
 instance
     (  HSkewGetTree r   l vr
     ,  HSkewGet r'  l vr'
-    ,  HPlus vr
     ,  Plus vr vr' ~ v) =>
        HSkewGet (r ': r') l v where
     hSkewGet (r `TLCons` r') l =
-        hSkewGetTree r l `hPlus` hSkewGet r' l
+        hSkewGetTree r l `hPlus2` hSkewGet r' l
 \end{code}
 %
 Observe that when doing |hSkewGet r l `hPlus` hSkewGet r' l| if the label is not present in |r| then
@@ -1007,15 +996,12 @@ instance
     (  HSkewGetField l' v'   l vf
     ,  HSkewGetTree r   l vr
     ,  HSkewGetTree r'  l vr'
-    ,  HPlus vf
-    ,  Plus vf vr ~    vfr
-    ,  HPlus vfr
-    ,  Plus vfr  vr'  ~ v) =>
+    ,  Plus (Plus vf vr) vr'  ~ v) =>
        HSkewGetTree ('Node (Field l' v') r r') l v where
     hSkewGetTree (HNode f r r') l =
         hSkewGetField f l
-            `hPlus` hSkewGetTree r l
-               `hPlus` hSkewGetTree r' l
+            `hPlus2` hSkewGetTree r l
+               `hPlus2` hSkewGetTree r' l
 \end{code}
 %
 Finally, the |Field| case, when a field is found, is the case
@@ -1027,7 +1013,7 @@ and |HNothing| or |HJust| is returned as appropriate.
 %
 \begin{code}
 instance
-    (  HEq l l' b
+    (  (l :== l') ~ b
     ,  HMakeMaybe b
     ,  MakeMaybe b v ~ m) =>
        HSkewGetField l' v l m where
@@ -1047,11 +1033,11 @@ but constructing a |SkewRecord| instead of an |HList|:
 rSkew =
   (l1  .=.  True     )  `hSkewExtend`
   (l2  .=.  9        )  `hSkewExtend`
-  --(l3  .=.  "bla"    )  `hSkewExtend`
-  -- (l4  .=.  'c'      )  `hSkewExtend`
-  -- (l5  .=.  Nothing  )  `hSkewExtend`
-  -- (l6  .=.  [4,5]    )  `hSkewExtend`
-  -- (l7  .=.  "last"   )  `hSkewExtend`
+  (l3  .=.  "bla"    )  `hSkewExtend`
+  (l4  .=.  'c'      )  `hSkewExtend`
+  (l5  .=.  Nothing  )  `hSkewExtend`
+  (l6  .=.  [4,5]    )  `hSkewExtend`
+  (l7  .=.  "last"   )  `hSkewExtend`
   emptySkewRecord
 
 lastSkew = hSkewGet rSkew l7
@@ -1634,7 +1620,9 @@ even as a built-in solution.
 %%% End: **
 
 \begin{code}
-main = return ()
+main =
+    print lastList >>
+    print lastSkew
 
 hListUpdate a = undefined
 hListRemove = undefined
