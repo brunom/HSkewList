@@ -3,6 +3,8 @@
 all: thesis.pdf thesis.exe
 pdf: thesis.pdf
 exe: thesis.exe
+run: thesis.hs
+	run$(GHC) thesis.hs -freverse-errors
 
 thesis.pdf: thesis.tex thesis.bib
 	latexmk -pdf -quiet thesis.tex
