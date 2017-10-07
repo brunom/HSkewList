@@ -344,14 +344,6 @@ We will not delve into the different possible definitions for |HEq|.
 For completeness, here is one that suffices for our purposes.
 For a more complete discussion about type equality in Haskell
 we refer to \cite{type-eq}.
-%if False
-\begin{code}
-class TypeCast x y | x -> y, y -> x
-instance TypeCast x x
-instance TypeCast b 'False => HEq x y b
-instance TypeCast b 'True => HEq x x b
-\end{code}
-%endif
 At this point we can see that the use of overlapping instances is unavoidable. This explains why
 the implementation of HList is based on type classes and functional dependencies instead of \emph{type families} \cite{Chak05,1086397,Schrijvers2008} (which do not support overlapping instances).
 
@@ -684,7 +676,7 @@ hArrayExtend f = hArrayModifyList (HCons f)
 
 hArrayModifyList hc (ArrayRecord r _) =
   let  r'  = hc r
-       fs  = hMapAny r'
+       fs  = hMapAny2 r'
   in   ArrayRecord r' (listArray (0, length fs - 1) fs)
 \end{code}
 %
@@ -720,6 +712,10 @@ instance
   where
   hMapAny (Field v `HCons` r) =
     unsafeCoerce v : hMapAny r
+
+hMapAny2 :: HList r -> [Any]
+hMapAny2 HNil = []
+hMapAny2 (Field v `HCons` r) = unsafeCoerce v : hMapAny2 r
 \end{code}
 
 
