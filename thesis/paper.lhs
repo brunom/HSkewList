@@ -254,7 +254,7 @@ data HList (fs :: [(l, Type)]) where
 infixr 2 `HCons`
 \end{code}
 
-For example, the value |HCons True (HCons 'a' HNil)| is a heterogeneous list of type |HCons Bool (HCons Char HNil)|.
+For example, the value |True `HCons` 'a' `HCons` HNil| is a heterogeneous list of type |Bool `HCons` Char `HCons` HNil|.
 
 \subsection{Extensible Records}
 \label{sec:extensiblerecords}
@@ -364,7 +364,7 @@ instance
     (  HEq l l' b
     ,  HListGet' b v' r' l v) =>
        HListGet ('( l', v') ': r') l v where
-    hListGet (HCons f'@(Field v') r') l =
+    hListGet (f'@(Field v') `HCons` r') l =
         hListGet' (hEq l (label f')) v' r' l
 \end{code}
 
@@ -402,13 +402,13 @@ For example, this is the GHC core of the example:
 
 \begin{code}
 lastListCore = case rList of
-  HCons _ rs1 -> case rs1 of
-    HCons _  rs2 -> case rs2 of
-     HCons _  rs3 -> case rs3 of
-       HCons _ rs4 -> case rs4 of
-          HCons _ rs5 -> case rs5 of
-            HCons _ rs6 -> case rs6 of
-              HCons e _ -> e
+  _ `HCons` rs1 -> case rs1 of
+    _ `HCons` rs2 -> case rs2 of
+     _ `HCons` rs3 -> case rs3 of
+       _ `HCons` rs4 -> case rs4 of
+          _ `HCons` rs5 -> case rs5 of
+            _ `HCons` rs6 -> case rs6 of
+              e `HCons` _ -> e
 \end{code}
 
 \section{Faster Extensible Records}\label{sec:faster}
@@ -534,7 +534,7 @@ instance  (  HEq l l' b
           ,  ArrayFind' b v' r l v n
           ,  ToValue n) =>
    ArrayFind ('(l', v') ': r) l v where
-     arrayFind (HCons f r) l =
+     arrayFind (f `HCons` r) l =
        toValue (arrayFind' (hEq l (label f)) (value f) r l)
 \end{code}
 %
@@ -630,8 +630,8 @@ class HFind r l v | r l -> v where
 instance
     (  HEq l l' b
     ,  HFind' b v' r' l v) =>
-       HFind (HCons (Field l' v') r') l v where
-    hFind ~(HCons f'@(Field v') r') l =
+       HFind (Field l' v' `HCons` r') l v where
+    hFind ~(f'@(Field v') `HCons` r') l =
         hFind' (hEq l (label f')) v' r' l
 \end{code}
 %
@@ -720,7 +720,7 @@ instance
   HMapAny r =>
   HMapAny (!!!(l, v) : r)
   where
-  hMapAny (HCons (Field v) r) =
+  hMapAny (Field v `HCons` r) =
     unsafeCoerce v : hMapAny r
 \end{code}
 
@@ -811,7 +811,7 @@ hLeaf        e         =  HNode e HEmpty HEmpty
 data TreeList ts where
     TLNil :: TreeList '[]
     TLCons :: HTree t -> TreeList ts -> TreeList (t ': ts)
-
+infixr 2 `TLCons`
 \end{code}
 
 \noindent
@@ -825,10 +825,10 @@ The following declarations define a skew list with the elements of the fourth st
 
 \begin{code}
 four =
-    TLCons  (hLeaf  (l4  .=.  'c')) $
-    TLCons  (HNode  (l5  .=.  Nothing)
-                   (hLeaf (l6  .=.  [4,5]))
-                   (hLeaf (l7  .=.  "last"))) $
+    hLeaf  (l4  .=.  'c') `TLCons`
+    HNode  (l5  .=.  Nothing)
+        (hLeaf (l6  .=.  [4,5]))
+        (hLeaf (l7  .=.  "last")) `TLCons`
     TLNil
 \end{code}
 
@@ -923,7 +923,7 @@ instance
         f
         r
         (Leaf f ': r) where
-    hSkewExtend' _ f r = TLCons (hLeaf f) r
+    hSkewExtend' _ f r = (hLeaf f) `TLCons` r
 \end{code}
 %
 When |HSkewCarry| returns |HTrue|, however, we build a new tree reusing the two trees that were at the start of the spine.
@@ -936,8 +936,8 @@ instance
         f
         (t ': t' ': r)
         ('Node f t t' ': r) where
-    hSkewExtend' _ f (TLCons t (TLCons t' r)) =
-        (TLCons (HNode f t t') r)
+    hSkewExtend' _ f (t `TLCons` t' `TLCons` r) =
+        (HNode f t t' `TLCons` r)
 \end{code}
 
 \subsubsection{Lookup}
@@ -988,7 +988,7 @@ instance
     ,  HPlus vr
     ,  Plus vr vr' ~ v) =>
        HSkewGet (r ': r') l v where
-    hSkewGet (TLCons r r') l =
+    hSkewGet (r `TLCons` r') l =
         hSkewGetTree r l `hPlus` hSkewGet r' l
 \end{code}
 %
@@ -1060,7 +1060,7 @@ the resulting core code is:
 
 \begin{code}
 -- lastSkewCore = case rSkew of
-  -- HCons t1 _ -> case t1 of
+  -- t1 `HCons` _ -> case t1 of
     -- HNode _ _ t12 -> case t12 of
       -- HNode _ _ t121 ->case t121 of
         -- HNode e _ _ -> e
@@ -1124,9 +1124,9 @@ instance
     HSkewUpdate' ('Just v) l e  (t ': ts)
                                 (t' ': ts')
     where
-    hSkewUpdate' _ l e (TLCons t ts) =
-        TLCons  (hSkewUpdateTree l e t)
-               (hSkewUpdate l e ts)
+    hSkewUpdate' _ l e (t `TLCons` ts) =
+        hSkewUpdateTree l e t `TLCons`
+               hSkewUpdate l e ts
 \end{code}
 %
 On a |HNode|, |hSkewUpdate| is recursively called on
@@ -1190,7 +1190,7 @@ The easy case is when the spine begins with a leaf.
 We just return the tail of the spine list.
 \begin{code}
 instance HSkewTail (Leaf e : ts) ts where
-    hSkewTail (TLCons _ ts) = ts
+    hSkewTail (_ `TLCons` ts) = ts
 \end{code}
 
 \noindent
@@ -1207,8 +1207,8 @@ instance
         ('Node e t ('Node e' t' t'') ': ts)
         (t ': 'Node e' t' t'' ': ts)
     where
-    hSkewTail (TLCons (HNode _ t t') ts) =
-        TLCons t (TLCons t' ts)
+    hSkewTail (HNode _ t t' `TLCons` ts) =
+        t `TLCons` t' `TLCons` ts
 \end{code}
 
 
@@ -1218,9 +1218,9 @@ Then |hSkewTail| removes the original occurrence,
 at the start of the list.
 \begin{code}
 -- hSkewRemove :: (HSkewUpdate l e (HList (HTree (Node e t t') ': ts)) (HList ts'), HSkewTail ts' ts'') => Sing l -> HList (HTree (Node e t t') ': ts) -> HList ts''
--- hSkewRemove l (HCons (HNode e t t') ts) =
+-- hSkewRemove l (H (HNode e t t') ts) =
     -- hSkewTail $
-    -- hSkewUpdate l e (HCons (HNode e t t') ts)
+    -- hSkewUpdate l e (HNode e t t' `HCons` ts)
 \end{code}
 
 %% $ fix emacs color highlighting
