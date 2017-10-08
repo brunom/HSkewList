@@ -211,7 +211,7 @@ we define the following multi-parameter class. The parameter |v| specifies the t
 of the values to be contained by a |HJust|.
 
 \begin{code}
-$(singletons [d|
+$(promote [d|
     makeMaybe False v = Nothing
     makeMaybe True v = Just v
     |])
@@ -233,7 +233,7 @@ Another operation that will be of interest on this type is the one that combines
 two values of type maybe.
 
 \begin{code}
-$(singletons [d|
+$(promote [d|
     plus Nothing b = b
     plus (Just a) b = Just a
     |])
@@ -795,7 +795,7 @@ data HTree t where
     HNode :: e -> HTree t -> HTree t' -> HTree ('Node e t t')
 leaf e = Node e Empty Empty
 type Leaf e = !!!Node e !!!Empty !!!Empty
-type  HLeaf  e         =  HTree (!!!Node e !!!Empty !!!Empty)
+type  HLeaf  e         =  HTree (Leaf e)
 \end{code}
 and a smart constructor for leaves:
 \begin{code}
