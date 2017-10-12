@@ -1035,17 +1035,16 @@ rSkew =
   (l6  .=.  [4,5]    )  `hSkewExtend`
   (l7  .=.  "last"   )  `hSkewExtend`
   emptySkewRecord
-
 lastSkew = hSkewGet rSkew l7
 \end{code}
 the resulting core code is:
 
 \begin{code}
--- lastSkewCore = case rSkew of
-  -- t1 `HCons` _ -> case t1 of
-    -- HNode _ _ t12 -> case t12 of
-      -- HNode _ _ t121 ->case t121 of
-        -- HNode e _ _ -> e
+lastSkewCore = case rSkew of
+  t1 `TLCons` _ -> case t1 of
+    HNode _ _ t12 -> case t12 of
+      HNode _ _ t121 ->case t121 of
+        HNode e _ _ -> e
 \end{code}
 Thus, getting to |l7| at run time only traverses a (logarithmic length) fraction of the elements,
 as we have seen in Figure~\ref{fig:search-skew}.
@@ -1198,12 +1197,12 @@ Last, |hSkewRemove| takes the first node and calls |hSkewUpdate|
 to duplicate it where the label we want gone was.
 Then |hSkewTail| removes the original occurrence,
 at the start of the list.
-\begin{code}
--- hSkewRemove :: (HSkewUpdate l e (HList (HTree (Node e t t') ': ts)) (HList ts'), HSkewTail ts' ts'') => Sing l -> HList (HTree (Node e t t') ': ts) -> HList ts''
--- hSkewRemove l (H (HNode e t t') ts) =
-    -- hSkewTail $
-    -- hSkewUpdate l e (HNode e t t' `HCons` ts)
-\end{code}
+%\begin{code}
+%-- hSkewRemove :: (HSkewUpdate l e (HList (HTree (Node e t t') ': ts)) (HList ts'), HSkewTail ts' ts'') => Sing l -> HList (HTree (Node e t t') ': ts) -> HList ts''
+%-- hSkewRemove l (H (HNode e t t') ts) =
+%    -- hSkewTail $
+%    -- hSkewUpdate l e (HNode e t t' `HCons` ts)
+%\end{code}
 
 %% $ fix emacs color highlighting
 
