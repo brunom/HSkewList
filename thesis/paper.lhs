@@ -316,8 +316,8 @@ The class |HListGet| retrieves from a record the value part
 corresponding to a specific label:
 
 \begin{code}
-class HListGet l fs v | l fs -> v where
-    hListGet :: Sing l -> HList fs -> v
+class HListGet l fs where
+    hListGet :: Sing l -> HList fs -> FromJust (Lookup l fs)
 
 hListGet2 ::
     SingI (Map ((:==$$) l) (Map FstSym0 fs)) =>
@@ -368,27 +368,30 @@ or the search must continue to the next node.
 
 \begin{code}
 instance
-    (  HListGet' (l :== l') v' l fs v) =>
-       HListGet l ('( l', v') ': fs) v where
-    hListGet l (f'@(Field v') `HCons` fs) =
-        hListGet' (hEq l (label f')) v' l fs
+    (  HListGet' (l :== l') l l' v' fs) =>
+       HListGet l ('( l', v') ': fs) where
+    hListGet l (f@(Field v') `HCons` fs) =
+        hListGet' (hEq l (label f)) l (label f) v' fs
 \end{code}
 
 |HListGet'| has two instances, for the cases |HTrue| and |HFalse|.
 
 \begin{code}
-class HListGet' (b::Bool) v' l fs v | b v' l fs -> v where
-    hListGet':: Sing b -> v' -> Sing l -> HList fs -> v
+class HListGet' (b::Bool) l l' v' fs where
+    hListGet':: Sing b -> Sing l -> Sing l' -> v' -> HList fs -> FromJust (Lookup l ('( l', v') ': fs))
 
 instance
-    HListGet' 'True v l fs v
+    (l :== l') ~ 'True =>
+    HListGet' 'True l l' v' fs
     where
-    hListGet' _ v _ _ = v
+    hListGet' _ _ _ v' _ = v'
 
 instance
-    HListGet l fs v =>
-    HListGet' 'False v' l fs v where
-    hListGet' _ _ l fs = hListGet l fs
+    (
+        (l :== l') ~ 'False,
+        HListGet l fs) =>
+    HListGet' 'False l l' v' fs where
+    hListGet' _ l _ _ fs = hListGet l fs
 \end{code}
 
 \noindent
