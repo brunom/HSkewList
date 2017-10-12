@@ -316,8 +316,22 @@ The class |HListGet| retrieves from a record the value part
 corresponding to a specific label:
 
 \begin{code}
-class HListGet r l v | r l -> v where
-    hListGet :: HList r -> Sing l -> v
+class HListGet l fs v | l fs -> v where
+    hListGet :: Sing l -> HList fs -> v
+
+hListGet2 ::
+    SingI (Map ((:==$$) l) (Map FstSym0 fs)) =>
+    Sing l ->
+    HList fs ->
+    FromJust (Lookup l fs)
+hListGet2 = work sing where
+    work ::
+        Sing (Map ((:==$$) l) (Map FstSym0 fs)) ->
+        Sing l ->
+        HList fs ->
+        FromJust (Lookup l fs)
+    work (SCons STrue  _) l (HCons (Field v) _ ) = v
+    work (SCons SFalse m) l (HCons _ fs) = work m l fs    
 \end{code}
 \noindent
 At the type-level it is statically checked that the record |r| indeed has
@@ -326,7 +340,7 @@ At value-level |hListGet| returns the value of type |v|.
 For example, the following expression returns the string |"last"|:
 
 \begin{code}
-lastList = hListGet rList l7
+lastList = hListGet l7 rList
 \end{code}
 
 Instead of polluting the definitions of type-level functions
@@ -354,27 +368,27 @@ or the search must continue to the next node.
 
 \begin{code}
 instance
-    (  HListGet' (l :== l') v' r' l v) =>
-       HListGet ('( l', v') ': r') l v where
-    hListGet (f'@(Field v') `HCons` r') l =
-        hListGet' (hEq l (label f')) v' r' l
+    (  HListGet' (l :== l') v' l fs v) =>
+       HListGet l ('( l', v') ': fs) v where
+    hListGet l (f'@(Field v') `HCons` fs) =
+        hListGet' (hEq l (label f')) v' l fs
 \end{code}
 
 |HListGet'| has two instances, for the cases |HTrue| and |HFalse|.
 
 \begin{code}
-class HListGet' (b::Bool) v' r' l v | b v' r' l -> v where
-    hListGet':: Sing b -> v' -> HList r' -> Sing l -> v
+class HListGet' (b::Bool) v' l fs v | b v' l fs -> v where
+    hListGet':: Sing b -> v' -> Sing l -> HList fs -> v
 
 instance
-    HListGet' 'True v r' l v
+    HListGet' 'True v l fs v
     where
     hListGet' _ v _ _ = v
 
 instance
-    HListGet r' l v =>
-    HListGet' 'False v' r' l v where
-    hListGet' _ _ r' l = hListGet r' l
+    HListGet l fs v =>
+    HListGet' 'False v' l fs v where
+    hListGet' _ _ l fs = hListGet l fs
 \end{code}
 
 \noindent
