@@ -42,6 +42,7 @@
 {-# LANGUAGE TemplateHaskell  #-}
 {-# LANGUAGE PartialTypeSignatures #-}
 {-# LANGUAGE ConstraintKinds #-}
+{-# LANGUAGE LambdaCase #-}
 {-# OPTIONS_GHC -Wunticked-promoted-constructors #-}
 
 import Data.Array
@@ -804,19 +805,62 @@ In this subsection we present our implementation of extensible records
 using (heterogeneous) skew lists.
 First, we introduce some types to model heterogeneous binary trees:
 
-\begin{code}
-data Tree a
-    = Empty
-    | Node a (Tree a) (Tree a)
-data HTree t where
-    HEmpty :: HTree 'Empty
-    HNode :: Field l v -> HTree t -> HTree t' -> HTree ('Node '(l, v) t t')
-leaf e = Node e Empty Empty
-type Leaf e = !!!Node e !!!Empty !!!Empty
-type  HLeaf  e         =  HTree (Leaf e)
-\end{code}
 and a smart constructor for leaves:
 \begin{code}
+$(promote [d|
+    data Tree a
+        = Empty
+        | Node a (Tree a) (Tree a)
+
+    height :: Tree e -> Nat
+    height Empty = 0
+    height (Node _ _ t) = 1 + height t
+
+    -- searchTree :: Eq l => l -> Tree (l, v) -> Maybe PathTree
+    -- searchTree l Empty = Nothing
+    -- searchTree l (Node (l2, v) t1 t2) = if l == l2 then Just PathRoot else tPlus (searchTree l t1) (searchTree l t2)
+    -- tPlus Nothing Nothing = Nothing
+    -- tPlus Nothing (Just a) = Just $ PathRight a
+    -- tPlus (Just a) _ = Just $ PathLeft a
+
+    -- searchList l [] = Nothing
+    -- searchList l (t : ts) = lPlus (searchTree l t) (searchList l ts)
+    -- lPlus Nothing Nothing = Nothing
+    -- lPlus Nothing (Just a) = Just $ PathTail a
+    -- lPlus (Just a) _ = Just $ PathHead a
+        
+    -- lookupTree :: Tree (l, v) -> PathTree -> v
+    -- lookupTree (Node (l,v) t1 t2) PathRoot = v
+    -- lookupTree (Node (l,v) t1 t2) (PathLeft p) = lookupTree t1 p
+    -- lookupTree (Node (l,v) t1 t2) (PathRight p) = lookupTree t2 p
+    -- lookupList (t : ts) (PathHead p) = lookupTree t p
+    -- lookupList (t : ts) (PathTail p) = lookupList ts p
+        
+    -- -- <|> not already available at the type level
+    -- Just a <|> _ = Just a
+    -- Nothing <|> a = a
+    
+    leaf e = Node e Empty Empty
+
+    -- TODO find out why skew1 doesn't work like skew
+    skew1 :: [e] -> [Tree e]
+    skew1 ts = foldr skew2 [] ts
+
+    skew :: [e] -> [Tree e]
+    skew [] = []
+    skew (f : fs) = skew2 f (skew fs)
+
+    skew2 f [] = [leaf f]
+    skew2 f [a] = [leaf  f, a]
+    skew2 f (a:b:ts) = if (height a == height b) then (Node f a b : ts) else (leaf f:a:b:ts)
+    |])
+
+type Leaf2 e = 'Node e 'Empty 'Empty
+
+data HTree t where
+    HEmpty :: HTree 'Empty
+    HNode :: Field l v -> HTree t1 -> HTree t2 -> HTree ('Node '(l, v) t1 t2) 
+type  HLeaf e         =  HTree (Leaf e)
 hLeaf :: Field l v -> HLeaf '(l, v)
 hLeaf  e         =  HNode e HEmpty HEmpty
 
@@ -824,6 +868,11 @@ data TreeList ts where
     TLNil :: TreeList '[]
     TLCons :: HTree t -> TreeList ts -> TreeList (t !!!: ts)
 infixr 2 `TLCons`
+
+newtype SkewRecord fs = SkewRecord (TreeList (Skew fs))
+
+skewNil :: SkewRecord !!![]
+skewNil = SkewRecord TLNil
 \end{code}
 
 \noindent
@@ -872,10 +921,6 @@ so |HSkewCarry| returns |HTrue|.
 %
 \begin{code}
 $(promote [d|
-    height :: Tree e -> Nat
-    height Empty = 0
-    height (Node _ _ t) = 1 + height t
-
     skewCarry [] = False
     skewCarry [_] = False
     skewCarry (t : t' : _) = height t == height t'
@@ -899,7 +944,17 @@ which resembles the |HCons| constructor.
 class HSkewExtend (l::k) v (r::[Tree (k, Type)]) (r'::[Tree (k, Type)]) | l v r -> r'
     where hSkewExtend :: Field l v -> TreeList r -> TreeList r'
 infixr 2 `hSkewExtend`
+
+hSkewExtend2 :: forall l v (fs::[(k, Type)]) s. (s ~ (Map HeightSym0 (Skew fs)), SingI s) => Field l v -> SkewRecord fs -> SkewRecord (!!!(l, v) !!!: fs)
+hSkewExtend2 f r = SkewRecord $ case r of
+    (SkewRecord TLNil) -> HNode f HEmpty HEmpty `TLCons` TLNil
+    (SkewRecord (a `TLCons` TLNil)) -> HNode f HEmpty HEmpty `TLCons` a `TLCons` TLNil
+    (SkewRecord (fa `TLCons` fb `TLCons` vs)) -> case sing :: Sing s of
+        (ha `SCons` (hb `SCons` _)) -> case ha %:== hb of
+            STrue -> HNode f fa fb `TLCons` vs
+            SFalse -> HNode f HEmpty HEmpty `TLCons` fa `TLCons` fb `TLCons` vs
 \end{code}
+
 |HSkewExtend| looks like |HListGet| shown earlier.
 |HSkewCarry| is now responsible for discriminating
 the current case,
@@ -927,7 +982,7 @@ instance
         l
         v
         r
-        (Leaf '(l, v) ': r) where
+        (Leaf2 '(l, v) ': r) where
     hSkewExtend' _ f r = (hLeaf f) `TLCons` r
 \end{code}
 %
@@ -1191,7 +1246,7 @@ we can find.
 The easy case is when the spine begins with a leaf.
 We just return the tail of the spine list.
 \begin{code}
-instance HSkewTail (Leaf e : ts) ts where
+instance HSkewTail (Leaf2 e : ts) ts where
     hSkewTail (_ `TLCons` ts) = ts
 \end{code}
 

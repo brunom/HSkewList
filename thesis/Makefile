@@ -4,7 +4,7 @@ all: thesis.pdf thesis.exe
 pdf: thesis.pdf
 exe: thesis.exe
 run: thesis.hs
-	run$(GHC) thesis.hs -freverse-errors
+	run$(GHC) thesis.hs
 
 thesis.pdf: thesis.tex thesis.bib
 	latexmk -pdf -quiet thesis.tex
@@ -13,7 +13,7 @@ GHC=ghc-8.2.1
 %GHC=ghc-7.4.2
 
 thesis.exe : thesis.hs
-	$(GHC) --make thesis.hs -o thesis.exe -freverse-errors
+	$(GHC) --make thesis.hs -o thesis.exe
 
 thesis.hs : thesis.lhs paper.lhs configuration.lhs
 	lhs2TeX thesis.lhs -o thesis.hs --newcode
