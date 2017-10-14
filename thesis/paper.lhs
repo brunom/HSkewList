@@ -201,8 +201,9 @@ In this case we are interested in manipulating a value-level value associated wi
 data HMaybe m where
     HNothing :: HMaybe 'Nothing
     HJust :: e -> HMaybe ('Just e)
+instance Show (HMaybe !!!Nothing) where
+    show HNothing = "HNothing"
 instance Show m => Show (HMaybe (!!!Just m)) where
-    ---show HNothing = "HNothing"
     show (HJust a) = "(HJust " ++ show a ++ ")"
 \end{code}
 
@@ -809,19 +810,19 @@ data Tree a
     | Node a (Tree a) (Tree a)
 data HTree t where
     HEmpty :: HTree 'Empty
-    HNode :: e -> HTree t -> HTree t' -> HTree ('Node e t t')
+    HNode :: Field l v -> HTree t -> HTree t' -> HTree ('Node '(l, v) t t')
 leaf e = Node e Empty Empty
 type Leaf e = !!!Node e !!!Empty !!!Empty
 type  HLeaf  e         =  HTree (Leaf e)
 \end{code}
 and a smart constructor for leaves:
 \begin{code}
-hLeaf :: e -> HLeaf e
-hLeaf        e         =  HNode e HEmpty HEmpty
+hLeaf :: Field l v -> HLeaf '(l, v)
+hLeaf  e         =  HNode e HEmpty HEmpty
 
 data TreeList ts where
     TLNil :: TreeList '[]
-    TLCons :: HTree t -> TreeList ts -> TreeList (t ': ts)
+    TLCons :: HTree t -> TreeList ts -> TreeList (t !!!: ts)
 infixr 2 `TLCons`
 \end{code}
 
@@ -895,8 +896,8 @@ we return |HTrue| if the first two trees are of equal size and
 All these pieces allow us to define |HSkewExtend|,
 which resembles the |HCons| constructor.
 \begin{code}
-class HSkewExtend f r r' | f r -> r'
-    where hSkewExtend :: f -> TreeList r -> TreeList r'
+class HSkewExtend (l::k) v (r::[Tree (k, Type)]) (r'::[Tree (k, Type)]) | l v r -> r'
+    where hSkewExtend :: Field l v -> TreeList r -> TreeList r'
 infixr 2 `hSkewExtend`
 \end{code}
 |HSkewExtend| looks like |HListGet| shown earlier.
@@ -907,13 +908,13 @@ while |HListGet| used |HEq| on the two labels.
 
 \begin{code}
 instance
-    (  HSkewExtend' (SkewCarry r)  f r r') =>
-       HSkewExtend     f r r' where
+    (  HSkewExtend' (SkewCarry r)  l v r r') =>
+       HSkewExtend    l v r r' where
     hSkewExtend f r =
         hSkewExtend' (hSkewCarry r) f r
 
-class HSkewExtend' (b::Bool) f r r' | b f r -> r' where
-    hSkewExtend' :: Sing b -> f -> TreeList r -> TreeList r'
+class HSkewExtend' (b::Bool) l v r r' | b l v r -> r' where
+    hSkewExtend' :: Sing b -> Field l v -> TreeList r -> TreeList r'
 \end{code}
 \noindent
 Here |HFalse| means that we should not add up the first two trees of the spine.
@@ -923,9 +924,10 @@ We just use |HLeaf| to insert a new tree at the beginning of the spine.
 instance
     HSkewExtend'
         'False
-        f
+        l
+        v
         r
-        (Leaf f ': r) where
+        (Leaf '(l, v) ': r) where
     hSkewExtend' _ f r = (hLeaf f) `TLCons` r
 \end{code}
 %
@@ -936,9 +938,10 @@ The length of the spine is reduced in one, since we take two elements but only a
 instance
     HSkewExtend'
         'True
-        f
+        l
+        v
         (t ': t' ': r)
-        ('Node f t t' ': r) where
+        ('Node '(l, v) t t' ': r) where
     hSkewExtend' _ f (t `TLCons` t' `TLCons` r) =
         (HNode f t t' `TLCons` r)
 \end{code}
@@ -1010,7 +1013,7 @@ instance
     ,  HSkewGetTree r   l vr
     ,  HSkewGetTree r'  l vr'
     ,  Plus (Plus vf vr) vr'  ~ v) =>
-       HSkewGetTree ('Node (Field l' v') r r') l v where
+       HSkewGetTree ('Node '(l', v') r r') l v where
     hSkewGetTree (HNode f r r') l =
         hSkewGetField f l
             `hPlus2` hSkewGetTree r l
@@ -1060,8 +1063,9 @@ the resulting core code is:
 lastSkewCore = case rSkew of
   t1 `TLCons` _ -> case t1 of
     HNode _ _ t12 -> case t12 of
-      HNode _ _ t121 ->case t121 of
-        HNode e _ _ -> e
+      HNode _ _ t121 -> case t121 of
+        HNode f _ _ -> case f of
+          Field v -> v
 \end{code}
 Thus, getting to |l7| at run time only traverses a (logarithmic length) fraction of the elements,
 as we have seen in Figure~\ref{fig:search-skew}.
@@ -1081,8 +1085,8 @@ class HSkewUpdate l e r r' | l e r -> r' where
     hSkewUpdate :: Sing l -> e -> TreeList r -> TreeList r'
 class HSkewUpdateTree l e r r' | l e r -> r' where
     hSkewUpdateTree :: Sing l -> e -> HTree r -> HTree r'
-class HSkewUpdateField l e r r' | l e r -> r' where
-    hSkewUpdateField :: Sing l -> e -> r -> r'
+class HSkewUpdateField l e l' v' l'' v'' | l e l' v' -> l'' v'' where
+    hSkewUpdateField :: Sing l -> e -> Field l' v' -> Field l'' v''
 \end{code}
 %
 We use the lookup operation |HSkewGet| to discriminate at type-level
@@ -1099,8 +1103,8 @@ class HSkewUpdate' m l e r r' | m l e r -> r' where
     hSkewUpdate' :: HMaybe m -> Sing l -> e -> TreeList r -> TreeList r'
 class HSkewUpdateTree' m l e r r' | m l e r -> r' where
     hSkewUpdateTree' :: HMaybe m -> Sing l -> e -> HTree r -> HTree r'
-class HSkewUpdateField' m l e r r' | m l e r -> r' where
-    hSkewUpdateField' :: HMaybe m -> Sing l -> e -> r -> r'
+class HSkewUpdateField' m l e l' v' l'' v'' | m l e l' v' -> l'' v'' where
+    hSkewUpdateField' :: HMaybe m -> Sing l -> e -> Field l' v' -> Field l'' v''
 \end{code}
 %
 In case the label is not present we have nothing to do than just returning the
@@ -1131,11 +1135,11 @@ On a |HNode|, |hSkewUpdate| is recursively called on
 the left and right sub-trees as well as on the element of the node.
 \begin{code}
 instance
-    (  HSkewUpdateField l e e' e''
+    (  HSkewUpdateField l e l' v' l'' v''
     ,  HSkewUpdateTree l e tl tl'
     ,  HSkewUpdateTree l e tr tr') =>
-    HSkewUpdateTree' ('Just v) l e  ('Node e' tl tr)
-                                ('Node e'' tl' tr')
+    HSkewUpdateTree' ('Just v) l e  ('Node '(l', v') tl tr)
+                                ('Node '(l'', v'') tl' tr')
     where
     hSkewUpdateTree' _ l e (HNode e' tl tr) =
         HNode  (hSkewUpdateField l e e')
@@ -1148,9 +1152,9 @@ are searching for (because we are considering the case |HJust v|), we simply ret
 %
 \begin{code}
 instance
-    HSkewUpdateField' ('Just v) l e (Field l v) e
+    HSkewUpdateField' ('Just v) l e l v l e
      where
-       hSkewUpdateField' _ l e e' = e
+       hSkewUpdateField' _ l e e' = Field e
 \end{code}
 
 At run time, this implementation of |hSkewUpdate| only
