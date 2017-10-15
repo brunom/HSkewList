@@ -365,33 +365,23 @@ the implementation of HList is based on type classes and functional dependencies
 Either the label of the current field matches |l|,
 or the search must continue to the next node.
 
-\begin{code}
-class HListGet l fs where
-    hListGet :: Sing l -> HList fs -> FromJust (Lookup l fs)
-instance
-    (  HListGet' (l :== l') l l' v' fs) =>
-       HListGet l ('( l', v') ': fs) where
-    hListGet l (f@(Field v') `HCons` fs) =
-        hListGet' l (label f) v' fs
-\end{code}
-
 |HListGet'| has two instances, for the cases |HTrue| and |HFalse|.
 
 \begin{code}
-class b ~ (l :== l') => HListGet' (b::Bool) l l' v' fs where
-    hListGet':: Sing l -> Sing l' -> v' -> HList fs -> FromJust (Lookup l ('( l', v') ': fs))
+class b ~ (l :== l') => HListGet (b::Bool) l l' v' fs' where
+    hListGet :: fs ~ ('(l', v') ': fs') => Sing l -> HList fs -> FromJust (Lookup l fs)
 
 instance
     'True ~ (l :== l') =>
-    HListGet' 'True l l' v' fs
+    HListGet 'True l l' v' fs'
     where
-    hListGet' _ _ v' _ = v'
+    hListGet l (Field v' `HCons` fs') = v'
 
 instance
-    (HListGet l fs
-    ,'False ~ (l :== l')) =>
-    HListGet' 'False l l' v' fs where
-    hListGet' l _ _ fs = hListGet l fs
+    ('False ~ (l :== l')
+    ,HListGet (l :== l'') l l'' v'' fs'') =>
+    HListGet 'False l l' v' (!!!(l'', v'') !!!: fs'') where
+    hListGet l (f' `HCons` fs') = hListGet l fs'
 \end{code}
 
 \noindent
