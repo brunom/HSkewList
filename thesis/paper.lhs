@@ -807,38 +807,42 @@ First, we introduce some types to model heterogeneous binary trees:
 
 and a smart constructor for leaves:
 \begin{code}
-$(promote [d|
+$(singletons [d|
     data Tree a
         = Empty
         | Node a (Tree a) (Tree a)
+    data PathList = PathTail PathList | PathHead PathTree
+    data PathTree = PathRoot | PathLeft PathTree | PathRight PathTree
+    |])
 
+$(promote [d|
     height :: Tree e -> Nat
     height Empty = 0
     height (Node _ _ t) = 1 + height t
 
-    -- searchTree :: Eq l => l -> Tree (l, v) -> Maybe PathTree
-    -- searchTree l Empty = Nothing
-    -- searchTree l (Node (l2, v) t1 t2) = if l == l2 then Just PathRoot else tPlus (searchTree l t1) (searchTree l t2)
-    -- tPlus Nothing Nothing = Nothing
-    -- tPlus Nothing (Just a) = Just $ PathRight a
-    -- tPlus (Just a) _ = Just $ PathLeft a
+    searchTree :: Eq l => l -> Tree (l, v) -> Maybe PathTree
+    searchTree l Empty = Nothing
+    searchTree l (Node (l2, v) t1 t2) = if l == l2 then Just PathRoot else tPlus (searchTree l t1) (searchTree l t2)
+    tPlus Nothing Nothing = Nothing
+    tPlus Nothing (Just a) = Just $ PathRight a
+    tPlus (Just a) _ = Just $ PathLeft a
 
-    -- searchList l [] = Nothing
-    -- searchList l (t : ts) = lPlus (searchTree l t) (searchList l ts)
-    -- lPlus Nothing Nothing = Nothing
-    -- lPlus Nothing (Just a) = Just $ PathTail a
-    -- lPlus (Just a) _ = Just $ PathHead a
+    searchList l [] = Nothing
+    searchList l (t : ts) = lPlus (searchTree l t) (searchList l ts)
+    lPlus Nothing Nothing = Nothing
+    lPlus Nothing (Just a) = Just $ PathTail a
+    lPlus (Just a) _ = Just $ PathHead a
         
-    -- lookupTree :: Tree (l, v) -> PathTree -> v
-    -- lookupTree (Node (l,v) t1 t2) PathRoot = v
-    -- lookupTree (Node (l,v) t1 t2) (PathLeft p) = lookupTree t1 p
-    -- lookupTree (Node (l,v) t1 t2) (PathRight p) = lookupTree t2 p
-    -- lookupList (t : ts) (PathHead p) = lookupTree t p
-    -- lookupList (t : ts) (PathTail p) = lookupList ts p
+    lookupTree :: Tree (l, v) -> PathTree -> v
+    lookupTree (Node (l,v) t1 t2) PathRoot = v
+    lookupTree (Node (l,v) t1 t2) (PathLeft p) = lookupTree t1 p
+    lookupTree (Node (l,v) t1 t2) (PathRight p) = lookupTree t2 p
+    lookupList (t : ts) (PathHead p) = lookupTree t p
+    lookupList (t : ts) (PathTail p) = lookupList ts p
         
-    -- -- <|> not already available at the type level
-    -- Just a <|> _ = Just a
-    -- Nothing <|> a = a
+    -- <|> not already available at the type level
+    Just a <|> _ = Just a
+    Nothing <|> a = a
     
     leaf e = Node e Empty Empty
 
@@ -871,8 +875,8 @@ infixr 2 `TLCons`
 
 newtype SkewRecord fs = SkewRecord (TreeList (Skew fs))
 
-skewNil :: SkewRecord !!![]
-skewNil = SkewRecord TLNil
+emptySkewRecord :: SkewRecord !!![]
+emptySkewRecord = SkewRecord TLNil
 \end{code}
 
 \noindent
@@ -898,10 +902,6 @@ four =
 \subsubsection{Construction}
 
 We define a smart constructor |emptySkewRecord| for empty skew lists, i.e. an empty list of trees.
-
-\begin{code}
-emptySkewRecord = TLNil
-\end{code}
 
 %\noindent
 |HHeight| returns the height of a tree.
@@ -941,18 +941,20 @@ we return |HTrue| if the first two trees are of equal size and
 All these pieces allow us to define |HSkewExtend|,
 which resembles the |HCons| constructor.
 \begin{code}
-class HSkewExtend (l::k) v (r::[Tree (k, Type)]) (r'::[Tree (k, Type)]) | l v r -> r'
-    where hSkewExtend :: Field l v -> TreeList r -> TreeList r'
+
+hSkewExtend :: HSkewExtend' (Skew fs) => Field l v -> SkewRecord fs -> SkewRecord (!!!(l, v) !!!: fs)
+hSkewExtend f (SkewRecord ts) = SkewRecord $ hSkewExtend' f ts
 infixr 2 `hSkewExtend`
 
 hSkewExtend2 :: forall l v (fs::[(k, Type)]) s. (s ~ (Map HeightSym0 (Skew fs)), SingI s) => Field l v -> SkewRecord fs -> SkewRecord (!!!(l, v) !!!: fs)
 hSkewExtend2 f r = SkewRecord $ case r of
-    (SkewRecord TLNil) -> HNode f HEmpty HEmpty `TLCons` TLNil
-    (SkewRecord (a `TLCons` TLNil)) -> HNode f HEmpty HEmpty `TLCons` a `TLCons` TLNil
-    (SkewRecord (fa `TLCons` fb `TLCons` vs)) -> case sing :: Sing s of
+    (SkewRecord TLNil) -> hLeaf f `TLCons` TLNil
+    (SkewRecord (a `TLCons` TLNil)) -> hLeaf f `TLCons` a `TLCons` TLNil
+    (SkewRecord (ta `TLCons` tb `TLCons` ts)) -> case sing :: Sing s of
         (ha `SCons` (hb `SCons` _)) -> case ha %:== hb of
-            STrue -> HNode f fa fb `TLCons` vs
-            SFalse -> HNode f HEmpty HEmpty `TLCons` fa `TLCons` fb `TLCons` vs
+            STrue -> HNode f ta tb `TLCons` ts
+            SFalse -> hLeaf f `TLCons` ta `TLCons` tb `TLCons` ts
+infixr 2 `hSkewExtend2`
 \end{code}
 
 |HSkewExtend| looks like |HListGet| shown earlier.
@@ -962,44 +964,37 @@ while |HListGet| used |HEq| on the two labels.
 %A smart test type-function saves on repetition.
 
 \begin{code}
+class HSkewExtend' ts where
+    hSkewExtend' :: Field l v -> TreeList ts -> TreeList (Skew2 '(l, v) ts)
 instance
-    (  HSkewExtend' (SkewCarry r)  l v r r') =>
-       HSkewExtend    l v r r' where
-    hSkewExtend f r =
-        hSkewExtend' (hSkewCarry r) f r
+       HSkewExtend' '[] where
+    hSkewExtend' f TLNil = hLeaf f `TLCons` TLNil
+instance
+       HSkewExtend' '[f] where
+    hSkewExtend' f ts = hLeaf f `TLCons` ts
+instance
+    (
+        (Height ta :== Height tb) ~ b,
+        HSkewExtend'' b ta tb) =>
+        HSkewExtend' (ta ': tb ': ts) where
+    hSkewExtend' f ts = hSkewExtend'' (undefined :: Proxy b) f ts
 
-class HSkewExtend' (b::Bool) l v r r' | b l v r -> r' where
-    hSkewExtend' :: Sing b -> Field l v -> TreeList r -> TreeList r'
+class HSkewExtend'' (b::Bool) ta tb where
+    hSkewExtend'' :: ts ~ (ta ': tb ': ts') => Proxy b -> Field l v -> TreeList ts -> TreeList (Skew2 !!!(l, v) ts)
+instance (Height ta :== Height tb) ~ !!!True => HSkewExtend'' !!!True ta tb where
+    hSkewExtend'' _ f (ta `TLCons` tb `TLCons` ts) = HNode f ta tb `TLCons` ts
+instance (Height ta :== Height tb) ~ !!!False => HSkewExtend'' !!!False ta tb where
+    hSkewExtend'' _ f (ta `TLCons` tb `TLCons` ts) = hLeaf f `TLCons` ta `TLCons` tb `TLCons` ts
 \end{code}
 \noindent
 Here |HFalse| means that we should not add up the first two trees of the spine.
 Either the size of the two leading trees are different, or the spine is empty or a singleton.
 We just use |HLeaf| to insert a new tree at the beginning of the spine.
-\begin{code}
-instance
-    HSkewExtend'
-        'False
-        l
-        v
-        r
-        (Leaf2 '(l, v) ': r) where
-    hSkewExtend' _ f r = (hLeaf f) `TLCons` r
-\end{code}
+
 %
 When |HSkewCarry| returns |HTrue|, however, we build a new tree reusing the two trees that were at the start of the spine.
 The length of the spine is reduced in one, since we take two elements but only add one.
 %
-\begin{code}
-instance
-    HSkewExtend'
-        'True
-        l
-        v
-        (t ': t' ': r)
-        ('Node '(l, v) t t' ': r) where
-    hSkewExtend' _ f (t `TLCons` t' `TLCons` r) =
-        (HNode f t t' `TLCons` r)
-\end{code}
 
 \subsubsection{Lookup}
 
@@ -1010,11 +1005,27 @@ but follows only the right one at run time.
 
 \begin{code}
 class HSkewGet r l v | r l -> v where
-    hSkewGet :: TreeList r -> Sing l -> HMaybe v
+    hSkewGet :: SkewRecord r -> Sing l -> HMaybe v
 class HSkewGetTree r l v | r l -> v where
     hSkewGetTree :: HTree r -> Sing l -> HMaybe v
 class HSkewGetField l' v' l v | l' v' l -> v where
     hSkewGetField :: Field l' v' -> Sing l -> HMaybe v
+
+hSkewGet2 ::
+    forall s fs l.
+    (!!!Just s ~ (SearchList l (Skew fs))
+    ,SingI s) =>
+    Sing l ->
+    SkewRecord fs ->
+    LookupList (Skew fs) s
+hSkewGet2 l (SkewRecord ts) = walkList (sing :: Sing s) ts where
+    walkList :: Sing (p :: PathList) -> TreeList ts -> LookupList ts p
+    walkList (SPathTail p) (t `TLCons` ts) = walkList p ts
+    walkList (SPathHead p) (t `TLCons` ts) = walkTree p t
+    walkTree :: Sing (p :: PathTree) -> HTree t -> LookupTree t p
+    walkTree SPathRoot (HNode (Field v) left right) = v
+    walkTree (SPathLeft p) (HNode v left right) = walkTree p left
+    walkTree (SPathRight p) (HNode v left right) = walkTree p right
 \end{code}
 Deciding on the path to the desired field
 is now more involved.
@@ -1042,15 +1053,15 @@ A recursive call is made for each sub-case, and the results are combined with |H
 If the field is found in the current tree,
 |HPlus| returns it, otherwise, it returns what the search down the spine did.
 %
-\begin{code}
-instance
-    (  HSkewGetTree r   l vr
-    ,  HSkewGet r'  l vr'
-    ,  Plus vr vr' ~ v) =>
-       HSkewGet (r ': r') l v where
-    hSkewGet (r `TLCons` r') l =
-        hSkewGetTree r l `hPlus2` hSkewGet r' l
-\end{code}
+-- \begin{code}
+-- instance
+    -- (  HSkewGetTree r   l vr
+    -- ,  HSkewGet r'  l vr'
+    -- ,  Plus vr vr' ~ v) =>
+       -- HSkewGet (r ': r') l v where
+    -- hSkewGet (SkewRecord (r `TLCons` r')) l =
+        -- hSkewGetTree r l `hPlus2` hSkewGet r' l
+-- \end{code}
 %
 Observe that when doing |hSkewGet r l `hPlus` hSkewGet r' l| if the label is not present in |r| then
 the type system chooses the second instance of |HPlus|  (|HPlus HNothing b b|).
@@ -1062,18 +1073,18 @@ Here three recursive calls are made,
 for the current field, the left tree, and the right tree.
 Thus two |HPlus| calls are needed to combine the result.
 %
-\begin{code}
-instance
-    (  HSkewGetField l' v'   l vf
-    ,  HSkewGetTree r   l vr
-    ,  HSkewGetTree r'  l vr'
-    ,  Plus (Plus vf vr) vr'  ~ v) =>
-       HSkewGetTree ('Node '(l', v') r r') l v where
-    hSkewGetTree (HNode f r r') l =
-        hSkewGetField f l
-            `hPlus2` hSkewGetTree r l
-               `hPlus2` hSkewGetTree r' l
-\end{code}
+-- \begin{code}
+-- instance
+    -- (  HSkewGetField l' v'   l vf
+    -- ,  HSkewGetTree r   l vr
+    -- ,  HSkewGetTree r'  l vr'
+    -- ,  Plus (Plus vf vr) vr'  ~ v) =>
+       -- HSkewGetTree ('Node '(l', v') r r') l v where
+    -- hSkewGetTree (HNode f r r') l =
+        -- hSkewGetField f l
+            -- `hPlus2` hSkewGetTree r l
+               -- `hPlus2` hSkewGetTree r' l
+-- \end{code}
 %
 Finally, the |Field| case, when a field is found, is the case
 %\alberto{cual, la que sigue o la anterior? no queda bien arrancar la orcion con And.....}
@@ -1110,17 +1121,18 @@ rSkew =
   (l6  .=.  [4,5]    )  `hSkewExtend`
   (l7  .=.  "last"   )  `hSkewExtend`
   emptySkewRecord
-lastSkew = hSkewGet rSkew l7
+lastSkew = hSkewGet2 l7 rSkew
 \end{code}
 the resulting core code is:
 
 \begin{code}
 lastSkewCore = case rSkew of
-  t1 `TLCons` _ -> case t1 of
-    HNode _ _ t12 -> case t12 of
-      HNode _ _ t121 -> case t121 of
-        HNode f _ _ -> case f of
-          Field v -> v
+    SkewRecord ts -> case ts of
+      t1 `TLCons` _ -> case t1 of
+        HNode _ _ t12 -> case t12 of
+          HNode _ _ t121 -> case t121 of
+            HNode f _ _ -> case f of
+              Field v -> v
 \end{code}
 Thus, getting to |l7| at run time only traverses a (logarithmic length) fraction of the elements,
 as we have seen in Figure~\ref{fig:search-skew}.
@@ -1148,69 +1160,69 @@ We use the lookup operation |HSkewGet| to discriminate at type-level
 whether the field with the searched label is present or not in the skew list.
 %
 \begin{code}
-instance  (  HSkewGet r l m
-          ,  HSkewUpdate' m l e r r') =>
-          HSkewUpdate l e r r'  where
-    hSkewUpdate l e r =
-       hSkewUpdate' (hSkewGet r l) l e r
+-- instance  (  HSkewGet r l m
+          -- ,  HSkewUpdate' m l e r r') =>
+          -- HSkewUpdate l e r r'  where
+    -- hSkewUpdate l e r =
+       -- hSkewUpdate' (hSkewGet r l) l e r
 
-class HSkewUpdate' m l e r r' | m l e r -> r' where
-    hSkewUpdate' :: HMaybe m -> Sing l -> e -> TreeList r -> TreeList r'
-class HSkewUpdateTree' m l e r r' | m l e r -> r' where
-    hSkewUpdateTree' :: HMaybe m -> Sing l -> e -> HTree r -> HTree r'
-class HSkewUpdateField' m l e l' v' l'' v'' | m l e l' v' -> l'' v'' where
-    hSkewUpdateField' :: HMaybe m -> Sing l -> e -> Field l' v' -> Field l'' v''
+-- class HSkewUpdate' m l e r r' | m l e r -> r' where
+    -- hSkewUpdate' :: HMaybe m -> Sing l -> e -> TreeList r -> TreeList r'
+-- class HSkewUpdateTree' m l e r r' | m l e r -> r' where
+    -- hSkewUpdateTree' :: HMaybe m -> Sing l -> e -> HTree r -> HTree r'
+-- class HSkewUpdateField' m l e l' v' l'' v'' | m l e l' v' -> l'' v'' where
+    -- hSkewUpdateField' :: HMaybe m -> Sing l -> e -> Field l' v' -> Field l'' v''
 \end{code}
 %
 In case the label is not present we have nothing to do than just returning the
 structure unchanged.
 %
 \begin{code}
-instance HSkewUpdate' 'Nothing l e r r  where
-    hSkewUpdate' _ l e r = r
+-- instance HSkewUpdate' 'Nothing l e r r  where
+    -- hSkewUpdate' _ l e r = r
 \end{code}
 %
 In the other cases (i.e. when lookup results in |HJust v|) we call |hSkewUpdate| recursively on all subparts in order to apply the update when necessary.
 Because of the previous instance (when lookup returns |HNothing|), at run time recursion will not enter in those cases where the label is not present.
 We start the process in the spine.
 %
-\begin{code}
-instance
-    (  HSkewUpdateTree l e t t'
-    ,  HSkewUpdate l e ts ts') =>
-    HSkewUpdate' ('Just v) l e  (t ': ts)
-                                (t' ': ts')
-    where
-    hSkewUpdate' _ l e (t `TLCons` ts) =
-        hSkewUpdateTree l e t `TLCons`
-               hSkewUpdate l e ts
-\end{code}
+-- \begin{code}
+-- instance
+    -- (  HSkewUpdateTree l e t t'
+    -- ,  HSkewUpdate l e ts ts') =>
+    -- HSkewUpdate' ('Just v) l e  (t ': ts)
+                                -- (t' ': ts')
+    -- where
+    -- hSkewUpdate' _ l e (t `TLCons` ts) =
+        -- hSkewUpdateTree l e t `TLCons`
+               -- hSkewUpdate l e ts
+-- \end{code}
 %
 On a |HNode|, |hSkewUpdate| is recursively called on
 the left and right sub-trees as well as on the element of the node.
-\begin{code}
-instance
-    (  HSkewUpdateField l e l' v' l'' v''
-    ,  HSkewUpdateTree l e tl tl'
-    ,  HSkewUpdateTree l e tr tr') =>
-    HSkewUpdateTree' ('Just v) l e  ('Node '(l', v') tl tr)
-                                ('Node '(l'', v'') tl' tr')
-    where
-    hSkewUpdateTree' _ l e (HNode e' tl tr) =
-        HNode  (hSkewUpdateField l e e')
-               (hSkewUpdateTree l e tl)
-               (hSkewUpdateTree l e tr)
-\end{code}
+-- \begin{code}
+-- instance
+    -- (  HSkewUpdateField l e l' v' l'' v''
+    -- ,  HSkewUpdateTree l e tl tl'
+    -- ,  HSkewUpdateTree l e tr tr') =>
+    -- HSkewUpdateTree' ('Just v) l e  ('Node '(l', v') tl tr)
+                                -- ('Node '(l'', v'') tl' tr')
+    -- where
+    -- hSkewUpdateTree' _ l e (HNode e' tl tr) =
+        -- HNode  (hSkewUpdateField l e e')
+               -- (hSkewUpdateTree l e tl)
+               -- (hSkewUpdateTree l e tr)
+-- \end{code}
 %
 Finally, when we arrive to a |Field| and we know the label is the one we
 are searching for (because we are considering the case |HJust v|), we simply return the updated field.
 %
-\begin{code}
-instance
-    HSkewUpdateField' ('Just v) l e l v l e
-     where
-       hSkewUpdateField' _ l e e' = Field e
-\end{code}
+-- \begin{code}
+-- instance
+    -- HSkewUpdateField' ('Just v) l e l v l e
+     -- where
+       -- hSkewUpdateField' _ l e e' = Field e
+-- \end{code}
 
 At run time, this implementation of |hSkewUpdate| only
 rebuilds the path to the field to update,
