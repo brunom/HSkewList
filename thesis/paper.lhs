@@ -368,18 +368,16 @@ or the search must continue to the next node.
 |HListGet'| has two instances, for the cases |HTrue| and |HFalse|.
 
 \begin{code}
-class b ~ (l :== l') => HListGet (b::Bool) l l' v' fs' where
-    hListGet :: fs ~ ('(l', v') ': fs') => Sing l -> HList fs -> FromJust (Lookup l fs)
+class HListGet (b::Bool) l l' v' fs' where
+    hListGet :: (b ~ (l :== l'), fs ~ ('(l', v') ': fs')) => Sing l -> HList fs -> FromJust (Lookup l fs)
 
 instance
-    'True ~ (l :== l') =>
     HListGet 'True l l' v' fs'
     where
     hListGet l (Field v' `HCons` fs') = v'
 
 instance
-    ('False ~ (l :== l')
-    ,HListGet (l :== l'') l l'' v'' fs'') =>
+    (HListGet (l :== l'') l l'' v'' fs'') =>
     HListGet 'False l l' v' (!!!(l'', v'') !!!: fs'') where
     hListGet l (f' `HCons` fs') = hListGet l fs'
 \end{code}
