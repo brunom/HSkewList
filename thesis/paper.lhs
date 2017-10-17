@@ -318,19 +318,19 @@ The class |HListGet| retrieves from a record the value part
 corresponding to a specific label:
 
 \begin{code}
-hListGet2 ::
+hListGetSing ::
     SingI (Map ((:==$$) l) (Map FstSym0 fs)) =>
     Sing l ->
     HList fs ->
     FromJust (Lookup l fs)
-hListGet2 = work sing where
-    work ::
-        Sing (Map ((:==$$) l) (Map FstSym0 fs)) ->
-        Sing l ->
-        HList fs ->
-        FromJust (Lookup l fs)
-    work (SCons STrue  _) l (HCons (Field v) _ ) = v
-    work (SCons SFalse m) l (HCons _ fs) = work m l fs    
+hListGetSing = hListGetSing' sing
+hListGetSing' ::
+    Sing (Map ((:==$$) l) (Map FstSym0 fs)) ->
+    Sing l ->
+    HList fs ->
+    FromJust (Lookup l fs)
+hListGetSing' (SCons STrue  _) l (HCons (Field v) _ ) = v
+hListGetSing' (SCons SFalse m) l (HCons _ fs) = hListGetSing' m l fs    
 \end{code}
 \noindent
 At the type-level it is statically checked that the record |r| indeed has
@@ -835,15 +835,15 @@ $(promote [d|
 
     -- TODO find out why skew1 doesn't work like skew
     skew1 :: [e] -> [Tree e]
-    skew1 ts = foldr skew2 [] ts
+    skew1 ts = foldr skew' [] ts
 
     skew :: [e] -> [Tree e]
     skew [] = []
-    skew (f : fs) = skew2 f (skew fs)
+    skew (f : fs) = skew' f (skew fs)
 
-    skew2 f [] = [leaf f]
-    skew2 f [a] = [leaf  f, a]
-    skew2 f (a:b:ts) = if (height a == height b) then (Node f a b : ts) else (leaf f:a:b:ts)
+    skew' f [] = [leaf f]
+    skew' f [a] = [leaf  f, a]
+    skew' f (a:b:ts) = if (height a == height b) then (Node f a b : ts) else (leaf f:a:b:ts)
     |])
 
 type Leaf2 e = 'Node e 'Empty 'Empty
@@ -933,15 +933,15 @@ hSkewExtend :: HSkewExtend' (Skew fs) => Field l v -> SkewRecord fs -> SkewRecor
 hSkewExtend f (SkewRecord ts) = SkewRecord $ hSkewExtend' f ts
 infixr 2 `hSkewExtend`
 
-hSkewExtend2 :: forall l v (fs::[(k, Type)]) s. (s ~ (Map HeightSym0 (Skew fs)), SingI s) => Field l v -> SkewRecord fs -> SkewRecord (!!!(l, v) !!!: fs)
-hSkewExtend2 f r = SkewRecord $ case r of
+hSkewExtendSing :: forall l v (fs::[(k, Type)]) s. (s ~ (Map HeightSym0 (Skew fs)), SingI s) => Field l v -> SkewRecord fs -> SkewRecord (!!!(l, v) !!!: fs)
+hSkewExtendSing f r = SkewRecord $ case r of
     (SkewRecord TLNil) -> hLeaf f `TLCons` TLNil
     (SkewRecord (a `TLCons` TLNil)) -> hLeaf f `TLCons` a `TLCons` TLNil
     (SkewRecord (ta `TLCons` tb `TLCons` ts)) -> case sing :: Sing s of
         (ha `SCons` (hb `SCons` _)) -> case ha %:== hb of
             STrue -> HNode f ta tb `TLCons` ts
             SFalse -> hLeaf f `TLCons` ta `TLCons` tb `TLCons` ts
-infixr 2 `hSkewExtend2`
+infixr 2 `hSkewExtendSing`
 \end{code}
 
 |HSkewExtend| looks like |HListGet| shown earlier.
@@ -952,22 +952,21 @@ while |HListGet| used |HEq| on the two labels.
 
 \begin{code}
 class HSkewExtend' ts where
-    hSkewExtend' :: Field l v -> TreeList ts -> TreeList (Skew2 '(l, v) ts)
+    hSkewExtend' :: Field l v -> TreeList ts -> TreeList (Skew' '(l, v) ts)
 instance
-       HSkewExtend' '[] where
+    HSkewExtend' '[] where
     hSkewExtend' f TLNil = hLeaf f `TLCons` TLNil
 instance
-       HSkewExtend' '[f] where
+    HSkewExtend' '[f] where
     hSkewExtend' f ts = hLeaf f `TLCons` ts
 instance
-    (
-        (Height ta :== Height tb) ~ b,
-        HSkewExtend'' b ta tb) =>
-        HSkewExtend' (ta ': tb ': ts) where
+    ((Height ta :== Height tb) ~ b
+    ,HSkewExtend'' b ta tb) =>
+    HSkewExtend' (ta ': tb ': ts) where
     hSkewExtend' f ts = hSkewExtend'' (undefined :: Proxy b) f ts
 
 class HSkewExtend'' (b::Bool) ta tb where
-    hSkewExtend'' :: ts ~ (ta ': tb ': ts') => Proxy b -> Field l v -> TreeList ts -> TreeList (Skew2 !!!(l, v) ts)
+    hSkewExtend'' :: ts ~ (ta ': tb ': ts') => Proxy b -> Field l v -> TreeList ts -> TreeList (Skew' !!!(l, v) ts)
 instance (Height ta :== Height tb) ~ !!!True => HSkewExtend'' !!!True ta tb where
     hSkewExtend'' _ f (ta `TLCons` tb `TLCons` ts) = HNode f ta tb `TLCons` ts
 instance (Height ta :== Height tb) ~ !!!False => HSkewExtend'' !!!False ta tb where
