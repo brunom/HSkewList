@@ -318,6 +318,12 @@ The class |HListGet| retrieves from a record the value part
 corresponding to a specific label:
 
 \begin{code}
+-- data PathList = PathTail PathList | PathHead PathTree
+
+-- data ListPath
+    -- = 
+-- makePath :: l -> [(l, v)] -> Maybe ListPath
+-- makePath = undefined
 hListGetSing ::
     SingI (Map ((:==$$) l) (Map FstSym0 fs)) =>
     Sing l ->
@@ -798,8 +804,8 @@ $(singletons [d|
     data Tree a
         = Empty
         | Node a (Tree a) (Tree a)
-    data PathList = PathTail PathList | PathHead PathTree
-    data PathTree = PathRoot | PathLeft PathTree | PathRight PathTree
+    data PathSpine = PathSpineTail PathSpine | PathSpineHead PathTree
+    data PathTree = PathTreeRoot | PathTreeLeft PathTree | PathTreeRight PathTree
     |])
 
 $(promote [d|
@@ -809,23 +815,23 @@ $(promote [d|
 
     searchTree :: Eq l => l -> Tree (l, v) -> Maybe PathTree
     searchTree l Empty = Nothing
-    searchTree l (Node (l2, v) t1 t2) = if l == l2 then Just PathRoot else tPlus (searchTree l t1) (searchTree l t2)
-    tPlus Nothing Nothing = Nothing
-    tPlus Nothing (Just a) = Just $ PathRight a
-    tPlus (Just a) _ = Just $ PathLeft a
+    searchTree l (Node (l2, v) t1 t2) = if l == l2 then Just PathTreeRoot else treePlus (searchTree l t1) (searchTree l t2)
+    treePlus Nothing Nothing = Nothing
+    treePlus Nothing (Just a) = Just $ PathTreeRight a
+    treePlus (Just a) _ = Just $ PathTreeLeft a
 
-    searchList l [] = Nothing
-    searchList l (t : ts) = lPlus (searchTree l t) (searchList l ts)
-    lPlus Nothing Nothing = Nothing
-    lPlus Nothing (Just a) = Just $ PathTail a
-    lPlus (Just a) _ = Just $ PathHead a
+    searchSpine l [] = Nothing
+    searchSpine l (t : ts) = spinePlus (searchTree l t) (searchSpine l ts)
+    spinePlus Nothing Nothing = Nothing
+    spinePlus Nothing (Just a) = Just $ PathSpineTail a
+    spinePlus (Just a) _ = Just $ PathSpineHead a
         
     lookupTree :: Tree (l, v) -> PathTree -> v
-    lookupTree (Node (l,v) t1 t2) PathRoot = v
-    lookupTree (Node (l,v) t1 t2) (PathLeft p) = lookupTree t1 p
-    lookupTree (Node (l,v) t1 t2) (PathRight p) = lookupTree t2 p
-    lookupList (t : ts) (PathHead p) = lookupTree t p
-    lookupList (t : ts) (PathTail p) = lookupList ts p
+    lookupTree (Node (l,v) t1 t2) PathTreeRoot = v
+    lookupTree (Node (l,v) t1 t2) (PathTreeLeft p) = lookupTree t1 p
+    lookupTree (Node (l,v) t1 t2) (PathTreeRight p) = lookupTree t2 p
+    lookupSpine (t : ts) (PathSpineHead p) = lookupTree t p
+    lookupSpine (t : ts) (PathSpineTail p) = lookupSpine ts p
         
     -- <|> not already available at the type level
     Just a <|> _ = Just a
@@ -855,15 +861,15 @@ type  HLeaf e         =  HTree (Leaf e)
 hLeaf :: Field l v -> HLeaf '(l, v)
 hLeaf  e         =  HNode e HEmpty HEmpty
 
-data TreeList ts where
-    TLNil :: TreeList '[]
-    TLCons :: HTree t -> TreeList ts -> TreeList (t !!!: ts)
-infixr 2 `TLCons`
+data Spine ts where
+    SpineNil :: Spine '[]
+    SpineCons :: HTree t -> Spine ts -> Spine (t !!!: ts)
+infixr 2 `SpineCons`
 
-newtype SkewRecord fs = SkewRecord (TreeList (Skew fs))
+newtype SkewRecord fs = SkewRecord (Spine (Skew fs))
 
 emptySkewRecord :: SkewRecord !!![]
-emptySkewRecord = SkewRecord TLNil
+emptySkewRecord = SkewRecord SpineNil
 \end{code}
 
 \noindent
@@ -877,11 +883,11 @@ The following declarations define a skew list with the elements of the fourth st
 
 \begin{code}
 four =
-    hLeaf  (l4  .=.  'c') `TLCons`
+    hLeaf  (l4  .=.  'c') `SpineCons`
     HNode  (l5  .=.  Nothing)
         (hLeaf (l6  .=.  [4,5]))
-        (hLeaf (l7  .=.  "last")) `TLCons`
-    TLNil
+        (hLeaf (l7  .=.  "last")) `SpineCons`
+    SpineNil
 \end{code}
 
 %% $ fix emacs color highlighting
@@ -914,7 +920,7 @@ $(promote [d|
     |])
 
 
-hSkewCarry :: TreeList r -> Sing (SkewCarry r)
+hSkewCarry :: Spine r -> Sing (SkewCarry r)
 hSkewCarry = undefined
 \end{code}
 %
@@ -935,12 +941,12 @@ infixr 2 `hSkewExtend`
 
 hSkewExtendSing :: forall l v (fs::[(k, Type)]) s. (s ~ (Map HeightSym0 (Skew fs)), SingI s) => Field l v -> SkewRecord fs -> SkewRecord (!!!(l, v) !!!: fs)
 hSkewExtendSing f r = SkewRecord $ case r of
-    (SkewRecord TLNil) -> hLeaf f `TLCons` TLNil
-    (SkewRecord (a `TLCons` TLNil)) -> hLeaf f `TLCons` a `TLCons` TLNil
-    (SkewRecord (ta `TLCons` tb `TLCons` ts)) -> case sing :: Sing s of
+    (SkewRecord SpineNil) -> hLeaf f `SpineCons` SpineNil
+    (SkewRecord (a `SpineCons` SpineNil)) -> hLeaf f `SpineCons` a `SpineCons` SpineNil
+    (SkewRecord (ta `SpineCons` tb `SpineCons` ts)) -> case sing :: Sing s of
         (ha `SCons` (hb `SCons` _)) -> case ha %:== hb of
-            STrue -> HNode f ta tb `TLCons` ts
-            SFalse -> hLeaf f `TLCons` ta `TLCons` tb `TLCons` ts
+            STrue -> HNode f ta tb `SpineCons` ts
+            SFalse -> hLeaf f `SpineCons` ta `SpineCons` tb `SpineCons` ts
 infixr 2 `hSkewExtendSing`
 \end{code}
 
@@ -952,13 +958,13 @@ while |HListGet| used |HEq| on the two labels.
 
 \begin{code}
 class HSkewExtend' ts where
-    hSkewExtend' :: Field l v -> TreeList ts -> TreeList (Skew' '(l, v) ts)
+    hSkewExtend' :: Field l v -> Spine ts -> Spine (Skew' '(l, v) ts)
 instance
     HSkewExtend' '[] where
-    hSkewExtend' f TLNil = hLeaf f `TLCons` TLNil
+    hSkewExtend' f SpineNil = hLeaf f `SpineCons` SpineNil
 instance
     HSkewExtend' '[f] where
-    hSkewExtend' f ts = hLeaf f `TLCons` ts
+    hSkewExtend' f ts = hLeaf f `SpineCons` ts
 instance
     ((Height ta :== Height tb) ~ b
     ,HSkewExtend'' b ta tb) =>
@@ -966,11 +972,11 @@ instance
     hSkewExtend' f ts = hSkewExtend'' (undefined :: Proxy b) f ts
 
 class HSkewExtend'' (b::Bool) ta tb where
-    hSkewExtend'' :: ts ~ (ta ': tb ': ts') => Proxy b -> Field l v -> TreeList ts -> TreeList (Skew' !!!(l, v) ts)
+    hSkewExtend'' :: ts ~ (ta ': tb ': ts') => Proxy b -> Field l v -> Spine ts -> Spine (Skew' !!!(l, v) ts)
 instance (Height ta :== Height tb) ~ !!!True => HSkewExtend'' !!!True ta tb where
-    hSkewExtend'' _ f (ta `TLCons` tb `TLCons` ts) = HNode f ta tb `TLCons` ts
+    hSkewExtend'' _ f (ta `SpineCons` tb `SpineCons` ts) = HNode f ta tb `SpineCons` ts
 instance (Height ta :== Height tb) ~ !!!False => HSkewExtend'' !!!False ta tb where
-    hSkewExtend'' _ f (ta `TLCons` tb `TLCons` ts) = hLeaf f `TLCons` ta `TLCons` tb `TLCons` ts
+    hSkewExtend'' _ f (ta `SpineCons` tb `SpineCons` ts) = hLeaf f `SpineCons` ta `SpineCons` tb `SpineCons` ts
 \end{code}
 \noindent
 Here |HFalse| means that we should not add up the first two trees of the spine.
@@ -999,19 +1005,20 @@ class HSkewGetField l' v' l v | l' v' l -> v where
 
 hSkewGet2 ::
     forall s fs l.
-    (!!!Just s ~ (SearchList l (Skew fs))
+    (!!!Just s ~ (SearchSpine l (Skew fs))
     ,SingI s) =>
     Sing l ->
     SkewRecord fs ->
-    LookupList (Skew fs) s
+    LookupSpine (Skew fs) s
+    -- todo singletons
 hSkewGet2 l (SkewRecord ts) = walkList (sing :: Sing s) ts where
-    walkList :: Sing (p :: PathList) -> TreeList ts -> LookupList ts p
-    walkList (SPathTail p) (t `TLCons` ts) = walkList p ts
-    walkList (SPathHead p) (t `TLCons` ts) = walkTree p t
+    walkList :: Sing (p :: PathSpine) -> Spine ts -> LookupSpine ts p
+    walkList (SPathSpineTail p) (t `SpineCons` ts) = walkList p ts
+    walkList (SPathSpineHead p) (t `SpineCons` ts) = walkTree p t
     walkTree :: Sing (p :: PathTree) -> HTree t -> LookupTree t p
-    walkTree SPathRoot (HNode (Field v) left right) = v
-    walkTree (SPathLeft p) (HNode v left right) = walkTree p left
-    walkTree (SPathRight p) (HNode v left right) = walkTree p right
+    walkTree SPathTreeRoot (HNode (Field v) left right) = v
+    walkTree (SPathTreeLeft p) (HNode v left right) = walkTree p left
+    walkTree (SPathTreeRight p) (HNode v left right) = walkTree p right
 \end{code}
 Deciding on the path to the desired field
 is now more involved.
@@ -1045,7 +1052,7 @@ If the field is found in the current tree,
     -- ,  HSkewGet r'  l vr'
     -- ,  Plus vr vr' ~ v) =>
        -- HSkewGet (r ': r') l v where
-    -- hSkewGet (SkewRecord (r `TLCons` r')) l =
+    -- hSkewGet (SkewRecord (r `SpineCons` r')) l =
         -- hSkewGetTree r l `hPlus2` hSkewGet r' l
 -- \end{code}
 %
@@ -1114,7 +1121,7 @@ the resulting core code is:
 \begin{code}
 lastSkewCore = case rSkew of
     SkewRecord ts -> case ts of
-      t1 `TLCons` _ -> case t1 of
+      t1 `SpineCons` _ -> case t1 of
         HNode _ _ t12 -> case t12 of
           HNode _ _ t121 -> case t121 of
             HNode f _ _ -> case f of
@@ -1135,7 +1142,7 @@ a field of some label with a new field with possibly new label and value.
 %
 \begin{code}
 class HSkewUpdate l e r r' | l e r -> r' where
-    hSkewUpdate :: Sing l -> e -> TreeList r -> TreeList r'
+    hSkewUpdate :: Sing l -> e -> Spine r -> Spine r'
 class HSkewUpdateTree l e r r' | l e r -> r' where
     hSkewUpdateTree :: Sing l -> e -> HTree r -> HTree r'
 class HSkewUpdateField l e l' v' l'' v'' | l e l' v' -> l'' v'' where
@@ -1153,7 +1160,7 @@ whether the field with the searched label is present or not in the skew list.
        -- hSkewUpdate' (hSkewGet r l) l e r
 
 -- class HSkewUpdate' m l e r r' | m l e r -> r' where
-    -- hSkewUpdate' :: HMaybe m -> Sing l -> e -> TreeList r -> TreeList r'
+    -- hSkewUpdate' :: HMaybe m -> Sing l -> e -> Spine r -> Spine r'
 -- class HSkewUpdateTree' m l e r r' | m l e r -> r' where
     -- hSkewUpdateTree' :: HMaybe m -> Sing l -> e -> HTree r -> HTree r'
 -- class HSkewUpdateField' m l e l' v' l'' v'' | m l e l' v' -> l'' v'' where
@@ -1179,8 +1186,8 @@ We start the process in the spine.
     -- HSkewUpdate' ('Just v) l e  (t ': ts)
                                 -- (t' ': ts')
     -- where
-    -- hSkewUpdate' _ l e (t `TLCons` ts) =
-        -- hSkewUpdateTree l e t `TLCons`
+    -- hSkewUpdate' _ l e (t `SpineCons` ts) =
+        -- hSkewUpdateTree l e t `SpineCons`
                -- hSkewUpdate l e ts
 -- \end{code}
 %
@@ -1227,7 +1234,7 @@ First, we need a helper to remove the first element of a skew list.
 %
 \begin{code}
 class HSkewTail ts ts' | ts -> ts' where
-    hSkewTail :: TreeList ts -> TreeList ts'
+    hSkewTail :: Spine ts -> Spine ts'
 \end{code}
 
 \noindent
@@ -1245,7 +1252,7 @@ The easy case is when the spine begins with a leaf.
 We just return the tail of the spine list.
 \begin{code}
 instance HSkewTail (Leaf2 e : ts) ts where
-    hSkewTail (_ `TLCons` ts) = ts
+    hSkewTail (_ `SpineCons` ts) = ts
 \end{code}
 
 \noindent
@@ -1262,8 +1269,8 @@ instance
         ('Node e t ('Node e' t' t'') ': ts)
         (t ': 'Node e' t' t'' ': ts)
     where
-    hSkewTail (HNode _ t t' `TLCons` ts) =
-        t `TLCons` t' `TLCons` ts
+    hSkewTail (HNode _ t t' `SpineCons` ts) =
+        t `SpineCons` t' `SpineCons` ts
 \end{code}
 
 
