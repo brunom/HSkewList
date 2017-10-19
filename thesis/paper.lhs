@@ -318,26 +318,37 @@ The class |HListGet| retrieves from a record the value part
 corresponding to a specific label:
 
 \begin{code}
--- data PathList = PathTail PathList | PathHead PathTree
+$(singletons [d|
+    data PathList = PathListTail PathList | PathListHead
+    |])
 
--- data ListPath
-    -- = 
--- makePath :: l -> [(l, v)] -> Maybe ListPath
--- makePath = undefined
+$(promote [d|
+    makePathList l [] = Nothing
+    makePathList l ((l2, v) : fs) = if l == l2 then Just PathListHead else makePathList l fs
+    
+    walkList Nothing _ = Nothing
+    walkList (Just p) fs = Just $ walkList' p fs
+    walkList' PathListHead ((_, v) : fs) = v
+    walkList' (PathListTail p) (_ : fs) = walkList' p fs
+    |])
+
 hListGetSing ::
-    SingI (Map ((:==$$) l) (Map FstSym0 fs)) =>
+    forall l fs.
+    SingI (MakePathList l fs) =>
     Sing l ->
     HList fs ->
-    FromJust (Lookup l fs)
-hListGetSing = hListGetSing' sing
+    HMaybe (WalkList (MakePathList l fs) fs)
+hListGetSing l fs = case sing :: Sing (MakePathList l fs) of
+    SNothing -> HNothing
+    SJust p -> HJust $ hListGetSing' p fs
 hListGetSing' ::
-    Sing (Map ((:==$$) l) (Map FstSym0 fs)) ->
-    Sing l ->
+    Sing p ->
     HList fs ->
-    FromJust (Lookup l fs)
-hListGetSing' (SCons STrue  _) l (HCons (Field v) _ ) = v
-hListGetSing' (SCons SFalse m) l (HCons _ fs) = hListGetSing' m l fs    
+    WalkList' p fs
+hListGetSing' SPathListHead (HCons (Field v) _ ) = v
+hListGetSing' (SPathListTail m) (HCons _ fs) = hListGetSing' m fs    
 \end{code}
+
 \noindent
 At the type-level it is statically checked that the record |r| indeed has
 a field with label |l| associated with a value of the type |v|.
@@ -832,10 +843,6 @@ $(promote [d|
     lookupTree (Node (l,v) t1 t2) (PathTreeRight p) = lookupTree t2 p
     lookupSpine (t : ts) (PathSpineHead p) = lookupTree t p
     lookupSpine (t : ts) (PathSpineTail p) = lookupSpine ts p
-        
-    -- <|> not already available at the type level
-    Just a <|> _ = Just a
-    Nothing <|> a = a
     
     leaf e = Node e Empty Empty
 
@@ -1003,7 +1010,7 @@ class HSkewGetTree r l v | r l -> v where
 class HSkewGetField l' v' l v | l' v' l -> v where
     hSkewGetField :: Field l' v' -> Sing l -> HMaybe v
 
-hSkewGet2 ::
+hSkewGetSing ::
     forall s fs l.
     (!!!Just s ~ (SearchSpine l (Skew fs))
     ,SingI s) =>
@@ -1011,7 +1018,7 @@ hSkewGet2 ::
     SkewRecord fs ->
     LookupSpine (Skew fs) s
     -- todo singletons
-hSkewGet2 l (SkewRecord ts) = walkList (sing :: Sing s) ts where
+hSkewGetSing l (SkewRecord ts) = walkList (sing :: Sing s) ts where
     walkList :: Sing (p :: PathSpine) -> Spine ts -> LookupSpine ts p
     walkList (SPathSpineTail p) (t `SpineCons` ts) = walkList p ts
     walkList (SPathSpineHead p) (t `SpineCons` ts) = walkTree p t
@@ -1114,7 +1121,7 @@ rSkew =
   (l6  .=.  [4,5]    )  `hSkewExtend`
   (l7  .=.  "last"   )  `hSkewExtend`
   emptySkewRecord
-lastSkew = hSkewGet2 l7 rSkew
+lastSkew = hSkewGetSing l7 rSkew
 \end{code}
 the resulting core code is:
 
