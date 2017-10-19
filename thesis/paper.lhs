@@ -324,7 +324,7 @@ $(singletons [d|
 
 $(promote [d|
     makePathList l [] = Nothing
-    makePathList l ((l2, v) : fs) = if l == l2 then Just PathListHead else makePathList l fs
+    makePathList l ((l2, v) : fs) = if l == l2 then Just PathListHead else case makePathList l fs of Nothing -> Nothing; Just p -> Just $ PathListTail p
     
     walkList Nothing _ = Nothing
     walkList (Just p) fs = Just $ walkList' p fs
@@ -356,7 +356,8 @@ At value-level |hListGet| returns the value of type |v|.
 For example, the following expression returns the string |"last"|:
 
 \begin{code}
-lastList = hListGet l7 rList
+lastListSing = hListGetSing l7 rList
+lastListClass = hListGetClass l7 rList
 \end{code}
 
 Instead of polluting the definitions of type-level functions
@@ -385,19 +386,18 @@ or the search must continue to the next node.
 |HListGet'| has two instances, for the cases |HTrue| and |HFalse|.
 
 \begin{code}
-class HListGet b l fs where
-    hListGet :: (b ~ (l :== l'), fs ~ ('(l', v') ': fs')) => Sing l -> HList fs -> FromJust (Lookup l fs)
-
-instance
-    HListGet 'True l fs
-    where
-    hListGet _ (Field v `HCons` _) = v
-
-instance
-    (fs' ~ ('(l'', v'') ': fs'')
-    ,HListGet (l :== l'') l fs') =>
-    HListGet 'False l ('(l', v') ': fs') where
-    hListGet l (_ `HCons` fs) = hListGet l fs
+class HListGetClass p where
+    hListGetClass :: p ~ MakePathList l fs => Sing l -> HList fs -> HMaybe (WalkList (MakePathList l fs) fs)
+instance HListGetClass 'Nothing where
+    hListGetClass _ _ = HNothing
+instance HListGetClass' p => HListGetClass ('Just p) where
+    hListGetClass _ fs = HJust $ hListGetClass' (undefined :: Proxy p) fs
+class HListGetClass' p where
+    hListGetClass' :: Proxy p -> HList fs -> WalkList' p fs
+instance HListGetClass' 'PathListHead where
+    hListGetClass' _ (HCons (Field v) _) = v
+instance HListGetClass' p => HListGetClass' ('PathListTail p) where
+    hListGetClass' _ (HCons _ fs) = hListGetClass' (undefined :: Proxy p) fs  
 \end{code}
 
 \noindent
@@ -416,7 +416,7 @@ The code is inlined to a case cascade, but the program must traverse the linked 
 For example, this is the GHC core of the example:
 
 \begin{code}
-lastListCore = case rList of
+lastListClassCore = case rList of
   _ `HCons` rs1 -> case rs1 of
     _ `HCons` rs2 -> case rs2 of
      _ `HCons` rs3 -> case rs3 of
@@ -1704,8 +1704,10 @@ even as a built-in solution.
 
 \begin{code}
 main =
-    print lastList >>
-    print lastSkew
+    print lastListSing >>
+    print lastListClass >>
+    print lastSkew >>
+    return ()
 
 hListUpdate a = undefined
 hListRemove = undefined
