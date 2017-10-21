@@ -342,15 +342,15 @@ hListGetSing ::
     Sing l ->
     HList fs ->
     HMaybe (WalkList (MakePathList l fs) fs)
-hListGetSing l fs = hWalkList (sing :: Sing (MakePathList l fs)) fs
+hListGetSing l fs = hWalkListSing (sing :: Sing (MakePathList l fs)) fs
 
-hWalkList :: Sing p -> HList fs -> HMaybe (WalkList p fs)
-hWalkList SNothing _ = HNothing
-hWalkList (SJust p) fs = HJust $ hWalkList' p fs
+hWalkListSing :: Sing p -> HList fs -> HMaybe (WalkList p fs)
+hWalkListSing SNothing _ = HNothing
+hWalkListSing (SJust p) fs = HJust $ hWalkList'Sing p fs
 
-hWalkList' :: Sing p -> HList fs -> WalkList' p fs
-hWalkList' SPathListHead (HCons (Field v) _ ) = v
-hWalkList' (SPathListTail m) (HCons _ fs) = hWalkList' m fs    
+hWalkList'Sing :: Sing p -> HList fs -> WalkList' p fs
+hWalkList'Sing SPathListHead (HCons (Field v) _ ) = v
+hWalkList'Sing (SPathListTail m) (HCons _ fs) = hWalkList'Sing m fs    
 \end{code}
 
 \noindent
@@ -390,18 +390,24 @@ or the search must continue to the next node.
 |HListGet'| has two instances, for the cases |HTrue| and |HFalse|.
 
 \begin{code}
-class HListGetClass p where
-    hListGetClass :: p ~ MakePathList l fs => Sing l -> HList fs -> HMaybe (WalkList (MakePathList l fs) fs)
-instance HListGetClass 'Nothing where
-    hListGetClass _ _ = HNothing
-instance HListGetClass' p => HListGetClass ('Just p) where
-    hListGetClass _ fs = HJust $ hListGetClass' (undefined :: Proxy p) fs
-class HListGetClass' p where
-    hListGetClass' :: Proxy p -> HList fs -> WalkList' p fs
-instance HListGetClass' 'PathListHead where
-    hListGetClass' _ (HCons (Field v) _) = v
-instance HListGetClass' p => HListGetClass' ('PathListTail p) where
-    hListGetClass' _ (HCons _ fs) = hListGetClass' (undefined :: Proxy p) fs  
+
+hListGetClass :: forall proxy l fs p. (p ~ MakePathList l fs, HWalkListClass p) => proxy l -> HList fs -> HMaybe (WalkList p fs)
+hListGetClass l fs = hWalkListClass (undefined :: Proxy p) fs
+
+class HWalkListClass p where
+    hWalkListClass :: proxy p -> HList fs -> HMaybe (WalkList p fs)
+instance HWalkListClass 'Nothing where
+    hWalkListClass _ _ = HNothing
+instance HWalkList'Class p => HWalkListClass ('Just p) where
+    hWalkListClass _ fs = HJust $ hWalkList'Class (undefined :: Proxy p) fs
+
+class HWalkList'Class p where
+    hWalkList'Class :: proxy p -> HList fs -> WalkList' p fs
+instance HWalkList'Class 'PathListHead where
+    hWalkList'Class _ (HCons (Field v) _) = v
+instance HWalkList'Class p => HWalkList'Class ('PathListTail p) where
+    hWalkList'Class _ (HCons _ fs) = hWalkList'Class (undefined :: Proxy p) fs  
+
 \end{code}
 
 \noindent
