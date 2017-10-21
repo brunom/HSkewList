@@ -322,12 +322,16 @@ $(singletons [d|
     data PathList = PathListTail PathList | PathListHead
     |])
 
-$(promote [d|
+$(promoteOnly [d|
+    makePathList :: Eq l => l -> [(l,v)] -> Maybe PathList 
     makePathList l [] = Nothing
     makePathList l ((l2, v) : fs) = if l == l2 then Just PathListHead else case makePathList l fs of Nothing -> Nothing; Just p -> Just $ PathListTail p
     
+    walkList :: Maybe PathList -> [(l,v)] -> Maybe v
     walkList Nothing _ = Nothing
     walkList (Just p) fs = Just $ walkList' p fs
+    
+    walkList' :: PathList -> [(l, v)] -> v
     walkList' PathListHead ((_, v) : fs) = v
     walkList' (PathListTail p) (_ : fs) = walkList' p fs
     |])
@@ -338,15 +342,15 @@ hListGetSing ::
     Sing l ->
     HList fs ->
     HMaybe (WalkList (MakePathList l fs) fs)
-hListGetSing l fs = case sing :: Sing (MakePathList l fs) of
-    SNothing -> HNothing
-    SJust p -> HJust $ hListGetSing' p fs
-hListGetSing' ::
-    Sing p ->
-    HList fs ->
-    WalkList' p fs
-hListGetSing' SPathListHead (HCons (Field v) _ ) = v
-hListGetSing' (SPathListTail m) (HCons _ fs) = hListGetSing' m fs    
+hListGetSing l fs = hWalkList (sing :: Sing (MakePathList l fs)) fs
+
+hWalkList :: Sing p -> HList fs -> HMaybe (WalkList p fs)
+hWalkList SNothing _ = HNothing
+hWalkList (SJust p) fs = HJust $ hWalkList' p fs
+
+hWalkList' :: Sing p -> HList fs -> WalkList' p fs
+hWalkList' SPathListHead (HCons (Field v) _ ) = v
+hWalkList' (SPathListTail m) (HCons _ fs) = hWalkList' m fs    
 \end{code}
 
 \noindent
