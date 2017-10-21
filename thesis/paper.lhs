@@ -771,26 +771,37 @@ $(promote [d|
     height Empty = 0
     height (Node _ _ t) = 1 + height t
 
-    searchTree :: Eq l => l -> Tree (l, v) -> Maybe PathTree
-    searchTree l Empty = Nothing
-    searchTree l (Node (l2, v) t1 t2) = if l == l2 then Just PathTreeRoot else treePlus (searchTree l t1) (searchTree l t2)
+    makePathSpine :: Eq l => l -> [Tree (l, v)] -> Maybe PathSpine
+    makePathSpine l [] = Nothing
+    makePathSpine l (t : ts) = spinePlus (makePathTree l t) (makePathSpine l ts)
+
+    spinePlus :: Maybe PathTree -> Maybe PathSpine -> Maybe PathSpine
+    spinePlus Nothing Nothing = Nothing
+    spinePlus Nothing (Just a) = Just $ PathSpineTail a
+    spinePlus (Just a) _ = Just $ PathSpineHead a
+
+    makePathTree :: Eq l => l -> Tree (l, v) -> Maybe PathTree
+    makePathTree l Empty = Nothing
+    makePathTree l (Node (l2, v) t1 t2) = if l == l2 then Just PathTreeRoot else treePlus (makePathTree l t1) (makePathTree l t2)
+
+    treePlus :: Maybe PathTree -> Maybe PathTree -> Maybe PathTree
     treePlus Nothing Nothing = Nothing
     treePlus Nothing (Just a) = Just $ PathTreeRight a
     treePlus (Just a) _ = Just $ PathTreeLeft a
 
-    searchSpine l [] = Nothing
-    searchSpine l (t : ts) = spinePlus (searchTree l t) (searchSpine l ts)
-    spinePlus Nothing Nothing = Nothing
-    spinePlus Nothing (Just a) = Just $ PathSpineTail a
-    spinePlus (Just a) _ = Just $ PathSpineHead a
-        
-    lookupTree :: Tree (l, v) -> PathTree -> v
-    lookupTree (Node (l,v) t1 t2) PathTreeRoot = v
-    lookupTree (Node (l,v) t1 t2) (PathTreeLeft p) = lookupTree t1 p
-    lookupTree (Node (l,v) t1 t2) (PathTreeRight p) = lookupTree t2 p
-    lookupSpine (t : ts) (PathSpineHead p) = lookupTree t p
-    lookupSpine (t : ts) (PathSpineTail p) = lookupSpine ts p
-    
+    walkSpine :: Maybe PathSpine -> [Tree (l, v)] -> Maybe v
+    walkSpine Nothing _ = Nothing
+    walkSpine (Just p) fs = Just $ walkSpine' p fs
+
+    walkSpine' :: PathSpine -> [Tree (l, v)] -> v
+    walkSpine' (PathSpineHead p) (t : ts) = walkTree p t
+    walkSpine' (PathSpineTail p) (t : ts) = walkSpine' p ts
+
+    walkTree :: PathTree -> Tree (l, v) -> v
+    walkTree PathTreeRoot (Node (l,v) t1 t2) = v
+    walkTree (PathTreeLeft p) (Node (l,v) t1 t2) = walkTree p t1
+    walkTree (PathTreeRight p) (Node (l,v) t1 t2) = walkTree p t2
+
     leaf e = Node e Empty Empty
 
     -- TODO find out why skew1 doesn't work like skew
@@ -959,21 +970,29 @@ class HSkewGetField l' v' l v | l' v' l -> v where
 
 hSkewGetSing ::
     forall s fs l.
-    (!!!Just s ~ (SearchSpine l (Skew fs))
+    (s ~ (MakePathSpine l (Skew fs))
     ,SingI s) =>
     Sing l ->
     SkewRecord fs ->
-    LookupSpine (Skew fs) s
-    -- todo singletons
-hSkewGetSing l (SkewRecord ts) = walkList (sing :: Sing s) ts where
-    walkList :: Sing (p :: PathSpine) -> Spine ts -> LookupSpine ts p
-    walkList (SPathSpineTail p) (t `SpineCons` ts) = walkList p ts
-    walkList (SPathSpineHead p) (t `SpineCons` ts) = walkTree p t
-    walkTree :: Sing (p :: PathTree) -> HTree t -> LookupTree t p
-    walkTree SPathTreeRoot (HNode (Field v) left right) = v
-    walkTree (SPathTreeLeft p) (HNode v left right) = walkTree p left
-    walkTree (SPathTreeRight p) (HNode v left right) = walkTree p right
+    HMaybe (WalkSpine s (Skew fs))
+hSkewGetSing l (SkewRecord ts) = hWalkSpine (sing :: Sing s) ts
+
+hWalkSpine :: Sing p -> Spine ts -> HMaybe (WalkSpine p ts)
+hWalkSpine SNothing _ = HNothing
+hWalkSpine (SJust p) ts = HJust $ hWalkSpine' p ts
+
+hWalkSpine' :: Sing p -> Spine ts -> WalkSpine' p ts
+hWalkSpine' (SPathSpineHead p) (t `SpineCons` ts) = hWalkTree p t
+hWalkSpine' (SPathSpineTail p) (t `SpineCons` ts) = hWalkSpine' p ts
+
+hWalkTree :: Sing p -> HTree t -> WalkTree p t
+hWalkTree SPathTreeRoot (HNode (Field v) t1 t2) = v
+hWalkTree (SPathTreeLeft p) (HNode _ t1 t2) = hWalkTree p t1
+hWalkTree (SPathTreeRight p) (HNode _ t1 t2) = hWalkTree p t2
+
+
 \end{code}
+
 Deciding on the path to the desired field
 is now more involved.
 The cases that both the test function and the worker function must consider
@@ -1095,10 +1114,10 @@ We now define an update operation that makes it possible to change
 a field of some label with a new field with possibly new label and value.
 %
 \begin{code}
-class HSkewUpdate l e r r' | l e r -> r' where
-    hSkewUpdate :: Sing l -> e -> Spine r -> Spine r'
-class HSkewUpdateTree l e r r' | l e r -> r' where
-    hSkewUpdateTree :: Sing l -> e -> HTree r -> HTree r'
+class HSkewUpdate l e ts ts' | l e ts -> ts' where
+    hSkewUpdate :: Sing l -> e -> Spine ts -> Spine ts'
+class HSkewUpdateTree l e t t' | l e t -> t' where
+    hSkewUpdateTree :: Sing l -> e -> HTree t -> HTree t'
 class HSkewUpdateField l e l' v' l'' v'' | l e l' v' -> l'' v'' where
     hSkewUpdateField :: Sing l -> e -> Field l' v' -> Field l'' v''
 \end{code}
