@@ -508,26 +508,23 @@ Items are then |unsafeCoerce|d on the way in and out based on the type informati
 %
 %
 \begin{code}
-data ArrayRecord r =
-  ArrayRecord (HList r) (Array Int Any)
+newtype ArrayRecord (fs :: [(l, Type)]) =
+  ArrayRecord (Array Int Any)
 \end{code}
 
 \subsubsection{Lookup}
 Lookup is done as a two step operation.
 First, the ordinal of a certain label in the record, and the type (|v|) of its stored element, are found with |ArrayFind|.
 %
-\begin{code}
-class ArrayFind r l v | r l -> v where
-  arrayFind :: HList r -> Sing l -> Int
-\end{code}
 %
 Second, function |hArrayGet| uses the index to obtain the element from the array and the
 type (|v|) to coerce that element to its correct type.
 %
 \begin{code}
-hArrayGet :: ArrayFind r l v => ArrayRecord r -> Sing l -> v
-hArrayGet (ArrayRecord r a) l =
-  unsafeCoerce (a ! arrayFind r l)
+hArrayGet :: forall fs l i. (i ~ ElemIndex l (Map FstSym0 fs), SingI i) => ArrayRecord fs -> Sing l -> HMaybe (Maybe_ 'Nothing (JustSym0 :.$$$ (:!!$$) l) i)
+hArrayGet (ArrayRecord a) _ = case sing :: Sing i of
+    SNothing -> HNothing
+    SJust i' -> HJust $ unsafeCoerce (a ! (fromInteger $ fromSing i'))
 \end{code}
 
 Figure~\ref{fig:search-array} shows a graphical representation of this process.
@@ -544,13 +541,6 @@ Dashed arrow represents the compile time search of the field in the heterogeneou
 using |HEq| to discriminate the cases of
 the label of the current field, which may match or not the searched one.
 %
-\begin{code}
-instance  (  ArrayFind' (l :== l') v' r l v n
-          ,  ToValue n) =>
-   ArrayFind ('(l', v') ': r) l v where
-     arrayFind (f `HCons` r) l =
-       toValue (arrayFind' (hEq l (label f)) (value f) r l)
-\end{code}
 %
 A difference with |HListGet| is that the work of searching the label,
 performed by |ArrayFind'|, is only done at type-level.
@@ -558,20 +548,6 @@ There is no value-level member of the class |ArrayFind'|;
 observe that |arrayFind'| is just an undefined value
 and nothing will be computed at run time.
 %
-\begin{code}
-arrayFind' ::  ArrayFind' b v' r l v n
-               => Sing b -> v' -> HList r -> Sing l -> Sing n
-arrayFind' = undefined
-
-data HZero
-data HSucc n
-
-class ArrayFind' (b::Bool) v' (r :: [(l, Type)]) l' v n | b v' r l' -> v n
-instance ArrayFind' 'True v r l v HZero
-instance (ArrayFind' (l :== l') v' r l v n)
-         => ArrayFind' 'False v'' ('(l', v') : r) l
-                        v (HSucc n)
-\end{code}
 %
 The types |HZero| and |HSucc| implement naturals at type-level.
 If the label is found, then the index |HZero| is returned.
@@ -580,22 +556,9 @@ Once the index is found it has to be converted into an |Int| value,
 in order to use this value as the index of the array.
 This is done by the function |toValue|.
 %
-\begin{code}
-class ToValue n where
-  toValue :: Sing n -> Int
-\end{code}
 %
 To perform this conversion in constant time, we have to provide
 one specific instance of |ToValue| for every type-level natural we use.
-\begin{spec}
-instance ToValue HZero where
-  toValue _ = 0
-instance ToValue (HSucc HZero) where
-  toValue _ = 1
-instance ToValue (HSucc (HSucc HZero)) where
-  toValue _ = 2
-...
-\end{spec}
 
 In this implementation of |ArrayFind| it is very easy to distinguish the two phases
 of the lookup process. However, the use of the function |toValue| introduces a big amount of
@@ -604,16 +567,6 @@ boilerplate. Although these instances can be automatically generated using Templ
 %which makes use of inlining and constant folding, two optimizations that are present in GHC.
 %(and any ohter competent compiler)
 %
-\begin{code}
-instance ToValue HZero where
-  toValue _ = 0
-
-hPrev :: Sing (HSucc n) -> Sing n
-hPrev = undefined
-
-instance ToValue n => ToValue (HSucc n) where
-  toValue n = 1 + toValue (hPrev n)
-\end{code}
 %
 %Based on these optimizations the computation of the index, which would be linear time, is performed at compile time.
 Based on inlining and constant folding, the computation of the index, which is linear time, is performed at compile time.
@@ -673,13 +626,6 @@ For this to work, the |HCons| pattern must be lazy, or code needs to be generate
 
 In |hArrayGet|, we use the index to obtain the element from the array and the
 type (|v|) to coerce the element to its correct type.
-%
-\begin{code}
-hArrayGet :: HFind r l v =>
-  ArrayRecord r -> l -> v
-hArrayGet (ArrayRecord r a) l =
-  unsafeCoerce (a ! hFind r l)
-\end{code}
 %endif
 %%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
@@ -688,19 +634,16 @@ hArrayGet (ArrayRecord r a) l =
 An empty |ArrayRecord| consists of an empty heterogeneous list and an empty array.
 %
 \begin{code}
+emptyArrayRecord :: ArrayRecord !!! []
 emptyArrayRecord =
-  ArrayRecord HNil (array (0, -1) [])
+  ArrayRecord (array (0, -1) [])
 \end{code}
 %
 Function |hArrayExtend| adds a field to an array record.
 %
 \begin{code}
-hArrayExtend f = hArrayModifyList (HCons f)
-
-hArrayModifyList hc (ArrayRecord r _) =
-  let  r'  = hc r
-       fs  = hMapAny2 r'
-  in   ArrayRecord r' (listArray (0, length fs - 1) fs)
+hArrayExtend :: Field l v -> ArrayRecord ls -> ArrayRecord ('(l, v) ': ls)
+hArrayExtend (Field v) (ArrayRecord a) = ArrayRecord $ listArray (0, 1 + snd (bounds a)) (unsafeCoerce v : elems a)
 \end{code}
 %
 %if False
