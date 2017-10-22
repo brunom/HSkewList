@@ -212,25 +212,6 @@ We aim to construct a type-level value of the maybe type from a boolean. For thi
 we define the following multi-parameter class. The parameter |v| specifies the type
 of the values to be contained by a |HJust|.
 
-\begin{code}
-$(promote [d|
-    makeMaybe False v = Nothing
-    makeMaybe True v = Just v
-    |])
-
-class HMakeMaybe (b::Bool) where
-    hMakeMaybe :: Sing b -> v -> HMaybe (MakeMaybe b v)
-instance HMakeMaybe 'False where
-    hMakeMaybe b v = HNothing
-instance HMakeMaybe 'True where
-    hMakeMaybe b v = HJust v
-
-hMakeMaybe2 :: Sing b -> v -> HMaybe (MakeMaybe b v)
-hMakeMaybe2 SFalse v = HNothing
-hMakeMaybe2 STrue  v = HJust v
-
-\end{code}
-
 Another operation that will be of interest on this type is the one that combines
 two values of type maybe.
 
@@ -395,14 +376,14 @@ hListGetClass :: forall proxy l fs p. (p ~ MakePathList l fs, HWalkListClass p) 
 hListGetClass l fs = hWalkListClass (undefined :: Proxy p) fs
 
 class HWalkListClass p where
-    hWalkListClass :: proxy p -> HList fs -> HMaybe (WalkList p fs)
+    hWalkListClass :: Proxy p -> HList fs -> HMaybe (WalkList p fs)
 instance HWalkListClass 'Nothing where
     hWalkListClass _ _ = HNothing
 instance HWalkList'Class p => HWalkListClass ('Just p) where
     hWalkListClass _ fs = HJust $ hWalkList'Class (undefined :: Proxy p) fs
 
 class HWalkList'Class p where
-    hWalkList'Class :: proxy p -> HList fs -> WalkList' p fs
+    hWalkList'Class :: Proxy p -> HList fs -> WalkList' p fs
 instance HWalkList'Class 'PathListHead where
     hWalkList'Class _ (HCons (Field v) _) = v
 instance HWalkList'Class p => HWalkList'Class ('PathListTail p) where
@@ -967,13 +948,6 @@ which explores all paths at compile time
 but follows only the right one at run time.
 
 \begin{code}
-class HSkewGet r l v | r l -> v where
-    hSkewGet :: SkewRecord r -> Sing l -> HMaybe v
-class HSkewGetTree r l v | r l -> v where
-    hSkewGetTree :: HTree r -> Sing l -> HMaybe v
-class HSkewGetField l' v' l v | l' v' l -> v where
-    hSkewGetField :: Field l' v' -> Sing l -> HMaybe v
-
 hSkewGetSing ::
     forall s fs l.
     (s ~ (MakePathSpine l (Skew fs))
@@ -997,6 +971,38 @@ hWalkTreeSing (SPathTreeLeft p) (HNode _ t1 t2) = hWalkTreeSing p t1
 hWalkTreeSing (SPathTreeRight p) (HNode _ t1 t2) = hWalkTreeSing p t2
 
 
+hSkewGetClass ::
+    forall s fs l.
+    (s ~ (MakePathSpine l (Skew fs))
+    ,HWalkSpineClass s) =>
+    Sing l ->
+    SkewRecord fs ->
+    HMaybe (WalkSpine s (Skew fs))
+hSkewGetClass l (SkewRecord ts) = hWalkSpineClass (undefined :: Proxy s) ts
+
+class HWalkSpineClass p where
+    hWalkSpineClass :: Proxy p -> Spine ts -> HMaybe (WalkSpine p ts)
+instance HWalkSpineClass 'Nothing where
+    hWalkSpineClass _ _ = HNothing
+instance HWalkSpine'Class p => HWalkSpineClass ('Just p) where
+    hWalkSpineClass _ ts = HJust $ hWalkSpine'Class (undefined :: Proxy p) ts
+
+class HWalkSpine'Class p where
+    hWalkSpine'Class :: Proxy p -> Spine ts -> WalkSpine' p ts
+instance HWalkTreeClass p => HWalkSpine'Class ('PathSpineHead p) where
+    hWalkSpine'Class _ (t `SpineCons` ts) = hWalkTreeClass (undefined :: Proxy p) t
+instance HWalkSpine'Class p => HWalkSpine'Class ('PathSpineTail p) where
+    hWalkSpine'Class _ (t `SpineCons` ts) = hWalkSpine'Class (undefined :: Proxy p) ts
+
+class HWalkTreeClass p where
+    hWalkTreeClass :: Proxy p -> HTree t -> WalkTree p t
+instance HWalkTreeClass !!!PathTreeRoot where
+    hWalkTreeClass _ (HNode (Field v) t1 t2) = v
+instance HWalkTreeClass p => HWalkTreeClass ('PathTreeLeft p) where
+    hWalkTreeClass _ (HNode _ t1 t2) = hWalkTreeClass (undefined :: Proxy p) t1
+instance HWalkTreeClass p => HWalkTreeClass ('PathTreeRight p) where
+    hWalkTreeClass _ (HNode _ t1 t2) = hWalkTreeClass (undefined :: Proxy p) t2
+
 \end{code}
 
 Deciding on the path to the desired field
@@ -1014,27 +1020,11 @@ For branching constructors |HCons| and |HNode|,
 We will run |HSkewGet| on both the spine and each tree, so we have two base cases.
 |HNil| is encountered at the end of the spine, and |HEmpty| at the bottom of trees.
 In both cases, the field was not found, so we return |HNothing|.
-\begin{code}
-instance HSkewGet '[] l 'Nothing where
-    hSkewGet _ _ = HNothing
-instance HSkewGetTree 'Empty l 'Nothing where
-    hSkewGetTree _ _ = HNothing
-\end{code}
 The |HCons| case must consider that the field may be found on the current tree or further down the spine.
 A recursive call is made for each sub-case, and the results are combined with |HPlus|.
 If the field is found in the current tree,
 |HPlus| returns it, otherwise, it returns what the search down the spine did.
-%
--- \begin{code}
--- instance
-    -- (  HSkewGetTree r   l vr
-    -- ,  HSkewGet r'  l vr'
-    -- ,  Plus vr vr' ~ v) =>
-       -- HSkewGet (r ': r') l v where
-    -- hSkewGet (SkewRecord (r `SpineCons` r')) l =
-        -- hSkewGetTree r l `hPlus2` hSkewGet r' l
--- \end{code}
-%
+
 Observe that when doing |hSkewGet r l `hPlus` hSkewGet r' l| if the label is not present in |r| then
 the type system chooses the second instance of |HPlus|  (|HPlus HNothing b b|).
 Thus, by lazy evaluation, the subexpression |hSkewGet r l| is not evaluated
@@ -1044,20 +1034,7 @@ since |hPlus| in that case simply returns its second argument.
 Here three recursive calls are made,
 for the current field, the left tree, and the right tree.
 Thus two |HPlus| calls are needed to combine the result.
-%
--- \begin{code}
--- instance
-    -- (  HSkewGetField l' v'   l vf
-    -- ,  HSkewGetTree r   l vr
-    -- ,  HSkewGetTree r'  l vr'
-    -- ,  Plus (Plus vf vr) vr'  ~ v) =>
-       -- HSkewGetTree ('Node '(l', v') r r') l v where
-    -- hSkewGetTree (HNode f r r') l =
-        -- hSkewGetField f l
-            -- `hPlus2` hSkewGetTree r l
-               -- `hPlus2` hSkewGetTree r' l
--- \end{code}
-%
+
 Finally, the |Field| case, when a field is found, is the case
 %\alberto{cual, la que sigue o la anterior? no queda bien arrancar la orcion con And.....}
 that may actually build a |HJust| result.
@@ -1065,17 +1042,6 @@ As in |HListGet| for linked lists, |HEq| compares both labels.
 We call |HMakeMaybe| with the result of the comparison,
 and |HNothing| or |HJust| is returned as appropriate.
 %
-\begin{code}
-instance
-    (  (l :== l') ~ b
-    ,  HMakeMaybe b
-    ,  MakeMaybe b v ~ m) =>
-       HSkewGetField l' v l m where
-    hSkewGetField f l =
-        hMakeMaybe
-            (hEq l (label f))
-            (value f)
-\end{code}
 
 When we repeat the experiment at the end of subsection \ref{sec:extensiblerecords},
 but constructing a |SkewRecord| instead of an |HList|:
@@ -1093,7 +1059,8 @@ rSkew =
   (l6  .=.  [4,5]    )  `hSkewExtend`
   (l7  .=.  "last"   )  `hSkewExtend`
   emptySkewRecord
-lastSkew = hSkewGetSing l7 rSkew
+lastSkewSing = hSkewGetSing l7 rSkew
+lastSkewClass = hSkewGetClass l7 rSkew
 \end{code}
 the resulting core code is:
 
@@ -1131,20 +1098,6 @@ class HSkewUpdateField l e l' v' l'' v'' | l e l' v' -> l'' v'' where
 We use the lookup operation |HSkewGet| to discriminate at type-level
 whether the field with the searched label is present or not in the skew list.
 %
-\begin{code}
--- instance  (  HSkewGet r l m
-          -- ,  HSkewUpdate' m l e r r') =>
-          -- HSkewUpdate l e r r'  where
-    -- hSkewUpdate l e r =
-       -- hSkewUpdate' (hSkewGet r l) l e r
-
--- class HSkewUpdate' m l e r r' | m l e r -> r' where
-    -- hSkewUpdate' :: HMaybe m -> Sing l -> e -> Spine r -> Spine r'
--- class HSkewUpdateTree' m l e r r' | m l e r -> r' where
-    -- hSkewUpdateTree' :: HMaybe m -> Sing l -> e -> HTree r -> HTree r'
--- class HSkewUpdateField' m l e l' v' l'' v'' | m l e l' v' -> l'' v'' where
-    -- hSkewUpdateField' :: HMaybe m -> Sing l -> e -> Field l' v' -> Field l'' v''
-\end{code}
 %
 In case the label is not present we have nothing to do than just returning the
 structure unchanged.
@@ -1678,7 +1631,8 @@ even as a built-in solution.
 main =
     print lastListSing >>
     print lastListClass >>
-    print lastSkew >>
+    print lastSkewSing >>
+    print lastSkewClass >>
     return ()
 
 hListUpdate a = undefined
