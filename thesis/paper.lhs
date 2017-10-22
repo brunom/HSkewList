@@ -981,20 +981,20 @@ hSkewGetSing ::
     Sing l ->
     SkewRecord fs ->
     HMaybe (WalkSpine s (Skew fs))
-hSkewGetSing l (SkewRecord ts) = hWalkSpine (sing :: Sing s) ts
+hSkewGetSing l (SkewRecord ts) = hWalkSpineSing (sing :: Sing s) ts
 
-hWalkSpine :: Sing p -> Spine ts -> HMaybe (WalkSpine p ts)
-hWalkSpine SNothing _ = HNothing
-hWalkSpine (SJust p) ts = HJust $ hWalkSpine' p ts
+hWalkSpineSing :: Sing p -> Spine ts -> HMaybe (WalkSpine p ts)
+hWalkSpineSing SNothing _ = HNothing
+hWalkSpineSing (SJust p) ts = HJust $ hWalkSpine'Sing p ts
 
-hWalkSpine' :: Sing p -> Spine ts -> WalkSpine' p ts
-hWalkSpine' (SPathSpineHead p) (t `SpineCons` ts) = hWalkTree p t
-hWalkSpine' (SPathSpineTail p) (t `SpineCons` ts) = hWalkSpine' p ts
+hWalkSpine'Sing :: Sing p -> Spine ts -> WalkSpine' p ts
+hWalkSpine'Sing (SPathSpineHead p) (t `SpineCons` ts) = hWalkTreeSing p t
+hWalkSpine'Sing (SPathSpineTail p) (t `SpineCons` ts) = hWalkSpine'Sing p ts
 
-hWalkTree :: Sing p -> HTree t -> WalkTree p t
-hWalkTree SPathTreeRoot (HNode (Field v) t1 t2) = v
-hWalkTree (SPathTreeLeft p) (HNode _ t1 t2) = hWalkTree p t1
-hWalkTree (SPathTreeRight p) (HNode _ t1 t2) = hWalkTree p t2
+hWalkTreeSing :: Sing p -> HTree t -> WalkTree p t
+hWalkTreeSing SPathTreeRoot (HNode (Field v) t1 t2) = v
+hWalkTreeSing (SPathTreeLeft p) (HNode _ t1 t2) = hWalkTreeSing p t1
+hWalkTreeSing (SPathTreeRight p) (HNode _ t1 t2) = hWalkTreeSing p t2
 
 
 \end{code}
