@@ -228,6 +228,9 @@ data ListRecord (fs :: [(l, Type)]) where
 hListExtend :: Field l v -> ListRecord fs -> ListRecord ('(l, v) ': fs)
 hListExtend (Field v) vs = v `ListCons` vs
 infixr 2 `hListExtend`
+
+hListEmpty :: ListRecord !!![]
+hListEmpty = ListNil
 \end{code}
 
 For example, the value |True `HCons` 'a' `HCons` HNil| is a heterogeneous list of type |Bool `HCons` Char `HCons` HNil|.
@@ -274,7 +277,7 @@ rList =
   (l5  .=.  Nothing  )  `hListExtend`
   (l6  .=.  [4,5]    )  `hListExtend`
   (l7  .=.  "last"   )  `hListExtend`
-  ListNil
+  hListEmpty
 \end{code}
 
 The class |HListGet| retrieves from a record the value part
@@ -582,8 +585,8 @@ type (|v|) to coerce the element to its correct type.
 An empty |ArrayRecord| consists of an empty heterogeneous list and an empty array.
 %
 \begin{code}
-emptyArrayRecord :: ArrayRecord !!! []
-emptyArrayRecord =
+hArrayEmpty :: ArrayRecord !!! []
+hArrayEmpty =
   ArrayRecord (array (0, -1) [])
 \end{code}
 %
@@ -627,7 +630,7 @@ rArray =
   (l5  .=.  Nothing  )  `hArrayExtend`
   (l6  .=.  [4,5]    )  `hArrayExtend`
   (l7  .=.  "last"   )  `hArrayExtend`
-  emptyArrayRecord
+  hArrayEmpty
 lastArray = hArrayGet l7 rArray
 \end{code}
 %
@@ -759,8 +762,8 @@ infixr 2 `SpineCons`
 
 newtype SkewRecord fs = SkewRecord (Spine (Skew fs))
 
-emptySkewRecord :: SkewRecord !!![]
-emptySkewRecord = SkewRecord SpineNil
+hSkewEmpty :: SkewRecord !!![]
+hSkewEmpty = SkewRecord SpineNil
 \end{code}
 
 \noindent
@@ -785,7 +788,7 @@ four =
 
 \subsubsection{Construction}
 
-We define a smart constructor |emptySkewRecord| for empty skew lists, i.e. an empty list of trees.
+We define a smart constructor |hSkewEmpty| for empty skew lists, i.e. an empty list of trees.
 
 %\noindent
 |HHeight| returns the height of a tree.
@@ -984,7 +987,7 @@ and |HNothing| or |HJust| is returned as appropriate.
 
 When we repeat the experiment at the end of subsection \ref{sec:extensiblerecords},
 but constructing a |SkewRecord| instead of an |HList|:
-% using |emptySkewRecord| to construct a |SkewRecord|: \alberto{quien es |emptySkewRecord|?}
+% using |hSkewEmpty| to construct a |SkewRecord|: \alberto{quien es |hSkewEmpty|?}
 
 %\alberto{yo capaz definiria un smart constructor que se llamara |hSkewEmpty| o por el estilo y lo pondria en lugar de HNil en la expresion de |rSkew|.}
 %
@@ -997,7 +1000,7 @@ rSkew =
   (l5  .=.  Nothing  )  `hSkewExtendClass`
   (l6  .=.  [4,5]    )  `hSkewExtendClass`
   (l7  .=.  "last"   )  `hSkewExtendClass`
-  emptySkewRecord
+  hSkewEmpty
 lastSkewSing = hSkewGetSing l7 rSkew
 lastSkewClass = hSkewGetClass l7 rSkew
 \end{code}
