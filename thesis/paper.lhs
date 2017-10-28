@@ -241,7 +241,7 @@ A field with label |l| and value of type |v| is represented by the type:
 
 \begin{code}
 newtype Field l v   =   Field { value :: v }
-(.=.)               ::  Sing l -> v -> Field l v
+(.=.)               ::  proxy l -> v -> Field l v
 _  .=.  v           =   Field v
 \end{code}
 
@@ -253,13 +253,13 @@ the phantom type parameter:
 We define separate types and constructors for labels.
 
 \begin{code}
-l1 = sing :: Sing "L1"
-l2 = sing :: Sing "L2"
-l3 = sing :: Sing "L3"
-l4 = sing :: Sing "L4"
-l5 = sing :: Sing "L5"
-l6 = sing :: Sing "L6"
-l7 = sing :: Sing "L7"
+l1 = undefined :: Proxy "L1"
+l2 = undefined :: Proxy "L2"
+l3 = undefined :: Proxy "L3"
+l4 = undefined :: Proxy "L4"
+l5 = undefined :: Proxy "L5"
+l6 = undefined :: Proxy "L6"
+l7 = undefined :: Proxy "L7"
 \end{code}
 
 Thus, the following defines a record (|rList|) with seven fields:
@@ -300,9 +300,9 @@ $(promoteOnly [d|
     |])
 
 hListGetSing ::
-    forall l fs.
+    forall proxy l fs.
     SingI (MakePathList l fs) =>
-    Sing l ->
+    proxy l ->
     ListRecord fs ->
     HMaybe (WalkList (MakePathList l fs) fs)
 hListGetSing l fs = hWalkListSing (sing :: Sing (MakePathList l fs)) fs
@@ -354,14 +354,14 @@ hListGetClass :: forall proxy l fs p. (p ~ MakePathList l fs, HWalkListClass p) 
 hListGetClass l fs = hWalkListClass (undefined :: Proxy p) fs
 
 class HWalkListClass p where
-    hWalkListClass :: Proxy p -> ListRecord fs -> HMaybe (WalkList p fs)
+    hWalkListClass :: proxy p -> ListRecord fs -> HMaybe (WalkList p fs)
 instance HWalkListClass 'Nothing where
     hWalkListClass _ _ = HNothing
 instance HWalkList'Class p => HWalkListClass ('Just p) where
     hWalkListClass _ fs = HJust $ hWalkList'Class (undefined :: Proxy p) fs
 
 class HWalkList'Class p where
-    hWalkList'Class :: Proxy p -> ListRecord fs -> WalkList' p fs
+    hWalkList'Class :: proxy p -> ListRecord fs -> WalkList' p fs
 instance HWalkList'Class 'PathListHead where
     hWalkList'Class _ (v `ListCons` _) = v
 instance HWalkList'Class p => HWalkList'Class ('PathListTail p) where
@@ -490,7 +490,7 @@ Second, function |hArrayGet| uses the index to obtain the element from the array
 type (|v|) to coerce that element to its correct type.
 %
 \begin{code}
-hArrayGet :: forall fs l i. (i ~ ElemIndex l (Map FstSym0 fs), SingI i) => Sing l -> ArrayRecord fs -> HMaybe (Maybe_ 'Nothing (JustSym0 :.$$$ SndSym0 :.$$$ (:!!$$) fs) i)
+hArrayGet :: forall fs proxy l i. (i ~ ElemIndex l (Map FstSym0 fs), SingI i) => proxy l -> ArrayRecord fs -> HMaybe (Maybe_ 'Nothing (JustSym0 :.$$$ SndSym0 :.$$$ (:!!$$) fs) i)
 hArrayGet _ (ArrayRecord a) = case sing :: Sing i of
     SNothing -> HNothing
     SJust i' -> HJust $ unsafeCoerce (a ! (fromInteger $ fromSing i'))
@@ -863,7 +863,7 @@ instance
     hSkewExtend' f ts = hSkewExtend'' (undefined :: Proxy b) f ts
 
 class HSkewExtend'' (b::Bool) ta tb where
-    hSkewExtend'' :: ts ~ (ta ': tb ': ts') => Proxy b -> Field l v -> Spine ts -> Spine (Skew' !!!(l, v) ts)
+    hSkewExtend'' :: ts ~ (ta ': tb ': ts') => proxy b -> Field l v -> Spine ts -> Spine (Skew' !!!(l, v) ts)
 instance (Height ta :== Height tb) ~ !!!True => HSkewExtend'' !!!True ta tb where
     hSkewExtend'' _ (Field v) (ta `SpineCons` tb `SpineCons` ts) = HNode v ta tb `SpineCons` ts
 instance (Height ta :== Height tb) ~ !!!False => HSkewExtend'' !!!False ta tb where
@@ -888,10 +888,10 @@ but follows only the right one at run time.
 
 \begin{code}
 hSkewGetSing ::
-    forall s fs l.
+    forall s fs proxy l.
     (s ~ (MakePathSpine l (Skew fs))
     ,SingI s) =>
-    Sing l ->
+    proxy l ->
     SkewRecord fs ->
     HMaybe (WalkSpine s (Skew fs))
 hSkewGetSing l (SkewRecord ts) = hWalkSpineSing (sing :: Sing s) ts
@@ -911,30 +911,30 @@ hWalkTreeSing (SPathTreeRight p) (HNode _ t1 t2) = hWalkTreeSing p t2
 
 
 hSkewGetClass ::
-    forall s fs l.
+    forall s fs proxy l.
     (s ~ (MakePathSpine l (Skew fs))
     ,HWalkSpineClass s) =>
-    Sing l ->
+    proxy l ->
     SkewRecord fs ->
     HMaybe (WalkSpine s (Skew fs))
 hSkewGetClass l (SkewRecord ts) = hWalkSpineClass (undefined :: Proxy s) ts
 
 class HWalkSpineClass p where
-    hWalkSpineClass :: Proxy p -> Spine ts -> HMaybe (WalkSpine p ts)
+    hWalkSpineClass :: proxy p -> Spine ts -> HMaybe (WalkSpine p ts)
 instance HWalkSpineClass 'Nothing where
     hWalkSpineClass _ _ = HNothing
 instance HWalkSpine'Class p => HWalkSpineClass ('Just p) where
     hWalkSpineClass _ ts = HJust $ hWalkSpine'Class (undefined :: Proxy p) ts
 
 class HWalkSpine'Class p where
-    hWalkSpine'Class :: Proxy p -> Spine ts -> WalkSpine' p ts
+    hWalkSpine'Class :: proxy p -> Spine ts -> WalkSpine' p ts
 instance HWalkTreeClass p => HWalkSpine'Class ('PathSpineHead p) where
     hWalkSpine'Class _ (t `SpineCons` ts) = hWalkTreeClass (undefined :: Proxy p) t
 instance HWalkSpine'Class p => HWalkSpine'Class ('PathSpineTail p) where
     hWalkSpine'Class _ (t `SpineCons` ts) = hWalkSpine'Class (undefined :: Proxy p) ts
 
 class HWalkTreeClass p where
-    hWalkTreeClass :: Proxy p -> HTree t -> WalkTree p t
+    hWalkTreeClass :: proxy p -> HTree t -> WalkTree p t
 instance HWalkTreeClass !!!PathTreeRoot where
     hWalkTreeClass _ (HNode v t1 t2) = v
 instance HWalkTreeClass p => HWalkTreeClass ('PathTreeLeft p) where
@@ -1026,11 +1026,11 @@ a field of some label with a new field with possibly new label and value.
 %
 \begin{code}
 class HSkewUpdate l e ts ts' | l e ts -> ts' where
-    hSkewUpdate :: Sing l -> e -> Spine ts -> Spine ts'
+    hSkewUpdate :: proxy l -> e -> Spine ts -> Spine ts'
 class HSkewUpdateTree l e t t' | l e t -> t' where
-    hSkewUpdateTree :: Sing l -> e -> HTree t -> HTree t'
+    hSkewUpdateTree :: proxy l -> e -> HTree t -> HTree t'
 class HSkewUpdateField l e l' v' l'' v'' | l e l' v' -> l'' v'' where
-    hSkewUpdateField :: Sing l -> e -> Field l' v' -> Field l'' v''
+    hSkewUpdateField :: proxy l -> e -> Field l' v' -> Field l'' v''
 \end{code}
 %
 We use the lookup operation |HSkewGet| to discriminate at type-level
