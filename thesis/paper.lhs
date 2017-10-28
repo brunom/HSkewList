@@ -806,17 +806,6 @@ If each top level tree is a digit,
 building a new taller tree is a form of carry,
 so |HSkewCarry| returns |HTrue|.
 %
-\begin{code}
-$(promote [d|
-    skewCarry [] = False
-    skewCarry [_] = False
-    skewCarry (t : t' : _) = height t == height t'
-    |])
-
-
-hSkewCarry :: Spine r -> Sing (SkewCarry r)
-hSkewCarry = undefined
-\end{code}
 %
 If the spine has none or one single tree we return |HFalse|.
 %
