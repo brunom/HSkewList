@@ -215,32 +215,19 @@ of the values to be contained by a |HJust|.
 Another operation that will be of interest on this type is the one that combines
 two values of type maybe.
 
-\begin{code}
-$(promote [d|
-    plus Nothing b = b
-    plus (Just a) b = Just a
-    |])
-class HPlus a where
-    hPlus :: HMaybe a -> HMaybe b -> HMaybe (Plus a b)
-instance HPlus ('Just a) where
-    hPlus a  _ = a
-instance HPlus 'Nothing where
-    hPlus _  b = b
-hPlus2 :: HMaybe a -> HMaybe b -> HMaybe (Plus a b)
-hPlus2 (HJust a) _ = HJust a
-hPlus2 HNothing b = b
-\end{code}
-
 \subsection{Heterogeneous Lists}
 
 Heterogeneous lists can be represented with the data types |HNil| and |HCons|,
 which model the structure of lists both at the value and type level:
 
 \begin{code}
-data HList (fs :: [(l, Type)]) where
-   HNil  :: HList !!![]
-   HCons :: Field l v -> HList fs -> HList ( !!!(l,v) !!!: fs)
-infixr 2 `HCons`
+data ListRecord (fs :: [(l, Type)]) where
+   ListNil  :: ListRecord !!![]
+   ListCons :: v -> ListRecord fs -> ListRecord ( !!!(l,v) !!!: fs)
+
+hListExtend :: Field l v -> ListRecord fs -> ListRecord ('(l, v) ': fs)
+hListExtend (Field v) vs = v `ListCons` vs
+infixr 2 `hListExtend`
 \end{code}
 
 For example, the value |True `HCons` 'a' `HCons` HNil| is a heterogeneous list of type |Bool `HCons` Char `HCons` HNil|.
@@ -263,11 +250,6 @@ Notice that the label is a phantom type \cite{Hin03}.
 We can retrieve the label value by using the function |label|, which exposes
 the phantom type parameter:
 
-\begin{code}
-label  ::  Field l v -> Sing l
-label  =   undefined
-\end{code}
-
 We define separate types and constructors for labels.
 
 \begin{code}
@@ -285,14 +267,14 @@ Thus, the following defines a record (|rList|) with seven fields:
 \begin{code}
 
 rList =
-  (l1  .=.  True     )  `HCons`
-  (l2  .=.  9        )  `HCons`
-  (l3  .=.  "bla"    )  `HCons`
-  (l4  .=.  'c'      )  `HCons`
-  (l5  .=.  Nothing  )  `HCons`
-  (l6  .=.  [4,5]    )  `HCons`
-  (l7  .=.  "last"   )  `HCons`
-  HNil
+  (l1  .=.  True     )  `hListExtend`
+  (l2  .=.  9        )  `hListExtend`
+  (l3  .=.  "bla"    )  `hListExtend`
+  (l4  .=.  'c'      )  `hListExtend`
+  (l5  .=.  Nothing  )  `hListExtend`
+  (l6  .=.  [4,5]    )  `hListExtend`
+  (l7  .=.  "last"   )  `hListExtend`
+  ListNil
 \end{code}
 
 The class |HListGet| retrieves from a record the value part
@@ -321,17 +303,17 @@ hListGetSing ::
     forall l fs.
     SingI (MakePathList l fs) =>
     Sing l ->
-    HList fs ->
+    ListRecord fs ->
     HMaybe (WalkList (MakePathList l fs) fs)
 hListGetSing l fs = hWalkListSing (sing :: Sing (MakePathList l fs)) fs
 
-hWalkListSing :: Sing p -> HList fs -> HMaybe (WalkList p fs)
+hWalkListSing :: Sing p -> ListRecord fs -> HMaybe (WalkList p fs)
 hWalkListSing SNothing _ = HNothing
 hWalkListSing (SJust p) fs = HJust $ hWalkList'Sing p fs
 
-hWalkList'Sing :: Sing p -> HList fs -> WalkList' p fs
-hWalkList'Sing SPathListHead (HCons (Field v) _ ) = v
-hWalkList'Sing (SPathListTail m) (HCons _ fs) = hWalkList'Sing m fs    
+hWalkList'Sing :: Sing p -> ListRecord fs -> WalkList' p fs
+hWalkList'Sing SPathListHead (v `ListCons` _) = v
+hWalkList'Sing (SPathListTail m) (_ `ListCons` fs) = hWalkList'Sing m fs    
 \end{code}
 
 \noindent
@@ -351,10 +333,6 @@ HList encapsulates type comparison in |HEq|.
 The type equality predicate |HEq| results in |HTrue| in case the compared types are equal and |HFalse| otherwise.
 Thus, when comparing two types in other type-level functions (like |HListGet| below),
 these two cases can be discriminated without using overlapping instances.
-\begin{code}
-hEq :: Sing x -> Sing y -> Sing (x :== y)
-hEq = undefined
-\end{code}
 %
 We will not delve into the different possible definitions for |HEq|.
 For completeness, here is one that suffices for our purposes.
@@ -372,22 +350,22 @@ or the search must continue to the next node.
 
 \begin{code}
 
-hListGetClass :: forall proxy l fs p. (p ~ MakePathList l fs, HWalkListClass p) => proxy l -> HList fs -> HMaybe (WalkList p fs)
+hListGetClass :: forall proxy l fs p. (p ~ MakePathList l fs, HWalkListClass p) => proxy l -> ListRecord fs -> HMaybe (WalkList p fs)
 hListGetClass l fs = hWalkListClass (undefined :: Proxy p) fs
 
 class HWalkListClass p where
-    hWalkListClass :: Proxy p -> HList fs -> HMaybe (WalkList p fs)
+    hWalkListClass :: Proxy p -> ListRecord fs -> HMaybe (WalkList p fs)
 instance HWalkListClass 'Nothing where
     hWalkListClass _ _ = HNothing
 instance HWalkList'Class p => HWalkListClass ('Just p) where
     hWalkListClass _ fs = HJust $ hWalkList'Class (undefined :: Proxy p) fs
 
 class HWalkList'Class p where
-    hWalkList'Class :: Proxy p -> HList fs -> WalkList' p fs
+    hWalkList'Class :: Proxy p -> ListRecord fs -> WalkList' p fs
 instance HWalkList'Class 'PathListHead where
-    hWalkList'Class _ (HCons (Field v) _) = v
+    hWalkList'Class _ (v `ListCons` _) = v
 instance HWalkList'Class p => HWalkList'Class ('PathListTail p) where
-    hWalkList'Class _ (HCons _ fs) = hWalkList'Class (undefined :: Proxy p) fs  
+    hWalkList'Class _ (_ `ListCons` fs) = hWalkList'Class (undefined :: Proxy p) fs  
 
 \end{code}
 
@@ -408,13 +386,13 @@ For example, this is the GHC core of the example:
 
 \begin{code}
 lastListClassCore = case rList of
-  _ `HCons` rs1 -> case rs1 of
-    _ `HCons` rs2 -> case rs2 of
-     _ `HCons` rs3 -> case rs3 of
-       _ `HCons` rs4 -> case rs4 of
-          _ `HCons` rs5 -> case rs5 of
-            _ `HCons` rs6 -> case rs6 of
-              e `HCons` _ -> e
+  _ `ListCons` rs1 -> case rs1 of
+    _ `ListCons` rs2 -> case rs2 of
+     _ `ListCons` rs3 -> case rs3 of
+       _ `ListCons` rs4 -> case rs4 of
+          _ `ListCons` rs5 -> case rs5 of
+            _ `ListCons` rs6 -> case rs6 of
+              e `ListCons` _ -> e
 \end{code}
 
 \section{Faster Extensible Records}\label{sec:faster}
@@ -512,8 +490,8 @@ Second, function |hArrayGet| uses the index to obtain the element from the array
 type (|v|) to coerce that element to its correct type.
 %
 \begin{code}
-hArrayGet :: forall fs l i. (i ~ ElemIndex l (Map FstSym0 fs), SingI i) => ArrayRecord fs -> Sing l -> HMaybe (Maybe_ 'Nothing (JustSym0 :.$$$ (:!!$$) l) i)
-hArrayGet (ArrayRecord a) _ = case sing :: Sing i of
+hArrayGet :: forall fs l i. (i ~ ElemIndex l (Map FstSym0 fs), SingI i) => Sing l -> ArrayRecord fs -> HMaybe (Maybe_ 'Nothing (JustSym0 :.$$$ SndSym0 :.$$$ (:!!$$) fs) i)
+hArrayGet _ (ArrayRecord a) = case sing :: Sing i of
     SNothing -> HNothing
     SJust i' -> HJust $ unsafeCoerce (a ! (fromInteger $ fromSing i'))
 \end{code}
@@ -582,31 +560,10 @@ Dashed arrow represents the compile time search of the field in the heterogeneou
 using |HEq| to discriminate the cases of
 the label of the current field, which may match or not the searched one.
 %
-\begin{code}
-class HFind r l v | r l -> v where
-  hFind :: r -> l -> Int
-instance
-    (  HFind' (l :== l') v' r' l v) =>
-       HFind (Field l' v' `HCons` r') l v where
-    hFind ~(f'@(Field v') `HCons` r') l =
-        hFind' (hEq l (label f')) v' r' l
-\end{code}
 %
 If the label is found, then the index 0 is returned.
 Otherwise, we increase the index by one and continue searching.
 %
-\begin{code}
-class HFind' b v' r l v | b v' r l -> v where
-    hFind':: b -> v' -> r -> l -> Int
-instance
-    HFind' 'True v r l v
-    where
-      hFind' _ _ _ _ = 0
-instance
-    HFind r l v => HFind' 'False v' r l v
-    where
-      hFind' _ _ r l = 1 + hFind r l
-\end{code}
 %
 The function |hFind| returns both the type of the field value (at type-level)
 and the index of the field in the record (at value-level).
@@ -635,16 +592,9 @@ Function |hArrayExtend| adds a field to an array record.
 \begin{code}
 hArrayExtend :: Field l v -> ArrayRecord ls -> ArrayRecord ('(l, v) ': ls)
 hArrayExtend (Field v) (ArrayRecord a) = ArrayRecord $ listArray (0, 1 + snd (bounds a)) (unsafeCoerce v : elems a)
-\end{code}
-%
-%if False
-
-\begin{code}
 infixr 2 `hArrayExtend`
 \end{code}
 
-%endif
-%
 The new field (which includes the type information of the element) is added to the heterogeneous list of the old record. The extended heterogeneous list
 is then converted to a plain Haskell list with |hMapAny|
 and turned into the array of the new record with |listArray|.
@@ -658,22 +608,6 @@ instead of just the field value type relation as a phantom parameter (i.e. only 
 The function |hMapAny| iterates over the heterogeneous list \emph{coercing} its elements to values
 of type |Any|.
 %
-\begin{code}
-class HMapAny r where
-  hMapAny :: HList r -> [Any]
-instance HMapAny !!![] where
-  hMapAny _ = []
-instance
-  HMapAny r =>
-  HMapAny (!!!(l, v) : r)
-  where
-  hMapAny (Field v `HCons` r) =
-    unsafeCoerce v : hMapAny r
-
-hMapAny2 :: HList r -> [Any]
-hMapAny2 HNil = []
-hMapAny2 (Field v `HCons` r) = unsafeCoerce v : hMapAny2 r
-\end{code}
 
 
 \subsubsection{Update and Remove}
@@ -685,11 +619,16 @@ We use the respective functions |hListUpdate| and |hListRemove| from the HList
 implementation of records.
 %
 \begin{code}
--- hArrayUpdate l e
-   -- = hArrayModifyList (hListUpdate l e)
-
--- hArrayRemove l
-   -- = hArrayModifyList (hListRemove l)
+rArray =
+  (l1  .=.  True     )  `hArrayExtend`
+  (l2  .=.  9        )  `hArrayExtend`
+  (l3  .=.  "bla"    )  `hArrayExtend`
+  (l4  .=.  'c'      )  `hArrayExtend`
+  (l5  .=.  Nothing  )  `hArrayExtend`
+  (l6  .=.  [4,5]    )  `hArrayExtend`
+  (l7  .=.  "last"   )  `hArrayExtend`
+  emptyArrayRecord
+lastArray = hArrayGet l7 rArray
 \end{code}
 %
 With |HArrayUpdate| we change a field of some label with a new field with possibly new label and value.
@@ -808,10 +747,10 @@ type Leaf2 e = 'Node e 'Empty 'Empty
 
 data HTree t where
     HEmpty :: HTree 'Empty
-    HNode :: Field l v -> HTree t1 -> HTree t2 -> HTree ('Node '(l, v) t1 t2) 
+    HNode :: v -> HTree t1 -> HTree t2 -> HTree ('Node '(l, v) t1 t2) 
 type  HLeaf e         =  HTree (Leaf e)
-hLeaf :: Field l v -> HLeaf '(l, v)
-hLeaf  e         =  HNode e HEmpty HEmpty
+hLeaf :: v -> HLeaf '(l, v)
+hLeaf  v         =  HNode v HEmpty HEmpty
 
 data Spine ts where
     SpineNil :: Spine '[]
@@ -887,18 +826,18 @@ All these pieces allow us to define |HSkewExtend|,
 which resembles the |HCons| constructor.
 \begin{code}
 
-hSkewExtend :: HSkewExtend' (Skew fs) => Field l v -> SkewRecord fs -> SkewRecord (!!!(l, v) !!!: fs)
-hSkewExtend f (SkewRecord ts) = SkewRecord $ hSkewExtend' f ts
-infixr 2 `hSkewExtend`
+hSkewExtendClass :: HSkewExtend' (Skew fs) => Field l v -> SkewRecord fs -> SkewRecord (!!!(l, v) !!!: fs)
+hSkewExtendClass f (SkewRecord ts) = SkewRecord $ hSkewExtend' f ts
+infixr 2 `hSkewExtendClass`
 
-hSkewExtendSing :: forall l v (fs::[(k, Type)]) s. (s ~ (Map HeightSym0 (Skew fs)), SingI s) => Field l v -> SkewRecord fs -> SkewRecord (!!!(l, v) !!!: fs)
-hSkewExtendSing f r = SkewRecord $ case r of
-    (SkewRecord SpineNil) -> hLeaf f `SpineCons` SpineNil
-    (SkewRecord (a `SpineCons` SpineNil)) -> hLeaf f `SpineCons` a `SpineCons` SpineNil
+hSkewExtendSing :: forall l v (fs::[(k, Type)]) s. (s ~ (Map HeightSym0 (Skew fs)), SingI s) => v -> SkewRecord fs -> SkewRecord (!!!(l, v) !!!: fs)
+hSkewExtendSing v r = SkewRecord $ case r of
+    (SkewRecord SpineNil) -> hLeaf v `SpineCons` SpineNil
+    (SkewRecord (a `SpineCons` SpineNil)) -> hLeaf v `SpineCons` a `SpineCons` SpineNil
     (SkewRecord (ta `SpineCons` tb `SpineCons` ts)) -> case sing :: Sing s of
         (ha `SCons` (hb `SCons` _)) -> case ha %:== hb of
-            STrue -> HNode f ta tb `SpineCons` ts
-            SFalse -> hLeaf f `SpineCons` ta `SpineCons` tb `SpineCons` ts
+            STrue -> HNode v ta tb `SpineCons` ts
+            SFalse -> hLeaf v `SpineCons` ta `SpineCons` tb `SpineCons` ts
 infixr 2 `hSkewExtendSing`
 \end{code}
 
@@ -913,10 +852,10 @@ class HSkewExtend' ts where
     hSkewExtend' :: Field l v -> Spine ts -> Spine (Skew' '(l, v) ts)
 instance
     HSkewExtend' '[] where
-    hSkewExtend' f SpineNil = hLeaf f `SpineCons` SpineNil
+    hSkewExtend' (Field v) SpineNil = hLeaf v `SpineCons` SpineNil
 instance
     HSkewExtend' '[f] where
-    hSkewExtend' f ts = hLeaf f `SpineCons` ts
+    hSkewExtend' (Field v) ts = hLeaf v `SpineCons` ts
 instance
     ((Height ta :== Height tb) ~ b
     ,HSkewExtend'' b ta tb) =>
@@ -926,9 +865,9 @@ instance
 class HSkewExtend'' (b::Bool) ta tb where
     hSkewExtend'' :: ts ~ (ta ': tb ': ts') => Proxy b -> Field l v -> Spine ts -> Spine (Skew' !!!(l, v) ts)
 instance (Height ta :== Height tb) ~ !!!True => HSkewExtend'' !!!True ta tb where
-    hSkewExtend'' _ f (ta `SpineCons` tb `SpineCons` ts) = HNode f ta tb `SpineCons` ts
+    hSkewExtend'' _ (Field v) (ta `SpineCons` tb `SpineCons` ts) = HNode v ta tb `SpineCons` ts
 instance (Height ta :== Height tb) ~ !!!False => HSkewExtend'' !!!False ta tb where
-    hSkewExtend'' _ f (ta `SpineCons` tb `SpineCons` ts) = hLeaf f `SpineCons` ta `SpineCons` tb `SpineCons` ts
+    hSkewExtend'' _ (Field v) (ta `SpineCons` tb `SpineCons` ts) = hLeaf v `SpineCons` ta `SpineCons` tb `SpineCons` ts
 \end{code}
 \noindent
 Here |HFalse| means that we should not add up the first two trees of the spine.
@@ -966,7 +905,7 @@ hWalkSpine'Sing (SPathSpineHead p) (t `SpineCons` ts) = hWalkTreeSing p t
 hWalkSpine'Sing (SPathSpineTail p) (t `SpineCons` ts) = hWalkSpine'Sing p ts
 
 hWalkTreeSing :: Sing p -> HTree t -> WalkTree p t
-hWalkTreeSing SPathTreeRoot (HNode (Field v) t1 t2) = v
+hWalkTreeSing SPathTreeRoot (HNode v t1 t2) = v
 hWalkTreeSing (SPathTreeLeft p) (HNode _ t1 t2) = hWalkTreeSing p t1
 hWalkTreeSing (SPathTreeRight p) (HNode _ t1 t2) = hWalkTreeSing p t2
 
@@ -997,7 +936,7 @@ instance HWalkSpine'Class p => HWalkSpine'Class ('PathSpineTail p) where
 class HWalkTreeClass p where
     hWalkTreeClass :: Proxy p -> HTree t -> WalkTree p t
 instance HWalkTreeClass !!!PathTreeRoot where
-    hWalkTreeClass _ (HNode (Field v) t1 t2) = v
+    hWalkTreeClass _ (HNode v t1 t2) = v
 instance HWalkTreeClass p => HWalkTreeClass ('PathTreeLeft p) where
     hWalkTreeClass _ (HNode _ t1 t2) = hWalkTreeClass (undefined :: Proxy p) t1
 instance HWalkTreeClass p => HWalkTreeClass ('PathTreeRight p) where
@@ -1051,13 +990,13 @@ but constructing a |SkewRecord| instead of an |HList|:
 %
 \begin{code}
 rSkew =
-  (l1  .=.  True     )  `hSkewExtend`
-  (l2  .=.  9        )  `hSkewExtend`
-  (l3  .=.  "bla"    )  `hSkewExtend`
-  (l4  .=.  'c'      )  `hSkewExtend`
-  (l5  .=.  Nothing  )  `hSkewExtend`
-  (l6  .=.  [4,5]    )  `hSkewExtend`
-  (l7  .=.  "last"   )  `hSkewExtend`
+  (l1  .=.  True     )  `hSkewExtendClass`
+  (l2  .=.  9        )  `hSkewExtendClass`
+  (l3  .=.  "bla"    )  `hSkewExtendClass`
+  (l4  .=.  'c'      )  `hSkewExtendClass`
+  (l5  .=.  Nothing  )  `hSkewExtendClass`
+  (l6  .=.  [4,5]    )  `hSkewExtendClass`
+  (l7  .=.  "last"   )  `hSkewExtendClass`
   emptySkewRecord
 lastSkewSing = hSkewGetSing l7 rSkew
 lastSkewClass = hSkewGetClass l7 rSkew
@@ -1070,8 +1009,7 @@ lastSkewCore = case rSkew of
       t1 `SpineCons` _ -> case t1 of
         HNode _ _ t12 -> case t12 of
           HNode _ _ t121 -> case t121 of
-            HNode f _ _ -> case f of
-              Field v -> v
+            HNode v _ _ -> v
 \end{code}
 Thus, getting to |l7| at run time only traverses a (logarithmic length) fraction of the elements,
 as we have seen in Figure~\ref{fig:search-skew}.
@@ -1211,7 +1149,7 @@ to duplicate it where the label we want gone was.
 Then |hSkewTail| removes the original occurrence,
 at the start of the list.
 %\begin{code}
-%-- hSkewRemove :: (HSkewUpdate l e (HList (HTree (Node e t t') ': ts)) (HList ts'), HSkewTail ts' ts'') => Sing l -> HList (HTree (Node e t t') ': ts) -> HList ts''
+%-- hSkewRemove :: (HSkewUpdate l e (ListRecord (HTree (Node e t t') ': ts)) (ListRecord ts'), HSkewTail ts' ts'') => Sing l -> ListRecord (HTree (Node e t t') ': ts) -> ListRecord ts''
 %-- hSkewRemove l (H (HNode e t t') ts) =
 %    -- hSkewTail $
 %    -- hSkewUpdate l e (HNode e t t' `HCons` ts)
@@ -1631,6 +1569,7 @@ even as a built-in solution.
 main =
     print lastListSing >>
     print lastListClass >>
+    print lastArray >>
     print lastSkewSing >>
     print lastSkewClass >>
     return ()
