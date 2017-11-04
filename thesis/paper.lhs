@@ -1,4 +1,4 @@
-\chapter{Grammar Fragments Fly First-Classqqq}
+\chapter{Fast records for Haskell}
 \label{chapt.first-class-grammaqqqmr}
 
 %if style==poly
@@ -67,50 +67,57 @@ import GHC.TypeLits
 
 \section{Introduction} \label{sec:intro}
 
-Although there have been many different proposals for Extensible Records in Haskell
+Many proposals add Extensible Records to Haskell
 \cite{Gaster96apolymorphic, Jones99lightweightextensible, LabeledFunctions, Leijen:fclabels, Leijen:scopedlabels, Jel10},
-it is still an open problem to find an implementation that manipulates records with satisfactory efficiency.
-Imperative dynamic languages use hash tables for objects,
+but they focus on features and the type system, not on runtime performance.
+Most implementations baked into the language store fields adjacent in memory,
+like a tuple or array.
+Library implementations use linked lists.
+
+Imperative dynamic languages like JavaScript and Python implement objects as hash tables,
 achieving constant time insertion and lookup.
 %\marcos{esto es algo que sabemos o sospechamos? hay referencias para dar?}
 %\bruno{sabemos pero no encuentro mejor referencia que http://en.wikipedia.org/wiki/Hashtable}
 %\marcos{hash tables heterogeneas?}
 %\bruno{heterogeneas, si, porque son lenguajes dinamicos}
-Inserting a field changes the table in place,
-destructing the old version of the object,
-not allowing for persistency as required in functional languages.
-Copying the underlying array of the hash table
-to preserve the old version makes insertion slower.
+Inserting or changing a field mutates the object.
+The old version of the object disappears.
+Functional languages require data persistence.
+New versions must not disturb old versions.
+The easy workaround to achieve persistence, cloning the hash table,
+makes insertion linear time and much slower.
 
-Clojure \cite{Hickey:2008:CPL:1408681.1408682} implements vectors with trees of small contiguous arrays,
+Clojure \cite{Hickey:2008:CPL:1408681.1408682} made popular
+and Scala \cite{odersky2008programming} picked up
+implementing immutable arrays as trees of small contiguous arrays,
 so insertion is logarithmic due to structural sharing.
 Clojure's hash map, built on top of vectors,
 then achieves logarithmic time insertion and lookup.
 
-The usual strategies for record insertion in functional languages are
+The common strategies for record insertion in functional languages are
 copying all existing fields along with the new one to a brand new tuple,
 or using a linked list \cite{Gaster96apolymorphic}.
-The tuple strategy offers the fastest possible lookup, but insertion is linear time.
-The linked list sits in opposite in the tradeoff curve,
+The tuple implementation offers the fastest possible lookup, but insertion is linear time.
+Linked lists make the reverse trade-off,
 with constant time insertion but linear time lookup.
-Since a record is essentially a dictionary,
-the obvious strategy to bridge this gap is a search tree.
-While lookup is much improved to logarithmic time,
-insertion is also hit and rendered logarithmic.
 
-Hash maps and ordered trees need hashing and compare functions.
-This ends up being the biggest turnoff for these techniques in our setting.
-Types, standing as field labels, do not have natural, readily accessible implementations
-for these functions.
+Since a record is essentially a dictionary from labels to field values,
+search trees seem to bridge the gap between lists and arrays
+by offering both insertion and lookup in logarithmic time.
+But just as unordered tuples offered constant time lookup
+because the position of each field is statically known,
+trees don't need to be ordered to fulfill requests in logarithmic time.
+Balance suffices.
 
-This paper aims to contribute a solution in that direction.
-Our starting point is the Haskell library for strongly typed heterogeneous collections HList \cite{KLS04}
-which provides an example implementation of extensible records.
-A drawback of HList is that lookup, the most used operation on records, is linear time.
-We propose two alternative implementations for extensible records as a Haskell library, using the same techniques as HList.
-One, called |ArrayRecord|, uses an array to hold the fields, achieving constant time lookup but linear time insertion.
-The other alternative, called |SkewRecord|, is based on a balanced tree structure. It maintains constant time insertions, but lowers lookup to logarithmic time.
-%\marcos{no se habla de la version Array} \bruno{ahora si}
+This thesis modernizes our presentation in \cite{martinez2013just}.
+Our core trick is the observation that when looking up a field by its compile time label in a branching data structure,
+paths that don't get to the field are pruned by the compiler and are not traversed at runtime.
+Harnessing modern Haskell features somewhat distances our solution from the original HList \cite{KLS04}.
+In particular we take advantage of singletons \cite{eisenberg2013dependently}
+to cleanly delimit the work at compile time later consumed at runtime.
+We first present a linked list solution less featured than production implementations such as \cite{vinyl}
+but with a more modern implementation
+that lays the groundwork for later tree and array implementations.
 
 Another contribution of this paper is the trick we use to reduce the run time work.
 We have observed that, when looking-up an element in a HList,
@@ -1032,52 +1039,52 @@ whether the field with the searched label is present or not in the skew list.
 In case the label is not present we have nothing to do than just returning the
 structure unchanged.
 %
-\begin{code}
--- instance HSkewUpdate' 'Nothing l e r r  where
-    -- hSkewUpdate' _ l e r = r
-\end{code}
+%\begin{code}
+%instance HSkewUpdate' 'Nothing l e r r  where
+%    hSkewUpdate' _ l e r = r
+%\end{code}
 %
 In the other cases (i.e. when lookup results in |HJust v|) we call |hSkewUpdate| recursively on all subparts in order to apply the update when necessary.
 Because of the previous instance (when lookup returns |HNothing|), at run time recursion will not enter in those cases where the label is not present.
 We start the process in the spine.
 %
--- \begin{code}
--- instance
-    -- (  HSkewUpdateTree l e t t'
-    -- ,  HSkewUpdate l e ts ts') =>
-    -- HSkewUpdate' ('Just v) l e  (t ': ts)
-                                -- (t' ': ts')
-    -- where
-    -- hSkewUpdate' _ l e (t `SpineCons` ts) =
-        -- hSkewUpdateTree l e t `SpineCons`
-               -- hSkewUpdate l e ts
--- \end{code}
+%\begin{code}
+%instance
+%    (  HSkewUpdateTree l e t t'
+%    ,  HSkewUpdate l e ts ts') =>
+%    HSkewUpdate' ('Just v) l e  (t ': ts)
+%                                (t' ': ts')
+%    where
+%    hSkewUpdate' _ l e (t `SpineCons` ts) =
+%        hSkewUpdateTree l e t `SpineCons`
+%               hSkewUpdate l e ts
+%\end{code}
 %
 On a |HNode|, |hSkewUpdate| is recursively called on
 the left and right sub-trees as well as on the element of the node.
--- \begin{code}
--- instance
-    -- (  HSkewUpdateField l e l' v' l'' v''
-    -- ,  HSkewUpdateTree l e tl tl'
-    -- ,  HSkewUpdateTree l e tr tr') =>
-    -- HSkewUpdateTree' ('Just v) l e  ('Node '(l', v') tl tr)
-                                -- ('Node '(l'', v'') tl' tr')
-    -- where
-    -- hSkewUpdateTree' _ l e (HNode e' tl tr) =
-        -- HNode  (hSkewUpdateField l e e')
-               -- (hSkewUpdateTree l e tl)
-               -- (hSkewUpdateTree l e tr)
--- \end{code}
+%\begin{code}
+%instance
+%    (  HSkewUpdateField l e l' v' l'' v''
+%    ,  HSkewUpdateTree l e tl tl'
+%    ,  HSkewUpdateTree l e tr tr') =>
+%    HSkewUpdateTree' ('Just v) l e  ('Node '(l', v') tl tr)
+%                                ('Node '(l'', v'') tl' tr')
+%    where
+%    hSkewUpdateTree' _ l e (HNode e' tl tr) =
+%        HNode  (hSkewUpdateField l e e')
+%               (hSkewUpdateTree l e tl)
+%               (hSkewUpdateTree l e tr)
+%\end{code}
 %
 Finally, when we arrive to a |Field| and we know the label is the one we
 are searching for (because we are considering the case |HJust v|), we simply return the updated field.
 %
--- \begin{code}
--- instance
-    -- HSkewUpdateField' ('Just v) l e l v l e
-     -- where
-       -- hSkewUpdateField' _ l e e' = Field e
--- \end{code}
+%\begin{code}
+%instance
+%    HSkewUpdateField' ('Just v) l e l v l e
+%     where
+%       hSkewUpdateField' _ l e e' = Field e
+%\end{code}
 
 At run time, this implementation of |hSkewUpdate| only
 rebuilds the path to the field to update,
