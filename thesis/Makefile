@@ -7,7 +7,7 @@ run: thesis.hs
 	run$(GHC) thesis.hs
 
 thesis.pdf: thesis.tex thesis.bib
-	latexmk -pdf -quiet thesis.tex
+	latexmk -pdf thesis.tex
 
 GHC=ghc-8.2.1
 %GHC=ghc-7.4.2

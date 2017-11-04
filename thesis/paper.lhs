@@ -20,10 +20,11 @@
 
 %endif
 
+%format !!! = " ~''"
+%format !!!: = "'':"
+
 %if style==newcode
 
-%format !!! = "''"
-%format !!!: = "'':"
 
 \begin{code}
 {-# LANGUAGE EmptyDataDecls #-}
@@ -109,39 +110,20 @@ because the position of each field is statically known,
 trees don't need to be ordered to fulfill requests in logarithmic time.
 Balance suffices.
 
-This thesis modernizes our presentation in \cite{martinez2013just}.
-Our core trick is the observation that when looking up a field by its compile time label in a branching data structure,
+Our core trick is the observation that when looking up a field
+by its compile time label in an unordered branching data structure,
 paths that don't get to the field are pruned by the compiler and are not traversed at runtime.
+The compiler traverses all fields but the program itself only has to traverse a small subset.
+Figure~\ref{fig:search-skew} demonstrates that even when the wanted field is the last,
+it can be reached visiting only one node of each tree level.
+
+This thesis modernizes our presentation in \cite{martinez2013just}.
 Harnessing modern Haskell features somewhat distances our solution from the original HList \cite{KLS04}.
 In particular we take advantage of singletons \cite{eisenberg2013dependently}
 to cleanly delimit the work at compile time later consumed at runtime.
 We first present a linked list solution less featured than production implementations such as \cite{vinyl}
 but with a more modern implementation
 that lays the groundwork for later tree and array implementations.
-
-Another contribution of this paper is the trick we use to reduce the run time work.
-We have observed that, when looking-up an element in a HList,
-the element is first searched at compile time in order to determine whether it
-belongs to the list.
-%and raise an error when it does not.
-This search generates the path the program follows at run time to obtain the element.
-In Figure~\ref{fig:search-hlist} we represent with a dashed arrow the compile time search,
-and with a solid arrow the generated path followed at run time.
-Since the structure is linear, the search and the path have the same length.
-
-\begin{figure}[tp]
-\begin{center}
-\includegraphics[scale=0.5]{search-hlist.pdf}
-\end{center}
-\caption{Search |l7| in HList} \label{fig:search-hlist}
-\end{figure}
-
-Thus, the key idea is very simple. When in Haskell we compare, for example, two stings, such as |"foo" == "baar"|, the entire process of searching the correct instance of |Eq| to be used is performed at compile time. No work is done at run time to search the correct instance and discard the incorrect ones. We apply the same concept to perform the search of a label into a record. Given that a label is represented by a singleton type we have enough information to determine the ``path of instances" that goes to it, discarding any possible wrong path.
-We also make use of lazy evaluation, to tell the compiler which path to follow without any cost at run time.
-
-%Instead of a linear structure as used by HList,
-For example, one of our proposed implementations uses an alternative structure for the representation of heterogeneous collections which is based on balanced trees.
-Such a structure better profits from the information given by the compile time search, leading to logarithmic length paths in the run time traversal (see Figure~\ref{fig:search-skew}).
 We show experimental results that confirm this behaviour.
 
 \begin{figure}[tp]
@@ -151,69 +133,51 @@ We show experimental results that confirm this behaviour.
 \caption{Search |l7| in balanced tree} \label{fig:search-skew}
 \end{figure}
 
+TODO thesis organization
 
-The rest of the paper is organized as follows.
-We start with a brief review of the type-level techniques used to implement extensible records
-by HList (Section~\ref{sec:hlist}).
-In Section~\ref{sec:faster} we show how using the same type-level techniques we can obtain alternative implementations of extensible records with faster lookup operations at run time.
-Section~\ref{sec:efficiency} presents some experimental results that compare the implementations we propose with HList, both at compile time and run time.
-Finally, in Section~\ref{sec:conclusions} we draw some conclusions and present possible directions for future work.
+\section{Singletons and classes}
 
-%if False
-In the rest of this paper we review the type-level techniques used to implement extensible records
-by HList (Section~\ref{sec:hlist}) and how we use these techniques to provide a couple of alternative implementations,
-%based on arrays and skew lists \cite{Mye83,OkaThesis},
-which turn out to have faster lookup operations at run time (Section~\ref{sec:faster}).
-In Section~\ref{sec:efficiency} we show some results about the efficiency of our approach compared to HList.
-Finally, in Section~\ref{sec:conclusions} we present some conclusions and possible directions for future work.
-%endif
+Since \cite{yorgey2012giving} standard data types are available as kinds also.
+One data type may be indexed with another data type that has been promoted.
+Singletons are types that have only one value
+and can simulate dependent types.
+The singletons library can generate singletons via Template Haskell \cite{SPJ02}.
+The standard |Maybe| data type is defined as
 
+\begin{spec}
+data Maybe a
+  =  Nothing
+  |  Just a
+\end{spec}
+which turns into the singleton
+\begin{spec}
+data SMaybe a where
+  SNothing  ::  SMaybe  !!!Nothing
+  SMaybe    ::  Sing e -> SMaybe (!!!Just e)
+\end{spec}
 
-\section{HList}\label{sec:hlist}
+We decorate promoted uses of Nothing and Just with ' to aid understanding
+although it's only rarely needed to disambiguate.
 
-HList is a Haskell library that implements typeful heterogeneous collections,
-such as heterogeneous lists or records, using extensions of Haskell for multi-parameter
-classes \cite{PJM97} and functional dependencies \cite{Jon00}.
-HList strongly relies on \emph{type-level programming} techniques by means of which
-types are used to represent type-level values, and classes are used to represent
-type-level functions.
-
-We illustrate the use of type-level programming by means of two simple examples that
-will be used later in the paper. We start with a type-level representation of booleans values.
-Since we are only interested in type-level computations, we define empty
-types |HTrue| and |HFalse| corresponding to each boolean value.
-
-The inhabitants |hTrue| and |hFalse| of those types are defined solely
-to be used in value-level expressions to construct type-level values by
-referring to the types of such expressions.
-
-Type-level functions can be described using multi-parameter classes with functional dependencies.
-For example, we can encode type-level negation by defining the following class:
-The functional dependency |t -> t'| expresses that the parameter |t|
-uniquely determines the parameter |t'|.
-Therefore, once |t| is instantiated,
-the instance of |t'| must be uniquely inferable by the type-system.
-In other words, the relation between |t| and |t'| is actually a function.
-Whereas the class definition describes the type signature of the type-level function,
-the function itself is defined by the following instance declarations:
-
-If we write the expression |(hNot hFalse)|, then we know that |t| is |HFalse|.
-So, the first instance of |hNot| is selected and thus |t'| is inferred to be |HTrue|.
-Observe that the computation is completely at the type-level;
-no interesting value-level computation takes place.
-
-Another example is the type-level representation of the maybe type.
-In this case we are interested in manipulating a value-level value associated with each type constructor.
+We define |HMaybe|, a close relative of |SMaybe| that doesn't singletonize the element itself.
+The H prefix honors HList.  
 
 \begin{code}
 data HMaybe m where
-    HNothing :: HMaybe 'Nothing
-    HJust :: e -> HMaybe ('Just e)
-instance Show (HMaybe !!!Nothing) where
-    show HNothing = "HNothing"
-instance Show m => Show (HMaybe (!!!Just m)) where
-    show (HJust a) = "(HJust " ++ show a ++ ")"
+    HNothing :: HMaybe !!!Nothing
+    HJust :: e -> HMaybe (!!!Just e)
 \end{code}
+
+
+We'll use |HMaybe| as the return type of our lookup functions.
+When a record doesn't contain a field of a given label,
+lookup returns |HNothing|, so we statically know at compile time
+that the operation failed.
+When lookup succeeds, |HJust| signals that fact at compile time
+and offers the value of the field at runtime.
+
+Operations with |HMaybe| can usually implemented with  
+|
 
 We aim to construct a type-level value of the maybe type from a boolean. For this purpose
 we define the following multi-parameter class. The parameter |v| specifies the type
