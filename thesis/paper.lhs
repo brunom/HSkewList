@@ -20,8 +20,13 @@
 
 %endif
 
+%if style==newcode
+%format !!! = "''"
+%format !!!: = "'':"
+%else
 %format !!! = " ~''"
 %format !!!: = "'':"
+%endif
 
 %if style==newcode
 
@@ -152,8 +157,8 @@ data Maybe a
 which turns into the singleton
 \begin{spec}
 data SMaybe a where
-  SNothing  ::  SMaybe  !!!Nothing
-  SMaybe    ::  Sing e -> SMaybe (!!!Just e)
+  SNothing :: SMaybe  !!!Nothing
+  SMaybe :: Sing e -> SMaybe (!!!Just e)
 \end{spec}
 
 We decorate promoted uses of Nothing and Just with ' to aid understanding
@@ -163,11 +168,19 @@ We define |HMaybe|, a close relative of |SMaybe| that doesn't singletonize the e
 The H prefix honors HList.  
 
 \begin{code}
-data HMaybe m where
+data HMaybe a where
     HNothing :: HMaybe !!!Nothing
     HJust :: e -> HMaybe (!!!Just e)
 \end{code}
 
+%if style==newcode
+\begin{code}
+instance Show (HMaybe !!!Nothing) where
+    show HNothing = "HNothing"
+instance Show m => Show (HMaybe (!!!Just m)) where
+    show (HJust a) = "(HJust " ++ show a ++ ")"
+\end{code}
+%endif
 
 We'll use |HMaybe| as the return type of our lookup functions.
 When a record doesn't contain a field of a given label,
@@ -176,25 +189,69 @@ that the operation failed.
 When lookup succeeds, |HJust| signals that fact at compile time
 and offers the value of the field at runtime.
 
-Operations with |HMaybe| can usually implemented with  
-|
+Operations with |HMaybe| can usually implemented
+with type classes by dispatching on types
+or with a normal function doing case analysis on constructors.
+For example, the function
+\begin{spec}
+$(promote [d|
+    plus :: Maybe a -> Maybe a -> Maybe a
+    plus Nothing b = b
+    plus (Just a) b = Just a
+    |])
+\end{spec}
+can be lifted to |HMaybe| simply as
+\begin{spec}
+hPlusSing :: HMaybe a -> HMaybe b -> HMaybe (Plus a b)
+hPlusSing HNothing b = b
+hPlusSing (HJust a) _ = HJust a
+\end{spec}
+or more elaborately as
+\begin{spec}
+class HPlusClass a where
+    hPlusClass :: HMaybe a -> HMaybe b -> HMaybe (Plus a b)
+instance HPlusClass !!!Nothing where
+    hPlusClass _  b = b
+instance HPlusClass (!!!Just a) where
+    hPlusClass a  _ = a
+\end{spec}
 
-We aim to construct a type-level value of the maybe type from a boolean. For this purpose
-we define the following multi-parameter class. The parameter |v| specifies the type
-of the values to be contained by a |HJust|.
+|hPlusSing| inspects the first argument at runtime
+to take one path or the other,
+while |hPlusClass| just needs the types.
+If the first argument of |hPlusSing| is |undefined|
+|hPlusSing| returns |undefined|.
+But |hPlusClass| works when the first argument is |undefined :: HNothing|.
 
-Another operation that will be of interest on this type is the one that combines
-two values of type maybe.
+\subsection{List record}
 
-\subsection{Heterogeneous Lists}
-
-Heterogeneous lists can be represented with the data types |HNil| and |HCons|,
-which model the structure of lists both at the value and type level:
-
+Records can be implemented with a list defined by
 \begin{code}
 data ListRecord (fs :: [(l, Type)]) where
    ListNil  :: ListRecord !!![]
    ListCons :: v -> ListRecord fs -> ListRecord ( !!!(l,v) !!!: fs)
+\end{code}
+We leave open the kind of labels.
+We can use types as in the original HList
+or symbols now that Haskell supports compile time literals.
+|ListRecord| is indexed by a list of pairs of labels and values.
+List of pairs is the native data type of Prelude's Lookup function.
+The label is purely a phantom type.
+It doesn't appear in the left hand side of the |ListCons| equation.
+
+We define a smart constructor |hListExtend|
+to avoid specifying the type of constructed records.
+We won't always care so much for ergonomics,
+specially in internal functions.
+This way we also align |ListRecord| with our other implementations of records,
+which need nontrivial constructors.
+|.=.| receives a label wrapped in a |proxy| to support labels not from kind |Type|,
+particularly |Symbol|, the promotion of text.
+Since |proxy| is a variable, we support any wrapper, |Proxy| and |Sing| for example.
+\begin{code}
+newtype Field l v   =   Field { value :: v }
+(.=.)               ::  proxy l -> v -> Field l v
+_  .=.  v           =   Field v
 
 hListExtend :: Field l v -> ListRecord fs -> ListRecord ('(l, v) ': fs)
 hListExtend (Field v) vs = v `ListCons` vs
@@ -204,28 +261,7 @@ hListEmpty :: ListRecord !!![]
 hListEmpty = ListNil
 \end{code}
 
-For example, the value |True `HCons` 'a' `HCons` HNil| is a heterogeneous list of type |Bool `HCons` Char `HCons` HNil|.
-
-\subsection{Extensible Records}
-\label{sec:extensiblerecords}
-
-Records are mappings from labels to values.
-They are modeled by an |HList| containing a heterogeneous list of fields.
-A field with label |l| and value of type |v| is represented by the type:
-
-\begin{code}
-newtype Field l v   =   Field { value :: v }
-(.=.)               ::  proxy l -> v -> Field l v
-_  .=.  v           =   Field v
-\end{code}
-
-\noindent
-Notice that the label is a phantom type \cite{Hin03}.
-We can retrieve the label value by using the function |label|, which exposes
-the phantom type parameter:
-
-We define separate types and constructors for labels.
-
+We define a bunch of labels of kind |Symbol|
 \begin{code}
 l1 = undefined :: Proxy "L1"
 l2 = undefined :: Proxy "L2"
@@ -235,11 +271,8 @@ l5 = undefined :: Proxy "L5"
 l6 = undefined :: Proxy "L6"
 l7 = undefined :: Proxy "L7"
 \end{code}
-
-Thus, the following defines a record (|rList|) with seven fields:
-
+so that we can define our running sample record with seven fields:
 \begin{code}
-
 rList =
   (l1  .=.  True     )  `hListExtend`
   (l2  .=.  9        )  `hListExtend`
@@ -251,19 +284,35 @@ rList =
   hListEmpty
 \end{code}
 
-The class |HListGet| retrieves from a record the value part
-corresponding to a specific label:
-
+The implementation of lookup for |ListRecords|
+is general to set the stage for the other record variants.
+|PathList| is the series of steps to reach a field.
+It's actually just a unary number.
 \begin{code}
 $(singletons [d|
     data PathList = PathListTail PathList | PathListHead
     |])
-
+\end{code}
+|makePathList| searches for the field in the pair list.
+We'll only need it at compile time,
+but the runtime definition allows easier testing.
+The algorithm can be a little messy
+without forcing the writing of a lot of auxiliary type families
+to account for their limited expressibility.
+\begin{code}
 $(promoteOnly [d|
     makePathList :: Eq l => l -> [(l,v)] -> Maybe PathList 
     makePathList l [] = Nothing
-    makePathList l ((l2, v) : fs) = if l == l2 then Just PathListHead else case makePathList l fs of Nothing -> Nothing; Just p -> Just $ PathListTail p
-    
+    makePathList l ((l2, v) : fs) = 
+        if l == l2 
+        then Just PathListHead
+        else case makePathList l fs of
+            Nothing -> Nothing
+            Just p -> Just $ PathListTail p
+\end{code}
+Finally, |walkList| traverses the |PathList| and the pair list
+simultaneously to retrieve the field value. 
+\begin{code}
     walkList :: Maybe PathList -> [(l,v)] -> Maybe v
     walkList Nothing _ = Nothing
     walkList (Just p) fs = Just $ walkList' p fs
@@ -272,7 +321,13 @@ $(promoteOnly [d|
     walkList' PathListHead ((_, v) : fs) = v
     walkList' (PathListTail p) (_ : fs) = walkList' p fs
     |])
+\end{code}
 
+The runtime implementation of list record lookup
+depends on the compiler to compute the promoted |MakePathList|
+as part of type checking,
+and then just transliterates |walkList|.
+\begin{code}
 hListGetSing ::
     forall proxy l fs.
     SingI (MakePathList l fs) =>
@@ -290,16 +345,12 @@ hWalkList'Sing SPathListHead (v `ListCons` _) = v
 hWalkList'Sing (SPathListTail m) (_ `ListCons` fs) = hWalkList'Sing m fs    
 \end{code}
 
-\noindent
-At the type-level it is statically checked that the record |r| indeed has
-a field with label |l| associated with a value of the type |v|.
-At value-level |hListGet| returns the value of type |v|.
-For example, the following expression returns the string |"last"|:
-
+%if style==newcode
 \begin{code}
 lastListSing = hListGetSing l7 rList
 lastListClass = hListGetClass l7 rList
 \end{code}
+%endif  
 
 Instead of polluting the definitions of type-level functions
 with the overlapping instance extension when comparing two types to be equal (e.g. labels),
