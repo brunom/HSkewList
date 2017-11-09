@@ -142,13 +142,39 @@ TODO thesis organization
 
 \section{Singletons and classes}
 
-Since \cite{yorgey2012giving} standard data types are available as kinds also.
+Since \cite{yorgey2012giving} standard data types are also available as kinds.
 One data type may be indexed with another data type that has been promoted.
-Singletons are types that have only one value
-and can simulate dependent types.
-The singletons library can generate singletons via Template Haskell \cite{SPJ02}.
-The standard |Maybe| data type is defined as
+The killer application of promoted kinds is using a promoted natural number
+\begin{spec}
+data Nat
+    =  Zero
+    |  Succ Nat
+\end{spec}
+to signal the length of a vector
+\begin{spec}
+data Vec :: * -> Nat -> *  where
+    VNil   :: Vec a !!!Zero
+    VCons  :: a->Vec a n->Vec a (!!!Succ n)
+\end{spec}
+We decorate promoted uses of constructors with ' to aid understanding
+although it's only rarely needed to disambiguate.
 
+Singletons are specially crafted types
+that derive from another promoted type
+and have only one value,
+so there's a one to one relationship between a singleton value and it's type.
+The singleton for the natural numbers is
+\begin{spec}
+data SNat :: Nat -> * where
+    SZero  :: SNat 'Zero
+    SSucc  :: forall (n::Nat). SNat n -> SNat ('Succ n) 
+\end{spec}
+Only |SZero| (and undefined) has type |SNat !!!Zero| and so on.
+The singletons library can generate singletons via Template Haskell \cite{SPJ02}
+observing the naming convention illustrated above.
+
+We'll also use some 'partial' singletons.
+For the standard |Maybe| data type defined as
 \begin{spec}
 data Maybe a
   =  Nothing
@@ -160,18 +186,15 @@ data SMaybe a where
   SNothing :: SMaybe  !!!Nothing
   SMaybe :: Sing e -> SMaybe (!!!Just e)
 \end{spec}
-
-We decorate promoted uses of Nothing and Just with ' to aid understanding
-although it's only rarely needed to disambiguate.
-
-We define |HMaybe|, a close relative of |SMaybe| that doesn't singletonize the element itself.
-The H prefix honors HList.  
-
+we'll define
 \begin{code}
 data HMaybe a where
     HNothing :: HMaybe !!!Nothing
     HJust :: e -> HMaybe (!!!Just e)
 \end{code}
+with the H prefix honoring HList.
+Notice that ow|HJust| wraps a naked |e|,
+not |Sing e| like |SMaybe|.
 
 %if style==newcode
 \begin{code}
@@ -189,9 +212,9 @@ that the operation failed.
 When lookup succeeds, |HJust| signals that fact at compile time
 and offers the value of the field at runtime.
 
-Operations with |HMaybe| can usually implemented
-with type classes by dispatching on types
-or with a normal function doing case analysis on constructors.
+Both type classes, by dispatching on types,
+and normal functions, by doing case analysis on constructors,
+can implement |HMaybe| operations.
 For example, the function
 \begin{spec}
 $(promote [d|
@@ -272,6 +295,13 @@ l6 = undefined :: Proxy "L6"
 l7 = undefined :: Proxy "L7"
 \end{code}
 so that we can define our running sample record with seven fields:
+
+%if style==newcode
+\begin{code}
+{-# NOINLINE rList #-}
+\end{code}
+%endif  
+
 \begin{code}
 rList =
   (l1  .=.  True     )  `hListExtend`
@@ -345,34 +375,10 @@ hWalkList'Sing SPathListHead (v `ListCons` _) = v
 hWalkList'Sing (SPathListTail m) (_ `ListCons` fs) = hWalkList'Sing m fs    
 \end{code}
 
-%if style==newcode
-\begin{code}
-lastListSing = hListGetSing l7 rList
-lastListClass = hListGetClass l7 rList
-\end{code}
-%endif  
-
-Instead of polluting the definitions of type-level functions
-with the overlapping instance extension when comparing two types to be equal (e.g. labels),
-HList encapsulates type comparison in |HEq|.
-The type equality predicate |HEq| results in |HTrue| in case the compared types are equal and |HFalse| otherwise.
-Thus, when comparing two types in other type-level functions (like |HListGet| below),
-these two cases can be discriminated without using overlapping instances.
-%
-We will not delve into the different possible definitions for |HEq|.
-For completeness, here is one that suffices for our purposes.
-For a more complete discussion about type equality in Haskell
-we refer to \cite{type-eq}.
-At this point we can see that the use of overlapping instances is unavoidable. This explains why
-the implementation of HList is based on type classes and functional dependencies instead of \emph{type families} \cite{Chak05,1086397,Schrijvers2008} (which do not support overlapping instances).
-
-|HListGet| uses |HEq| to discriminate the two possible cases.
-
-Either the label of the current field matches |l|,
-or the search must continue to the next node.
-
-|HListGet'| has two instances, for the cases |HTrue| and |HFalse|.
-
+The implementation with type classes is analogous.
+Funtional dependencies are unnecessary.
+|Proxy| substitutes |Sing| and the path is never consumed at runtime,
+gaining a little efficiency.
 \begin{code}
 
 hListGetClass :: forall proxy l fs p. (p ~ MakePathList l fs, HWalkListClass p) => proxy l -> ListRecord fs -> HMaybe (WalkList p fs)
@@ -390,25 +396,28 @@ class HWalkList'Class p where
 instance HWalkList'Class 'PathListHead where
     hWalkList'Class _ (v `ListCons` _) = v
 instance HWalkList'Class p => HWalkList'Class ('PathListTail p) where
-    hWalkList'Class _ (_ `ListCons` fs) = hWalkList'Class (undefined :: Proxy p) fs  
-
+    hWalkList'Class _ (_ `ListCons` fs) = hWalkList'Class (undefined :: Proxy p) fs
 \end{code}
-
-\noindent
-If the labels match, the corresponding value is returned, both at the value and type levels.
-Otherwise, |HListGet'| calls back to |HListGet| to continue the search.
-The two type-functions are mutually recursive.
-There is no case for the empty list; lookup fails.
 
 For GHC, the type level machinery not only generates correct value level code,
 but efficient code too.
-At the value level, the functions |hListGet| and |hListGet'| are trivial,
+At the value level, the functions |hWalkListClass| and |hWalkList'Class| are trivial,
 devoid of logic and conditions.
 For this reason,
-GHC is smart enough to elide the dictionary objects and indirect jumps for |hListGet|.
+GHC is smart enough to elide the dictionary objects and indirect jumps for |hWalkListClass|.
 The code is inlined to a case cascade, but the program must traverse the linked list.
-For example, this is the GHC core of the example:
+When GHC is nerfed to forbid it inlining |rList| and just producing |"last"|,
+\begin{code}
+lastListClass = hListGetClass l7 rList
+\end{code}
 
+%if style==newcode
+\begin{code}
+lastListSing = hListGetSing l7 rList
+\end{code}
+%endif  
+
+\noindent generates the same core code as
 \begin{code}
 lastListClassCore = case rList of
   _ `ListCons` rs1 -> case rs1 of
@@ -420,6 +429,10 @@ lastListClassCore = case rList of
               e `ListCons` _ -> e
 \end{code}
 
+|lastListSing| generates less efficient code
+because each step entails three pattern matches:
+the list, the path and its equality constraint.
+
 \section{Faster Extensible Records}\label{sec:faster}
 
 Extensible records can double as
@@ -428,13 +441,12 @@ collections that guarantee at compile time
 that all labels searched for are available.
 For example, \cite{FlyFirstClass}, a library for first-class attribute
 grammars, uses extensible records to encode the collection of
-attributes associated to each non-terminal. If we wanted to use it to
+attributes associated to each non-terminal. If we wanted to use records to
 implement a system with a big number of attributes (e.g. a compiler)
 an efficient structure would be needed.
-Increasing the size of GHC's context reduction stack
-makes the program compile
-but at run time the linear time lookup algorithm
-hurts performance.\marcos{queda medio raro esto}
+After increasing the size of GHC's context reduction stack,
+the program compiles,
+but it runs slowly due to the linear time lookup algorithm.
 The usual replacement when lookup in a linked list is slow
 is a search tree.
 In that case we would need to define a |HOrd| type-function
@@ -1583,9 +1595,10 @@ even as a built-in solution.
 main =
     print lastListSing >>
     print lastListClass >>
-    print lastArray >>
-    print lastSkewSing >>
-    print lastSkewClass >>
+    print lastListClassCore >>
+    -- print lastArray >>
+    -- print lastSkewSing >>
+    -- print lastSkewClass >>
     return ()
 
 hListUpdate a = undefined
