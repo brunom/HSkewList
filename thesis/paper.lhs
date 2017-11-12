@@ -186,15 +186,17 @@ data SMaybe a where
   SNothing :: SMaybe  !!!Nothing
   SMaybe :: Sing e -> SMaybe (!!!Just e)
 \end{spec}
-we'll define
+we'll define the GADT \cite{peyton2006simple}
 \begin{code}
 data HMaybe a where
     HNothing :: HMaybe !!!Nothing
     HJust :: e -> HMaybe (!!!Just e)
 \end{code}
 with the H prefix honoring HList.
-Notice that ow|HJust| wraps a naked |e|,
-not |Sing e| like |SMaybe|.
+Notice that |HJust| wraps a naked |e|,
+not a |Sing e| like |SJust|.
+Both |SMaybe| and |HMaybe| can force term and type level
+copmutations to run in-sync.
 
 %if style==newcode
 \begin{code}
@@ -204,13 +206,6 @@ instance Show m => Show (HMaybe (!!!Just m)) where
     show (HJust a) = "(HJust " ++ show a ++ ")"
 \end{code}
 %endif
-
-We'll use |HMaybe| as the return type of our lookup functions.
-When a record doesn't contain a field of a given label,
-lookup returns |HNothing|, so we statically know at compile time
-that the operation failed.
-When lookup succeeds, |HJust| signals that fact at compile time
-and offers the value of the field at runtime.
 
 Both type classes, by dispatching on types,
 and normal functions, by doing case analysis on constructors,
@@ -246,6 +241,13 @@ If the first argument of |hPlusSing| is |undefined|
 |hPlusSing| returns |undefined|.
 But |hPlusClass| works when the first argument is |undefined :: HNothing|.
 
+We'll use |HMaybe| as the return type of our lookup functions.
+When a record doesn't contain a field of a given label,
+lookup returns |HNothing|, so we statically know at compile time
+that the operation failed.
+When lookup succeeds, |HJust| signals that fact at compile time
+and offers the value of the field at runtime.
+
 \subsection{List record}
 
 Records can be implemented with a list defined by
@@ -256,9 +258,9 @@ data ListRecord (fs :: [(l, Type)]) where
 \end{code}
 We leave open the kind of labels.
 We can use types as in the original HList
-or symbols now that Haskell supports compile time literals.
+or symbols now that Haskell supports compile time string literals.
 |ListRecord| is indexed by a list of pairs of labels and values.
-List of pairs is the native data type of Prelude's Lookup function.
+List of pairs is the native data type of Prelude's |lookup| function.
 The label is purely a phantom type.
 It doesn't appear in the left hand side of the |ListCons| equation.
 
@@ -266,13 +268,13 @@ We define a smart constructor |hListExtend|
 to avoid specifying the type of constructed records.
 We won't always care so much for ergonomics,
 specially in internal functions.
-This way we also align |ListRecord| with our other implementations of records,
+|hListExtend| also aligns |ListRecord| with our other implementations of records,
 which need nontrivial constructors.
 |.=.| receives a label wrapped in a |proxy| to support labels not from kind |Type|,
 particularly |Symbol|, the promotion of text.
 Since |proxy| is a variable, we support any wrapper, |Proxy| and |Sing| for example.
 \begin{code}
-newtype Field l v   =   Field { value :: v }
+newtype Field l v   =   Field v
 (.=.)               ::  proxy l -> v -> Field l v
 _  .=.  v           =   Field v
 
@@ -315,20 +317,23 @@ rList =
 \end{code}
 
 The implementation of lookup for |ListRecords|
-is general to set the stage for the other record variants.
+is more elaborate than needed to set the stage for the other record variants.
 |PathList| is the series of steps to reach a field.
 It's actually just a unary number.
+At each node the path leads to the head or the tail of the list.
 \begin{code}
 $(singletons [d|
     data PathList = PathListTail PathList | PathListHead
     |])
 \end{code}
+
 |makePathList| searches for the field in the pair list.
 We'll only need it at compile time,
 but the runtime definition allows easier testing.
-The algorithm can be a little messy
-without forcing the writing of a lot of auxiliary type families
-to account for their limited expressibility.
+The singletons package generates the promoted type family for us.
+At the term-level we can write the function a little messy
+without type families limited expressibility
+forcing us to chunk it into a lot of auxiliary definitions.
 \begin{code}
 $(promoteOnly [d|
     makePathList :: Eq l => l -> [(l,v)] -> Maybe PathList 
@@ -340,6 +345,7 @@ $(promoteOnly [d|
             Nothing -> Nothing
             Just p -> Just $ PathListTail p
 \end{code}
+
 Finally, |walkList| traverses the |PathList| and the pair list
 simultaneously to retrieve the field value. 
 \begin{code}
@@ -355,8 +361,7 @@ simultaneously to retrieve the field value.
 
 The runtime implementation of list record lookup
 depends on the compiler to compute the promoted |MakePathList|
-as part of type checking,
-and then just transliterates |walkList|.
+as part of type checking.
 \begin{code}
 hListGetSing ::
     forall proxy l fs.
@@ -365,7 +370,20 @@ hListGetSing ::
     ListRecord fs ->
     HMaybe (WalkList (MakePathList l fs) fs)
 hListGetSing l fs = hWalkListSing (sing :: Sing (MakePathList l fs)) fs
+\end{code}
 
+\noindent The |SingI| constraint forces the compiler to compute the path to the field.
+|sing| converts the constraint into a singleton object we can inspect.
+This worker/wrapper pattern is very common with singletons.
+|SingI| is convenient for callers because the compiler fills it automatically,
+but the implementation needs to destruct an object itself.
+Since |SingI| only has method |sing|,
+the method dictionary for |SingI| is |sing| itself.
+After desugaring, a function that takes a constraint
+and one that takes a singleton object are indistinguishable.
+
+The rest is just a mechanical transliteration of |walkList|.
+\begin{code}
 hWalkListSing :: Sing p -> ListRecord fs -> HMaybe (WalkList p fs)
 hWalkListSing SNothing _ = HNothing
 hWalkListSing (SJust p) fs = HJust $ hWalkList'Sing p fs
@@ -399,6 +417,14 @@ instance HWalkList'Class p => HWalkList'Class ('PathListTail p) where
     hWalkList'Class _ (_ `ListCons` fs) = hWalkList'Class (undefined :: Proxy p) fs
 \end{code}
 
+While |hListGetClass| defines its own type class,
+|hListGetSing| uses predefined |SingI|.
+Reuse is the spirit of functional programming.
+If it weren't for |hListGetClass| slight performance advantage,
+|hListGetSing| would be preferable.
+It would be nice if the compiler could generate the same code for both variants.
+The difference in performance is larger in later functions.
+
 For GHC, the type level machinery not only generates correct value level code,
 but efficient code too.
 At the value level, the functions |hWalkListClass| and |hWalkList'Class| are trivial,
@@ -426,7 +452,7 @@ lastListClassCore = case rList of
        _ `ListCons` rs4 -> case rs4 of
           _ `ListCons` rs5 -> case rs5 of
             _ `ListCons` rs6 -> case rs6 of
-              e `ListCons` _ -> e
+              e `ListCons` _ -> HJust e
 \end{code}
 
 |lastListSing| generates less efficient code
@@ -449,25 +475,23 @@ the program compiles,
 but it runs slowly due to the linear time lookup algorithm.
 The usual replacement when lookup in a linked list is slow
 is a search tree.
-In that case we would need to define a |HOrd| type-function
-analogue to HList's magic |HEq|
-and port some standard balanced tree to compile time,
-tricky rotations and all.
-As unappealing as this already is,
-the real roadblock is |HOrd|.
-Without help from the compiler,
-defining such type function for
-unstructured labels is beyond (our) reach.
+The need to compare labels at compile-time
+rules out using plain types as labels.
+Symbols do have ordering.
+Balanced trees have complex implementations
+with tricky rotations,
+but the singletons library surely can promote them.
+The problem is that we want to do the minimum of work at runtime.
+With singletons the runtime definition mirrors the compile time definition,
+and performance suffers.
+The implementation of singleton comparison for Symbols actually compares each character.
 
 The key insight is that sub-linear behavior is only needed at run time.
 We do not worry if the work done at compile time is superlinear
 as long as it helps us to speed up our programs at run time.
-|HListGet| already looks for our label at compile time
-to fail compilation if we require a field for a record
-without such label.
+|MakePathList| can be slower than |walkList| without slowing programs.
 So our idea is to maintain the fields stored unordered, but
-%we just store our field unordered
-in a structure that allows fast random access and depends on the compiler to
+in a structure that allows fast random access and depend on the compiler to
 hardcode the path to our fields.
 
 We will present two variants of faster records.
@@ -483,7 +507,7 @@ genericity over the length of tuples as in \cite{Tullsen00thezip}, i.e. efficien
 %if False
 \alberto{aca lo que queres decir es que no tenes tuplas arbitrarias de largo |n| con sus correspondientes proycciones, no? si armaramos con tuplas un estructura telescopica con pares anidados, acceder un field nos quedaria un camino |fst . snd . ...| y eso es orden |n|. Este problema de las tuplas de largo |n| es una de las motivaciones de staged programming, y en particular de Template Haskell (TH). No se podra combinar lo de type-level programming con TH para en lugar de generar un array, generar una tupla de largo |n| y acceder al i-esimo elemento? tiene pinta de ser equivalente a generar el array, pero es otra alternativa.}
 %endif
-we will use an array instead, converting field values to a common type.
+we will use an array instead, coercing field values to type |Any|.
 %|Any| via |unsafeCoerce|,
 %since array elements must be of the same type.
 %Apart from this breach of type safety,
@@ -491,7 +515,8 @@ This implementation supports linear time insertions
 and constant time lookups.
 
 The second variant is tree-like, being
-based on Skew Binary Random-Access Lists~\cite{OkaThesis}, a structure that guarantees constant time  insertions and logarithmic time access to any element.
+based on Skew Binary Random-Access Lists~\cite{OkaThesis}, a structure that guarantees constant time  insertions 
+and logarithmic time access to any element.
 Other, perhaps simpler, data structures
 such as Braun trees \cite{brauntrees} could have been chosen, since
 the key property
@@ -505,11 +530,13 @@ applications heavy on record modification.
 \subsection{Array Records}\label{sec:array}
 
 An Array Record has two components:
-an array containing the values of the fields, and an heterogeneous list used to find a field's ordinal for lookup in the array.
-To allow the storage of elements of different types in the array, we use the type |Any|\footnote{A special type that can be used as a safe placeholder for any value.}.
-Items are then |unsafeCoerce|d on the way in and out based on the type information we keep in the heterogeneous list.
-%A proper implementation would hide the data constructor
-%in a separate module to ensure type safety.
+an array containing the values of the fields, 
+and compile-time list used to find a field's type and its ordinal for lookup in the array.
+To allow the storage of elements of different types in the array, 
+we use the type |Any|\footnote{A special type that can be used as a safe placeholder for any value.}.
+Items are then |unsafeCoerce|d on the way in and out based on the type information we keep in the compile-time list.
+An industrial implementation would hide the data constructor
+in a separate module to ensure type safety.
 %\alberto{type safety o type abstraction?}
 %
 %
@@ -519,22 +546,41 @@ newtype ArrayRecord (fs :: [(l, Type)]) =
 \end{code}
 
 \subsubsection{Lookup}
-Lookup is done as a two step operation.
-First, the ordinal of a certain label in the record, and the type (|v|) of its stored element, are found with |ArrayFind|.
-%
-%
-Second, function |hArrayGet| uses the index to obtain the element from the array and the
-type (|v|) to coerce that element to its correct type.
-%
+Array lookup is not recursive.
 \begin{code}
-hArrayGet :: forall fs proxy l i. (i ~ ElemIndex l (Map FstSym0 fs), SingI i) => proxy l -> ArrayRecord fs -> HMaybe (Maybe_ 'Nothing (JustSym0 :.$$$ SndSym0 :.$$$ (:!!$$) fs) i)
+hArrayGet :: 
+    forall fs proxy l i.
+    (i ~ ElemIndex l (Map FstSym0 fs), SingI i) => 
+    proxy l -> 
+    ArrayRecord fs -> 
+    HMaybe (Maybe_ 'Nothing (JustSym0 :.$$$ SndSym0 :.$$$ (:!!$$) fs) i)
 hArrayGet _ (ArrayRecord a) = case sing :: Sing i of
     SNothing -> HNothing
     SJust i' -> HJust $ unsafeCoerce (a ! (fromInteger $ fromSing i'))
 \end{code}
 
+\noindent Instead of defining custom helper functions,
+the type-level layer uses standard prelude functions
+already promoted by the singletons library.
+|ElemIndex| returns the position of an element in a list.
+|Map FstSym0 fs| builds a list of just the labels from the list of pairs.
+Since currying is not allowed with type family application,
+each arity gets a separate promoted definition.
+|FstSym0| receives no argument and works only as a first-class type-level argument.
+
+The return type uses the position of the field to get the field value.
+At term-level, the core of the return type would be |maybe Nothing (Just . snd (!!) fs}|.
+So in the case the label is present in the label list 
+and elemIndex did return the position,
+the value comes from indexing the pair list with the same position. and taking the second field of the pair.
+
+At runtime built-in |fromSing| computes the plain term-level index.
+|unsafeCoerce| just restores the type we know the |Any| object actually has.
+
 Figure~\ref{fig:search-array} shows a graphical representation of this process.
-Dashed arrow represents the compile time search of the field in the heterogeneous list which results in the index of the element in the array. Using this index the element is retrieved from the array in constant time at run time (solid arrow).
+Dashed arrow represents the compile time search of the field in the compile-time list
+which results in the index of the element in the array.
+Using this index the element is retrieved from the array in constant time at run time (solid arrow).
 
 \begin{figure}[t]
 \begin{center}
