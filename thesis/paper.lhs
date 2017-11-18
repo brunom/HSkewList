@@ -421,7 +421,7 @@ While |hListGetClass| defines its own type class,
 |hListGetSing| uses predefined |SingI|.
 Reuse is the spirit of functional programming.
 If it weren't for |hListGetClass| slight performance advantage,
-|hListGetSing| would be preferable.
+|hListGetSing| would win.
 It would be nice if the compiler could generate the same code for both variants.
 The difference in performance is larger in later functions.
 
@@ -467,9 +467,9 @@ collections that guarantee at compile time
 that all labels searched for are available.
 For example, \cite{FlyFirstClass}, a library for first-class attribute
 grammars, uses extensible records to encode the collection of
-attributes associated to each non-terminal. If we wanted to use records to
-implement a system with a big number of attributes (e.g. a compiler)
-an efficient structure would be needed.
+attributes associated to each non-terminal.
+To use records to implement a system with a big number of attributes (e.g. a compiler),
+we would need an efficient structure.
 After increasing the size of GHC's context reduction stack,
 the program compiles,
 but it runs slowly due to the linear time lookup algorithm.
@@ -485,6 +485,13 @@ The problem is that we want to do the minimum of work at runtime.
 With singletons the runtime definition mirrors the compile time definition,
 and performance suffers.
 The implementation of singleton comparison for Symbols actually compares each character.
+\begin{spec}
+instance SOrd Symbol where
+  a `sCompare` b = case fromSing a `compare` fromSing b of
+                     LT -> unsafeCoerce SLT
+                     EQ -> unsafeCoerce SEQ
+                     GT -> unsafeCoerce SGT
+\end{spec}
 
 The key insight is that sub-linear behavior is only needed at run time.
 We do not worry if the work done at compile time is superlinear
@@ -514,68 +521,137 @@ we will use an array instead, coercing field values to type |Any|.
 This implementation supports linear time insertions
 and constant time lookups.
 
-The second variant is tree-like, being
-based on Skew Binary Random-Access Lists~\cite{OkaThesis}, a structure that guarantees constant time  insertions 
+The second variant is tree-like,
+based on Skew Binary Random-Access Lists~\cite{OkaThesis}, a structure with constant time insertion
 and logarithmic time access to any element.
-Other, perhaps simpler, data structures
-such as Braun trees \cite{brauntrees} could have been chosen, since
+We could have chosen other, perhaps simpler, data structures
+such as Braun trees \cite{brauntrees}, since
 the key property
 of searching at compile time while retrieving at run time
 works unchanged in any balanced tree structure.
-However, those structures do not offer constant time insertion
-and are not drop-in replacements for simple linear lists.
+In every node of a Braun tree,
+the left subtree has either the same number of nodes as the right subtree or one more,
+guaranteeing the minimum distance from root to leaf.
+Insertion proceeds level by level, left to right.
+However, few structures offer constant time insertion
+and are drop-in replacements for simple linear lists.
 A structure with logarithmic insertion slows down
 applications heavy on record modification.
-
+Insertion in search trees is also logarithmic.
+Otherwise it would be possible to sort a collection in linear time.
+ 
 \subsection{Array Records}\label{sec:array}
 
+
+The most popular implementation of records
+is to place fields contiguous in memory.
+This variant is the most pragmatic that we offer.
+Contiguous memory uses cache best.
+Since normal values in Haskell are boxed,
+there's still one indirection left,
+but it's still less indirections than the alternatives.
+
 An Array Record has two components:
-an array containing the values of the fields, 
-and compile-time list used to find a field's type and its ordinal for lookup in the array.
+an runtime array containing the values of the fields, 
+and a compile-time list used to find a field's type and its ordinal for lookup in the array.
 To allow the storage of elements of different types in the array, 
-we use the type |Any|\footnote{A special type that can be used as a safe placeholder for any value.}.
+we use element type |Any|, a placeholder type that documents our intention,
+even though any boxed type would work.
 Items are then |unsafeCoerce|d on the way in and out based on the type information we keep in the compile-time list.
 An industrial implementation would hide the data constructor
-in a separate module to ensure type safety.
-%\alberto{type safety o type abstraction?}
-%
-%
+in a separate module to ensure type safety
+by only allowing white-listed functions to access the array directly.
 \begin{code}
 newtype ArrayRecord (fs :: [(l, Type)]) =
   ArrayRecord (Array Int Any)
 \end{code}
 
+\subsubsection{Construction}
+
+An empty |ArrayRecord| consists of an empty array,
+and an empty compile-time field list.
+
+\begin{code}
+hArrayEmpty :: ArrayRecord !!! []
+hArrayEmpty =
+  ArrayRecord (array (0, -1) [])
+\end{code}
+
+\noindent The -1 is an eye sore, but we keep the standard arrays for familiarity.
+
+Function |hArrayExtend| adds a field to an array record.
+
+\begin{code}
+hArrayExtend :: Field l v -> ArrayRecord ls -> ArrayRecord ('(l, v) ': ls)
+hArrayExtend (Field v) (ArrayRecord a) =
+    ArrayRecord $ listArray (0, 1 + snd (bounds a)) (unsafeCoerce v : elems a)
+infixr 2 `hArrayExtend`
+\end{code}
+
+\noindent The new field becomes the head of both the compile-time list and the runtime array.
+Growing the array requires an intermediate list
+and computing updated bounds.
+|unsafeCoerce| explicitly converts the field value to |Any|,
+because |Any| is not really a superclass, but a normal type.
+Using |Any| to hide type information is purely a convention.
+The type checker does not treat |Any| specially.
+It's not part of the language.
+
+The previous presentation of this material stored a singly linked list record alongside the array,
+mainly because the typing side of field keeping was not as cleanly segregated from the runtime side as now.
+But the linked list had the advantage of speeding up back to back insertions.
+Since building a new record ignored array of the old record,
+and the array of the new record only depended on the list of the new record,
+the lazy language never built the array of a record that was only used to build bigger records.
+Adding $n$ fields was then a linear time operation instead of quadratic,
+but the list more than doubles the size of the record.
+The optimization can be done manually when needed.
+
 \subsubsection{Lookup}
-Array lookup is not recursive.
+Array lookup is not recursive,
+so the extra overhead of singletons over classes is constant
+and not proportional to the number of fields in the record.
+The implementation also takes advantage of unique singleton features.
+We won't bother writing an implementation with classes.
+This is the case that makes singletons shine.
 \begin{code}
 hArrayGet :: 
     forall fs proxy l i.
-    (i ~ ElemIndex l (Map FstSym0 fs), SingI i) => 
+    (i ~ ElemIndex l (Map FstSym0 fs)
+    ,SingI i) => 
     proxy l -> 
     ArrayRecord fs -> 
-    HMaybe (Maybe_ 'Nothing (JustSym0 :.$$$ SndSym0 :.$$$ (:!!$$) fs) i)
+    HMaybe (Maybe_
+        !!!Nothing
+        (JustSym0 :.$$$ SndSym0 :.$$$ (:!!$$) fs)
+        i)
 hArrayGet _ (ArrayRecord a) = case sing :: Sing i of
     SNothing -> HNothing
     SJust i' -> HJust $ unsafeCoerce (a ! (fromInteger $ fromSing i'))
 \end{code}
 
-\noindent Instead of defining custom helper functions,
-the type-level layer uses standard prelude functions
-already promoted by the singletons library.
-|ElemIndex| returns the position of an element in a list.
-|Map FstSym0 fs| builds a list of just the labels from the list of pairs.
-Since currying is not allowed with type family application,
-each arity gets a separate promoted definition.
-|FstSym0| receives no argument and works only as a first-class type-level argument.
+\noindent
+First we search the compile-time list of fields for the position of the label
+with |ElemIndex l (Map FstSym0 fs)|.
+|ElemIndex| is a standard prelude function
+that the singletons library already promotes out of the box.
+|FstSym0| is the version of compile time |fst| that can be used without arguments.
+\footnote{Other versions end with broken dishes}
+Three places need the position,
+so it pays to abuse an equality constraint to avoid repeating the definition.
 
 The return type uses the position of the field to get the field value.
-At term-level, the core of the return type would be |maybe Nothing (Just . snd (!!) fs}|.
+At term-level, the core of the return type would be |maybe Nothing (Just . snd . (!!) fs) i|.
 So in the case the label is present in the label list 
-and elemIndex did return the position,
-the value comes from indexing the pair list with the same position. and taking the second field of the pair.
+and |elemIndex| did return the position,
+the value comes from indexing the pair list with the same position,
+taking the value half of the pair,
+and wrapping everything in |Just|.
 
-At runtime built-in |fromSing| computes the plain term-level index.
-|unsafeCoerce| just restores the type we know the |Any| object actually has.
+At runtime, first |sing| turns the constraint into either |SJust| or |SNothing|.
+Then |fromSing| computes the plain term-level index.
+|unsafeCoerce| just restores the type the |Any| object actually has.
+By virtue of inlining and constant folding, the compiler computes and hard-codes the position of the field.
 
 Figure~\ref{fig:search-array} shows a graphical representation of this process.
 Dashed arrow represents the compile time search of the field in the compile-time list
@@ -589,118 +665,20 @@ Using this index the element is retrieved from the array in constant time at run
 \caption{Search |l7| in Array} \label{fig:search-array}
 \end{figure}
 
-|ArrayFind| follows the same pattern as |HListGet| shown earlier,
-using |HEq| to discriminate the cases of
-the label of the current field, which may match or not the searched one.
-%
-%
-A difference with |HListGet| is that the work of searching the label,
-performed by |ArrayFind'|, is only done at type-level.
-There is no value-level member of the class |ArrayFind'|;
-observe that |arrayFind'| is just an undefined value
-and nothing will be computed at run time.
-%
-%
-The types |HZero| and |HSucc| implement naturals at type-level.
-If the label is found, then the index |HZero| is returned.
-Otherwise, we increase the index by one (|HSucc|) and continue searching.
-Once the index is found it has to be converted into an |Int| value,
-in order to use this value as the index of the array.
-This is done by the function |toValue|.
-%
-%
-To perform this conversion in constant time, we have to provide
-one specific instance of |ToValue| for every type-level natural we use.
+|HMaybe (Lookup l fs)| would be a nicer return type.
+The problem is convincing the type checker that |lookup|
+is equivalent to the longer composite expression with |elemIndex|, |!!| and |snd|.
+Enlarging the scope of |unsafeCoerce| would work,
+but that's heavier cheating than we already do.
 
-In this implementation of |ArrayFind| it is very easy to distinguish the two phases
-of the lookup process. However, the use of the function |toValue| introduces a big amount of
-boilerplate. Although these instances can be automatically generated using Template Haskell, we make use of a couple of optimizations that are present in GHC to propose a less verbose implementation of |ToValue|.
-%We propose another less verbose implementation of |ToValue|,
-%which makes use of inlining and constant folding, two optimizations that are present in GHC.
-%(and any ohter competent compiler)
-%
-%
-%Based on these optimizations the computation of the index, which would be linear time, is performed at compile time.
-Based on inlining and constant folding, the computation of the index, which is linear time, is performed at compile time.
 
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-%if False
-Lookup is done as a two step operation.
-First the ordinal of a certain label in the record is found with |HFind|.
-Second the index obtained is used
-to retrieve the correct element from the array.
-Figure~\ref{fig:search-array} shows a graphical representation of this process.
-Dashed arrow represents the compile time search of the field in the heterogeneous list which results in the index of the element in the array. Using this index the element is retrieved from the array in constant time at run time (solid arrow).
-
-\begin{figure}[htp]
-\begin{center}
-\includegraphics[scale=0.5]{search-array.pdf}
-\end{center}
-\caption{Search |l7| in Array} \label{fig:search-array}
-\end{figure}
-
-|HFind| follows the same pattern as |HListGet| shown earlier,
-using |HEq| to discriminate the cases of
-the label of the current field, which may match or not the searched one.
-%
-%
-If the label is found, then the index 0 is returned.
-Otherwise, we increase the index by one and continue searching.
-%
-%
-The function |hFind| returns both the type of the field value (at type-level)
-and the index of the field in the record (at value-level).
-Note that the input is not examined at the value level.
-GHC reduces each invocation of hFind to a simple integer constant via inlining and constant folding,
-as any competent compiler is expected to do.
-For this to work, the |HCons| pattern must be lazy, or code needs to be generated to test the data for undefined values.
-
-In |hArrayGet|, we use the index to obtain the element from the array and the
-type (|v|) to coerce the element to its correct type.
-%endif
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-\subsubsection{Construction}
-
-An empty |ArrayRecord| consists of an empty heterogeneous list and an empty array.
-%
+%if style==newcode
 \begin{code}
-hArrayEmpty :: ArrayRecord !!! []
-hArrayEmpty =
-  ArrayRecord (array (0, -1) [])
+{-# NOINLINE rArray #-}
 \end{code}
-%
-Function |hArrayExtend| adds a field to an array record.
-%
-\begin{code}
-hArrayExtend :: Field l v -> ArrayRecord ls -> ArrayRecord ('(l, v) ': ls)
-hArrayExtend (Field v) (ArrayRecord a) = ArrayRecord $ listArray (0, 1 + snd (bounds a)) (unsafeCoerce v : elems a)
-infixr 2 `hArrayExtend`
-\end{code}
+%endif  
 
-The new field (which includes the type information of the element) is added to the heterogeneous list of the old record. The extended heterogeneous list
-is then converted to a plain Haskell list with |hMapAny|
-and turned into the array of the new record with |listArray|.
-Note that the array of the old record is not used.
-In this way, if several fields are added to a record
-but lookup is not done on the intermediate records,
-the intermediate arrays are not ever created by virtue of Haskell's laziness.
-Adding $n$ fields is then a linear time operation instead of quadratic.
-This optimization is the reason why an |ArrayRecord| contains the actual corresponding |HList|
-instead of just the field value type relation as a phantom parameter (i.e. only at the type-level).
-The function |hMapAny| iterates over the heterogeneous list \emph{coercing} its elements to values
-of type |Any|.
-%
-
-
-\subsubsection{Update and Remove}
-
-Functions |hArrayUpdate| and |hArrayRemove|, to update and remove a field respectively,
-are similar to the extension function in the sense that both have to reconstruct
-the array after modifying the list.
-We use the respective functions |hListUpdate| and |hListRemove| from the HList
-implementation of records.
-%
+%if style==newcode
 \begin{code}
 rArray =
   (l1  .=.  True     )  `hArrayExtend`
@@ -713,9 +691,8 @@ rArray =
   hArrayEmpty
 lastArray = hArrayGet l7 rArray
 \end{code}
+%endif  
 %
-With |HArrayUpdate| we change a field of some label with a new field with possibly new label and value.
-
 
 \subsection{Skew Binary Random-Access List}\label{sec:skew}
 
@@ -724,7 +701,7 @@ but easier and more direct fashion than \cite{OkaThesis}, which is founded on nu
 A skew list is a linked list spine of complete binary trees.
 
 The invariant of skew lists is that the height of trees
-get strictly larger along the linked list,
+get strictly larger along the spine,
 except that the first two trees may be of equal size.
 Because of the size restriction,
 the spine is bounded by the logarithm of the element count,
@@ -747,7 +724,7 @@ we remove them and insert a new node built
 of the new element and the two trees removed; and
 (2) we just insert a new leaf.
 In Figure~\ref{fig:insert} we show a graphic representation of
-the successive skew lists that arise in the process of construction of a skew list with the elements of |rList| from section \ref{sec:extensiblerecords}.
+the successive skew lists that arise in the process of construction of a skew list.
 Nodes connected by arrows represent linked-lists and nodes connected by lines represent trees.
 The first two steps (adding elements with label |l7| and |l6|) are in case (2),
 thus two leaves are inserted into the spine.
@@ -1639,10 +1616,10 @@ even as a built-in solution.
 
 \begin{code}
 main =
-    print lastListSing >>
-    print lastListClass >>
-    print lastListClassCore >>
-    -- print lastArray >>
+    -- print lastListSing >>
+    -- print lastListClass >>
+    -- print lastListClassCore >>
+    print lastArray >>
     -- print lastSkewSing >>
     -- print lastSkewClass >>
     return ()
