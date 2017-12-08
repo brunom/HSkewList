@@ -166,8 +166,8 @@ so there's a one to one relationship between a singleton value and it's type.
 The singleton for the natural numbers is
 \begin{spec}
 data SNat :: Nat -> * where
-    SZero  :: SNat 'Zero
-    SSucc  :: forall (n::Nat). SNat n -> SNat ('Succ n) 
+    SZero  :: SNat !!!Zero
+    SSucc  :: forall (n::Nat). SNat n -> SNat (!!!Succ n) 
 \end{spec}
 Only |SZero| (and undefined) has type |SNat !!!Zero| and so on.
 The singletons library can generate singletons via Template Haskell \cite{SPJ02}
@@ -212,7 +212,7 @@ and normal functions, by doing case analysis on constructors,
 can implement |HMaybe| operations.
 For example, the function
 \begin{spec}
-$(promote [d|
+$(singletons [d|
     plus :: Maybe a -> Maybe a -> Maybe a
     plus Nothing b = b
     plus (Just a) b = Just a
@@ -335,7 +335,7 @@ At the term-level we can write the function a little messy
 without type families limited expressibility
 forcing us to chunk it into a lot of auxiliary definitions.
 \begin{code}
-$(promoteOnly [d|
+$(singletons [d|
     makePathList :: Eq l => l -> [(l,v)] -> Maybe PathList 
     makePathList l [] = Nothing
     makePathList l ((l2, v) : fs) = 
@@ -404,16 +404,16 @@ hListGetClass l fs = hWalkListClass (undefined :: Proxy p) fs
 
 class HWalkListClass p where
     hWalkListClass :: proxy p -> ListRecord fs -> HMaybe (WalkList p fs)
-instance HWalkListClass 'Nothing where
+instance HWalkListClass !!!Nothing where
     hWalkListClass _ _ = HNothing
-instance HWalkList'Class p => HWalkListClass ('Just p) where
+instance HWalkList'Class p => HWalkListClass (!!!Just p) where
     hWalkListClass _ fs = HJust $ hWalkList'Class (undefined :: Proxy p) fs
 
 class HWalkList'Class p where
     hWalkList'Class :: proxy p -> ListRecord fs -> WalkList' p fs
-instance HWalkList'Class 'PathListHead where
+instance HWalkList'Class !!!PathListHead where
     hWalkList'Class _ (v `ListCons` _) = v
-instance HWalkList'Class p => HWalkList'Class ('PathListTail p) where
+instance HWalkList'Class p => HWalkList'Class (!!!PathListTail p) where
     hWalkList'Class _ (_ `ListCons` fs) = hWalkList'Class (undefined :: Proxy p) fs
 \end{code}
 
@@ -454,10 +454,71 @@ lastListClassCore = case rList of
             _ `ListCons` rs6 -> case rs6 of
               e `ListCons` _ -> HJust e
 \end{code}
+namely
+%if style==poly
+\begin{code}
+lastListClassCore
+  = case rList of { ListCons @ v @ fs @ l cobox ds fs1 ->
+    case fs1 of {
+      ListNil ipv -> $fHWalkList'ClassPathListTail3 `cast` <Co:68>;
+      ListCons @ v1 @ fs2 @ l1 cobox1 ds1 fs3 ->
+        case fs3 of {
+          ListNil ipv -> $fHWalkList'ClassPathListTail3 `cast` <Co:133>;
+          ListCons @ v2 @ fs4 @ l2 cobox2 ds2 fs5 ->
+            case fs5 of {
+              ListNil ipv -> $fHWalkList'ClassPathListTail3 `cast` <Co:194>;
+              ListCons @ v3 @ fs6 @ l3 cobox3 ds3 fs7 ->
+                case fs7 of {
+                  ListNil ipv -> $fHWalkList'ClassPathListTail3 `cast` <Co:251>;
+                  ListCons @ v4 @ fs8 @ l4 cobox4 ds4 fs9 ->
+                    case fs9 of {
+                      ListNil ipv -> $fHWalkList'ClassPathListTail3 `cast` <Co:304>;
+                      ListCons @ v5 @ fs10 @ l5 cobox5 ds5 fs11 ->
+                        case fs11 of {
+                          ListNil ipv -> $fHWalkList'ClassPathListHead1 `cast` <Co:353>;
+                          ListCons @ v6 @ fs12 @ l6 cobox6 v7 ds6 -> v7 `cast` <Co:371>
+                        }
+                    }
+                }
+            }
+        }
+    }
+    }
+\end{code}
+%endif
+It seems ghc makes core total by inserting explicit error calls for the |ListNil| case in |$fHWalkList'ClassPathListTail3|.
+To get understandable core call it like ghc-8.2.1 thesis.hs -c -O3 -ddump-simpl -dsuppress-idinfo -dsuppress-coercions -dsuppress-type-applications -dsuppress-uniques -dsuppress-module-prefixes.
 
 |lastListSing| generates less efficient code
 because each step entails three pattern matches:
 the list, the path and its equality constraint.
+%if style==poly
+\begin{code}
+hWalkList'SingCore
+  = \ (@ l)
+      (@ (p :: PathList))
+      (@ (fs :: [(l, *)]))
+      (ds :: Sing p)
+      (ds1 :: ListRecord fs) ->
+      case ds `cast` <Co:2> of {
+        SPathListTail @ n $d~ m ->
+          case HEq_sc ($d~ `cast` <Co:5>) of cobox { __DEFAULT ->
+          case ds1 of {
+            ListNil ipv -> lvl35;
+            ListCons @ v @ fs1 @ l1 cobox1 ds2 fs2 ->
+              (hWalkList'Sing m fs2) `cast` <Co:48>
+          }
+          };
+        SPathListHead $d~ ->
+          case HEq_sc ($d~ `cast` <Co:4>) of cobox { __DEFAULT ->
+          case ds1 of {
+            ListNil ipv -> lvl35;
+            ListCons @ v @ fs1 @ l1 cobox1 v1 ds2 -> v1 `cast` <Co:18>
+          }
+          }
+      }
+\end{code}
+%endif  
 
 \section{Faster Extensible Records}\label{sec:faster}
 
@@ -740,23 +801,107 @@ access to some elements.
 
 In this subsection we present our implementation of extensible records
 using (heterogeneous) skew lists.
-First, we introduce some types to model heterogeneous binary trees:
-
-and a smart constructor for leaves:
+First we need a tree type to tag our heterogeneous trees,
+just as we tagged our list records with a list of pairs.
+A Template Haskell splice generates type-level and singleton versions
+of our term-level definition.
 \begin{code}
 $(singletons [d|
     data Tree a
         = Empty
         | Node a (Tree a) (Tree a)
-    data PathSpine = PathSpineTail PathSpine | PathSpineHead PathTree
-    data PathTree = PathTreeRoot | PathTreeLeft PathTree | PathTreeRight PathTree
     |])
+\end{code}
+    
+For convenience, we define the |leaf| smart constructor. 
+\begin{code}
+leaf e = Node e Empty Empty
+type Leaf e = !!!Node e !!!Empty !!!Empty
+\end{code}
+We have to manually define the type-level version
+because the singletons library would define a type family
+and not a type synonym.
+Type families don't work in the header of a class instance
+as we require later on.
 
-$(promote [d|
+The heterogeneous version of trees is a mechanical translation.
+\begin{code}
+data HTree t where
+    HEmpty :: HTree !!!Empty
+    HNode :: v -> HTree t1 -> HTree t2 -> HTree (!!!Node !!!(l, v) t1 t2) 
+\end{code}
+as is the heterogeneous version of |leaf|
+\begin{code}
+type  HLeaf e         =  HTree (Leaf e)
+hLeaf :: v -> HLeaf !!!(l, v)
+hLeaf  v         =  HNode v HEmpty HEmpty
+\end{code}
+
+We tie trees together in a spine
+\begin{code}
+data Spine ts where
+    SpineNil :: Spine !!![]
+    SpineCons :: HTree t -> Spine ts -> Spine (t !!!: ts)
+infixr 2 `SpineCons`
+\end{code}
+that consists and is tagged by a list of trees.
+
+The invariant of skew tree needs |height|.
+\begin{code}
+$(singletons [d|
     height :: Tree e -> Nat
     height Empty = 0
     height (Node _ _ t) = 1 + height t
+    |])
+\end{code}
+\noindent Note that |height| returns |Nat|, not |Int| or |Integer|.
+The change enables correct promotion
+for the price of making the term-level version almost useless.
 
+Each size determines a unique skew tree,
+unlike search trees where the insertion order
+determines slightly different trees even for balanced variants.
+The shape of a skew tree is a shallow function from the previous size 
+\begin{code}
+$(promote [d|
+    skew' f (a:b:ts) | height a == height b = Node f a b : ts
+    skew' f ts = Node f Empty Empty : ts
+
+    skew :: [e] -> [Tree e]
+    skew [] = []
+    skew (f : fs) = skew' f (skew fs)
+    |])
+\end{code}
+
+\noindent We promote skew only to a type function and not also to a singleton function
+to avoid having to rewrite the function without overlapping patterns.
+We won't need the singleton version.
+
+%if style==newcode
+\begin{code}
+$(promote [d|
+    -- TODO find out why skew1 doesn't work like skew
+    skew1 :: [e] -> [Tree e]
+    skew1 ts = foldr skew' [] ts
+    |])
+\end{code}
+%endif
+
+|PathSpine| and |PathTree| mirror earlier |PathList| for linear lists,
+and encode the steps to get to a field.
+|PathTree| has three options.
+The field we want may be in the current node, to the left or to the right.
+|PathSpine| is most similar to |PathList|,
+but if we don't continue down the spine we are still not done.
+We need to continue the path on the current tree.
+\begin{code}    
+$(singletons [d|
+    data PathSpine = PathSpineTail PathSpine | PathSpineHead PathTree
+    data PathTree = PathTreeRoot | PathTreeLeft PathTree | PathTreeRight PathTree
+    |])
+    
+    
+$(singletons [d|
     makePathSpine :: Eq l => l -> [Tree (l, v)] -> Maybe PathSpine
     makePathSpine l [] = Nothing
     makePathSpine l (t : ts) = spinePlus (makePathTree l t) (makePathSpine l ts)
@@ -787,35 +932,7 @@ $(promote [d|
     walkTree PathTreeRoot (Node (l,v) t1 t2) = v
     walkTree (PathTreeLeft p) (Node (l,v) t1 t2) = walkTree p t1
     walkTree (PathTreeRight p) (Node (l,v) t1 t2) = walkTree p t2
-
-    leaf e = Node e Empty Empty
-
-    -- TODO find out why skew1 doesn't work like skew
-    skew1 :: [e] -> [Tree e]
-    skew1 ts = foldr skew' [] ts
-
-    skew :: [e] -> [Tree e]
-    skew [] = []
-    skew (f : fs) = skew' f (skew fs)
-
-    skew' f [] = [leaf f]
-    skew' f [a] = [leaf  f, a]
-    skew' f (a:b:ts) = if (height a == height b) then (Node f a b : ts) else (leaf f:a:b:ts)
     |])
-
-type Leaf2 e = 'Node e 'Empty 'Empty
-
-data HTree t where
-    HEmpty :: HTree 'Empty
-    HNode :: v -> HTree t1 -> HTree t2 -> HTree ('Node '(l, v) t1 t2) 
-type  HLeaf e         =  HTree (Leaf e)
-hLeaf :: v -> HLeaf '(l, v)
-hLeaf  v         =  HNode v HEmpty HEmpty
-
-data Spine ts where
-    SpineNil :: Spine '[]
-    SpineCons :: HTree t -> Spine ts -> Spine (t !!!: ts)
-infixr 2 `SpineCons`
 
 newtype SkewRecord fs = SkewRecord (Spine (Skew fs))
 
@@ -1170,7 +1287,7 @@ we can find.
 The easy case is when the spine begins with a leaf.
 We just return the tail of the spine list.
 \begin{code}
-instance HSkewTail (Leaf2 e : ts) ts where
+instance HSkewTail (Leaf e : ts) ts where
     hSkewTail (_ `SpineCons` ts) = ts
 \end{code}
 
@@ -1617,9 +1734,9 @@ even as a built-in solution.
 \begin{code}
 main =
     -- print lastListSing >>
-    -- print lastListClass >>
+    print lastListClass >>
     -- print lastListClassCore >>
-    print lastArray >>
+    -- print lastArray >>
     -- print lastSkewSing >>
     -- print lastSkewClass >>
     return ()

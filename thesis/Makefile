@@ -15,10 +15,10 @@ GHC=ghc-8.2.1
 thesis.exe : thesis.hs
 	$(GHC) --make thesis.hs -o thesis.exe
 
-thesis.hs : thesis.lhs paper.lhs configuration.lhs
+thesis.hs : records.lhs thesis.lhs paper.lhs configuration.lhs
 	lhs2TeX thesis.lhs -o thesis.hs --newcode
 
-thesis.tex: records.lhs thesis.lhs paper.lhs
+thesis.tex: records.lhs thesis.lhs paper.lhs configuration.lhs
 	lhs2TeX --poly thesis.lhs -o thesis.tex
 
 clean:
