@@ -211,13 +211,13 @@ Both type classes, by dispatching on types,
 and normal functions, by doing case analysis on constructors,
 can implement |HMaybe| operations.
 For example, the function
-\begin{spec}
+\begin{code}
 $(singletons [d|
     plus :: Maybe a -> Maybe a -> Maybe a
     plus Nothing b = b
     plus (Just a) b = Just a
     |])
-\end{spec}
+\end{code}
 can be lifted to |HMaybe| simply as
 \begin{spec}
 hPlusSing :: HMaybe a -> HMaybe b -> HMaybe (Plus a b)
@@ -890,36 +890,59 @@ $(promote [d|
 |PathSpine| and |PathTree| mirror earlier |PathList| for linear lists,
 and encode the steps to get to a field.
 |PathTree| has three options.
-The field we want may be in the current node, to the left or to the right.
+The wanted field may be in the current node, to the left or to the right.
 |PathSpine| is most similar to |PathList|,
-but if we don't continue down the spine we are still not done.
-We need to continue the path on the current tree.
+but if we found the right spine element
+we still need to continue the path down the current tree.
 \begin{code}    
 $(singletons [d|
     data PathSpine = PathSpineTail PathSpine | PathSpineHead PathTree
     data PathTree = PathTreeRoot | PathTreeLeft PathTree | PathTreeRight PathTree
     |])
+\end{code}
     
-    
+To create and consume |PathSpine| and |PathTree|,
+we'll define helper function |maybeMap|, which didn't make the cut
+to be included among the built in functions that come with the singletons library.
+It's a specialization of |fmap| for |Maybe| only.
+The type itself suffices to determine the function.
+\begin{code}    
+$(singletons [d|
+    maybeMap :: (a -> b) -> Maybe a -> Maybe b
+    maybeMap f Nothing = Nothing
+    maybeMap f (Just a) = Just (f a)
+    |])
+\end{code}
+
+With |maybeMap| and |plus| from earlier,
+|makePathSpine| and |makePathTree| are simple.
+|makePathTree| has three cases.
+When the tree is empty, so is the path.
+When the current node has the field, the path is |PathTreeRoot|.
+Else the field may be left or right.
+Since Haskell is lazy, we compute the path for both children
+and have |plus| choose the non empty path.
+|maybeMap| adds |PathTreeRight| or |PathTreeLeft| to the subpath
+from the recursive call.
+\begin{code}
+$(singletons [d|
+    makePathTree :: Eq l => l -> Tree (l, v) -> Maybe PathTree
+    makePathTree l Empty = Nothing
+    makePathTree l (Node (l2, v) t1 t2) = if l == l2 then Just PathTreeRoot else maybeMap PathTreeRight (makePathTree l t1) `plus` maybeMap PathTreeLeft (makePathTree l t2)
+    |])
+\end{code}
+
+|makePathSpine| is similar, just taking into account the difference in the input structure.
+\begin{code}
 $(singletons [d|
     makePathSpine :: Eq l => l -> [Tree (l, v)] -> Maybe PathSpine
     makePathSpine l [] = Nothing
-    makePathSpine l (t : ts) = spinePlus (makePathTree l t) (makePathSpine l ts)
+    makePathSpine l (t : ts) = maybeMap PathSpineHead (makePathTree l t) `plus` maybeMap PathSpineTail (makePathSpine l ts)
+    |])
+\end{code}
 
-    spinePlus :: Maybe PathTree -> Maybe PathSpine -> Maybe PathSpine
-    spinePlus Nothing Nothing = Nothing
-    spinePlus Nothing (Just a) = Just $ PathSpineTail a
-    spinePlus (Just a) _ = Just $ PathSpineHead a
-
-    makePathTree :: Eq l => l -> Tree (l, v) -> Maybe PathTree
-    makePathTree l Empty = Nothing
-    makePathTree l (Node (l2, v) t1 t2) = if l == l2 then Just PathTreeRoot else treePlus (makePathTree l t1) (makePathTree l t2)
-
-    treePlus :: Maybe PathTree -> Maybe PathTree -> Maybe PathTree
-    treePlus Nothing Nothing = Nothing
-    treePlus Nothing (Just a) = Just $ PathTreeRight a
-    treePlus (Just a) _ = Just $ PathTreeLeft a
-
+\begin{code}    
+$(singletons [d|
     walkSpine :: Maybe PathSpine -> [Tree (l, v)] -> Maybe v
     walkSpine Nothing _ = Nothing
     walkSpine (Just p) fs = Just $ walkSpine' p fs
@@ -1733,12 +1756,12 @@ even as a built-in solution.
 
 \begin{code}
 main =
-    -- print lastListSing >>
+    print lastListSing >>
     print lastListClass >>
-    -- print lastListClassCore >>
-    -- print lastArray >>
-    -- print lastSkewSing >>
-    -- print lastSkewClass >>
+    print lastListClassCore >>
+    print lastArray >>
+    print lastSkewSing >>
+    print lastSkewClass >>
     return ()
 
 hListUpdate a = undefined
