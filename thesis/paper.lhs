@@ -943,18 +943,14 @@ $(singletons [d|
 
 \begin{code}    
 $(singletons [d|
-    walkSpine :: Maybe PathSpine -> [Tree (l, v)] -> Maybe v
-    walkSpine Nothing _ = Nothing
-    walkSpine (Just p) fs = Just $ walkSpine' p fs
+    walkSpine :: [Tree (l, v)] -> PathSpine -> v
+    walkSpine (t : ts) (PathSpineHead p) = walkTree t p
+    walkSpine (t : ts) (PathSpineTail p) = walkSpine ts p
 
-    walkSpine' :: PathSpine -> [Tree (l, v)] -> v
-    walkSpine' (PathSpineHead p) (t : ts) = walkTree p t
-    walkSpine' (PathSpineTail p) (t : ts) = walkSpine' p ts
-
-    walkTree :: PathTree -> Tree (l, v) -> v
-    walkTree PathTreeRoot (Node (l,v) t1 t2) = v
-    walkTree (PathTreeLeft p) (Node (l,v) t1 t2) = walkTree p t1
-    walkTree (PathTreeRight p) (Node (l,v) t1 t2) = walkTree p t2
+    walkTree :: Tree (l, v) -> PathTree -> v
+    walkTree (Node (l,v) t1 t2) PathTreeRoot = v
+    walkTree (Node (l,v) t1 t2) (PathTreeLeft p) = walkTree t1 p
+    walkTree (Node (l,v) t1 t2) (PathTreeRight p) = walkTree t2 p
     |])
 
 newtype SkewRecord fs = SkewRecord (Spine (Skew fs))
@@ -1077,53 +1073,53 @@ but follows only the right one at run time.
 
 \begin{code}
 hSkewGetSing ::
-    forall s fs proxy l.
-    (s ~ (MakePathSpine l (Skew fs))
-    ,SingI s) =>
+    forall p fs proxy l.
+    (p ~ (MakePathSpine l (Skew fs))
+    ,SingI p) =>
     proxy l ->
     SkewRecord fs ->
-    HMaybe (WalkSpine s (Skew fs))
-hSkewGetSing l (SkewRecord ts) = hWalkSpineSing (sing :: Sing s) ts
+    HMaybe (MaybeMap (WalkSpineSym1 (Skew fs)) p)
+hSkewGetSing l (SkewRecord ts) = hWalkSpineSing ts (sing :: Sing p)
 
-hWalkSpineSing :: Sing p -> Spine ts -> HMaybe (WalkSpine p ts)
-hWalkSpineSing SNothing _ = HNothing
-hWalkSpineSing (SJust p) ts = HJust $ hWalkSpine'Sing p ts
+hWalkSpineSing :: Spine ts -> Sing p -> HMaybe (MaybeMap (WalkSpineSym1 ts) p)
+hWalkSpineSing ts SNothing = HNothing
+hWalkSpineSing ts (SJust p) = HJust $ hWalkSpine'Sing ts p
 
-hWalkSpine'Sing :: Sing p -> Spine ts -> WalkSpine' p ts
-hWalkSpine'Sing (SPathSpineHead p) (t `SpineCons` ts) = hWalkTreeSing p t
-hWalkSpine'Sing (SPathSpineTail p) (t `SpineCons` ts) = hWalkSpine'Sing p ts
+hWalkSpine'Sing :: Spine ts -> Sing p -> WalkSpine ts p
+hWalkSpine'Sing (t `SpineCons` ts) (SPathSpineHead p) = hWalkTreeSing t p
+hWalkSpine'Sing (t `SpineCons` ts) (SPathSpineTail p) = hWalkSpine'Sing ts p
 
-hWalkTreeSing :: Sing p -> HTree t -> WalkTree p t
-hWalkTreeSing SPathTreeRoot (HNode v t1 t2) = v
-hWalkTreeSing (SPathTreeLeft p) (HNode _ t1 t2) = hWalkTreeSing p t1
-hWalkTreeSing (SPathTreeRight p) (HNode _ t1 t2) = hWalkTreeSing p t2
+hWalkTreeSing :: HTree t -> Sing p -> WalkTree t p
+hWalkTreeSing (HNode v t1 t2) SPathTreeRoot = v
+hWalkTreeSing (HNode _ t1 t2) (SPathTreeLeft p) = hWalkTreeSing t1 p
+hWalkTreeSing (HNode _ t1 t2) (SPathTreeRight p) = hWalkTreeSing t2 p
 
 
 hSkewGetClass ::
-    forall s fs proxy l.
-    (s ~ (MakePathSpine l (Skew fs))
-    ,HWalkSpineClass s) =>
+    forall p fs proxy l.
+    (p ~ (MakePathSpine l (Skew fs))
+    ,HWalkSpineClass p) =>
     proxy l ->
     SkewRecord fs ->
-    HMaybe (WalkSpine s (Skew fs))
-hSkewGetClass l (SkewRecord ts) = hWalkSpineClass (undefined :: Proxy s) ts
+    HMaybe (MaybeMap (WalkSpineSym1 (Skew fs)) p)
+hSkewGetClass l (SkewRecord ts) = hWalkSpineClass (undefined :: Proxy p) ts
 
 class HWalkSpineClass p where
-    hWalkSpineClass :: proxy p -> Spine ts -> HMaybe (WalkSpine p ts)
+    hWalkSpineClass :: proxy p -> Spine ts -> HMaybe (MaybeMap (WalkSpineSym1 ts) p)
 instance HWalkSpineClass 'Nothing where
     hWalkSpineClass _ _ = HNothing
 instance HWalkSpine'Class p => HWalkSpineClass ('Just p) where
     hWalkSpineClass _ ts = HJust $ hWalkSpine'Class (undefined :: Proxy p) ts
 
 class HWalkSpine'Class p where
-    hWalkSpine'Class :: proxy p -> Spine ts -> WalkSpine' p ts
+    hWalkSpine'Class :: proxy p -> Spine ts -> WalkSpine ts p
 instance HWalkTreeClass p => HWalkSpine'Class ('PathSpineHead p) where
     hWalkSpine'Class _ (t `SpineCons` ts) = hWalkTreeClass (undefined :: Proxy p) t
 instance HWalkSpine'Class p => HWalkSpine'Class ('PathSpineTail p) where
     hWalkSpine'Class _ (t `SpineCons` ts) = hWalkSpine'Class (undefined :: Proxy p) ts
 
 class HWalkTreeClass p where
-    hWalkTreeClass :: proxy p -> HTree t -> WalkTree p t
+    hWalkTreeClass :: proxy p -> HTree t -> WalkTree t p
 instance HWalkTreeClass !!!PathTreeRoot where
     hWalkTreeClass _ (HNode v t1 t2) = v
 instance HWalkTreeClass p => HWalkTreeClass ('PathTreeLeft p) where
