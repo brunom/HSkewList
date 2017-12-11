@@ -349,13 +349,22 @@ $(singletons [d|
 Finally, |walkList| traverses the |PathList| and the pair list
 simultaneously to retrieve the field value. 
 \begin{code}
-    walkList :: Maybe PathList -> [(l,v)] -> Maybe v
-    walkList Nothing _ = Nothing
-    walkList (Just p) fs = Just $ walkList' p fs
-    
-    walkList' :: PathList -> [(l, v)] -> v
-    walkList' PathListHead ((_, v) : fs) = v
-    walkList' (PathListTail p) (_ : fs) = walkList' p fs
+    walkList :: [(l, v)] -> PathList -> v
+    walkList ((_, v) : fs) PathListHead = v
+    walkList (_ : fs) (PathListTail p) = walkList fs p
+    |])
+\end{code}
+
+To consume |PathList|,
+we'll define helper function |maybeMap|, which didn't make the cut
+to be included among the built in functions that come with the singletons library.
+It's a specialization of |fmap| for |Maybe| only.
+The type itself suffices to determine the function.
+\begin{code}    
+$(singletons [d|
+    maybeMap :: (a -> b) -> Maybe a -> Maybe b
+    maybeMap f Nothing = Nothing
+    maybeMap f (Just a) = Just (f a)
     |])
 \end{code}
 
@@ -368,8 +377,8 @@ hListGetSing ::
     SingI (MakePathList l fs) =>
     proxy l ->
     ListRecord fs ->
-    HMaybe (WalkList (MakePathList l fs) fs)
-hListGetSing l fs = hWalkListSing (sing :: Sing (MakePathList l fs)) fs
+    HMaybe (MaybeMap (WalkListSym1 fs) (MakePathList l fs))
+hListGetSing l fs = hWalkListSing fs (sing :: Sing (MakePathList l fs))
 \end{code}
 
 \noindent The |SingI| constraint forces the compiler to compute the path to the field.
@@ -384,13 +393,13 @@ and one that takes a singleton object are indistinguishable.
 
 The rest is just a mechanical transliteration of |walkList|.
 \begin{code}
-hWalkListSing :: Sing p -> ListRecord fs -> HMaybe (WalkList p fs)
-hWalkListSing SNothing _ = HNothing
-hWalkListSing (SJust p) fs = HJust $ hWalkList'Sing p fs
+hWalkListSing :: ListRecord fs -> Sing p -> HMaybe (MaybeMap (WalkListSym1 fs) p)
+hWalkListSing fs SNothing = HNothing
+hWalkListSing fs (SJust p) = HJust $ hWalkList'Sing fs p
 
-hWalkList'Sing :: Sing p -> ListRecord fs -> WalkList' p fs
-hWalkList'Sing SPathListHead (v `ListCons` _) = v
-hWalkList'Sing (SPathListTail m) (_ `ListCons` fs) = hWalkList'Sing m fs    
+hWalkList'Sing :: ListRecord fs -> Sing p -> WalkList fs p
+hWalkList'Sing (v `ListCons` _) SPathListHead = v
+hWalkList'Sing (_ `ListCons` fs) (SPathListTail m) = hWalkList'Sing fs m    
 \end{code}
 
 The implementation with type classes is analogous.
@@ -399,22 +408,22 @@ Funtional dependencies are unnecessary.
 gaining a little efficiency.
 \begin{code}
 
-hListGetClass :: forall proxy l fs p. (p ~ MakePathList l fs, HWalkListClass p) => proxy l -> ListRecord fs -> HMaybe (WalkList p fs)
-hListGetClass l fs = hWalkListClass (undefined :: Proxy p) fs
+hListGetClass :: forall proxy l fs p. (p ~ MakePathList l fs, HWalkListClass p) => proxy l -> ListRecord fs -> HMaybe (MaybeMap (WalkListSym1 fs) p)
+hListGetClass l fs = hWalkListClass fs (undefined :: Proxy p)
 
 class HWalkListClass p where
-    hWalkListClass :: proxy p -> ListRecord fs -> HMaybe (WalkList p fs)
+    hWalkListClass :: ListRecord fs -> proxy p -> HMaybe (MaybeMap (WalkListSym1 fs) p)
 instance HWalkListClass !!!Nothing where
     hWalkListClass _ _ = HNothing
 instance HWalkList'Class p => HWalkListClass (!!!Just p) where
-    hWalkListClass _ fs = HJust $ hWalkList'Class (undefined :: Proxy p) fs
+    hWalkListClass fs _ = HJust $ hWalkList'Class fs (undefined :: Proxy p)
 
 class HWalkList'Class p where
-    hWalkList'Class :: proxy p -> ListRecord fs -> WalkList' p fs
+    hWalkList'Class :: ListRecord fs -> proxy p -> WalkList  fs p
 instance HWalkList'Class !!!PathListHead where
-    hWalkList'Class _ (v `ListCons` _) = v
+    hWalkList'Class (v `ListCons` _) _ = v
 instance HWalkList'Class p => HWalkList'Class (!!!PathListTail p) where
-    hWalkList'Class _ (_ `ListCons` fs) = hWalkList'Class (undefined :: Proxy p) fs
+    hWalkList'Class (_ `ListCons` fs) _ = hWalkList'Class fs (undefined :: Proxy p)
 \end{code}
 
 While |hListGetClass| defines its own type class,
@@ -898,19 +907,6 @@ we still need to continue the path down the current tree.
 $(singletons [d|
     data PathSpine = PathSpineTail PathSpine | PathSpineHead PathTree
     data PathTree = PathTreeRoot | PathTreeLeft PathTree | PathTreeRight PathTree
-    |])
-\end{code}
-    
-To create and consume |PathSpine| and |PathTree|,
-we'll define helper function |maybeMap|, which didn't make the cut
-to be included among the built in functions that come with the singletons library.
-It's a specialization of |fmap| for |Maybe| only.
-The type itself suffices to determine the function.
-\begin{code}    
-$(singletons [d|
-    maybeMap :: (a -> b) -> Maybe a -> Maybe b
-    maybeMap f Nothing = Nothing
-    maybeMap f (Just a) = Just (f a)
     |])
 \end{code}
 
