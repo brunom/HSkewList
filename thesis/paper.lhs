@@ -937,6 +937,7 @@ $(singletons [d|
     |])
 \end{code}
 
+|walkSpine| and |walkTree| are simple.
 \begin{code}    
 $(singletons [d|
     walkSpine :: [Tree (l, v)] -> PathSpine -> v
@@ -948,29 +949,15 @@ $(singletons [d|
     walkTree (Node (l,v) t1 t2) (PathTreeLeft p) = walkTree t1 p
     walkTree (Node (l,v) t1 t2) (PathTreeRight p) = walkTree t2 p
     |])
-
-newtype SkewRecord fs = SkewRecord (Spine (Skew fs))
-
-hSkewEmpty :: SkewRecord !!![]
-hSkewEmpty = SkewRecord SpineNil
 \end{code}
 
-\noindent
-The element precedes the subtrees in |HNode|
-so all elements in expressions read in order left to right.
-The common leaf case warrants the helper type |HLeaf|
-and the smart constructor |hLeaf|.
-
-A (heterogeneous) skew list is then defined as a heterogeneous list of (heterogeneous) binary trees.
-The following declarations define a skew list with the elements of the fourth step of Figure~\ref{fig:insert}:
-
-\begin{code}
-four =
-    hLeaf  (l4  .=.  'c') `SpineCons`
-    HNode  (l5  .=.  Nothing)
-        (hLeaf (l6  .=.  [4,5]))
-        (hLeaf (l7  .=.  "last")) `SpineCons`
-    SpineNil
+We arrive at the nicest piece of code.
+The |SkewRecord| type parameter is a list of fields, of label-value pairs.
+But |Skew| computes the skew tree of the list,
+which |SkewRecord| stores,
+so it's well formed by construction.
+\begin{code}    
+newtype SkewRecord fs = SkewRecord (Spine (Skew fs))
 \end{code}
 
 %% $ fix emacs color highlighting
@@ -978,41 +965,19 @@ four =
 \subsubsection{Construction}
 
 We define a smart constructor |hSkewEmpty| for empty skew lists, i.e. an empty list of trees.
-
-%\noindent
-|HHeight| returns the height of a tree.
-We will use it to detect the case of two leading equal height trees in the spine.
-%
+\begin{code}    
+hSkewEmpty :: SkewRecord !!![]
+hSkewEmpty = SkewRecord SpineNil
+\end{code}
     
-\noindent
-|HSkewCarry| finds out if a skew list |l| is in case (1) or (2).
-This will be used for insertion to decide whether we need to take the two leading existing trees
-and put them below a new |HNode| (case 1),
-or just insert a new |HLeaf| (case 2).
-In the numerical representation of data structures,
-adding an item is incrementing the number.
-If each top level tree is a digit,
-building a new taller tree is a form of carry,
-so |HSkewCarry| returns |HTrue|.
-%
-%
-If the spine has none or one single tree we return |HFalse|.
-%
-In case the spine has more than one tree,
-we return |HTrue| if the first two trees are of equal size and
-|HFalse| otherwise.
-%
-
-All these pieces allow us to define |HSkewExtend|,
-which resembles the |HCons| constructor.
 \begin{code}
 
 hSkewExtendClass :: HSkewExtend' (Skew fs) => Field l v -> SkewRecord fs -> SkewRecord (!!!(l, v) !!!: fs)
 hSkewExtendClass f (SkewRecord ts) = SkewRecord $ hSkewExtend' f ts
 infixr 2 `hSkewExtendClass`
 
-hSkewExtendSing :: forall l v (fs::[(k, Type)]) s. (s ~ (Map HeightSym0 (Skew fs)), SingI s) => v -> SkewRecord fs -> SkewRecord (!!!(l, v) !!!: fs)
-hSkewExtendSing v r = SkewRecord $ case r of
+hSkewExtendSing :: forall l v (fs::[(k, Type)]) s. (s ~ (Map HeightSym0 (Skew fs)), SingI s) => Field l v -> SkewRecord fs -> SkewRecord (!!!(l, v) !!!: fs)
+hSkewExtendSing (Field v) r = SkewRecord $ case r of
     (SkewRecord SpineNil) -> hLeaf v `SpineCons` SpineNil
     (SkewRecord (a `SpineCons` SpineNil)) -> hLeaf v `SpineCons` a `SpineCons` SpineNil
     (SkewRecord (ta `SpineCons` tb `SpineCons` ts)) -> case sing :: Sing s of
@@ -1167,17 +1132,15 @@ When we repeat the experiment at the end of subsection \ref{sec:extensiblerecord
 but constructing a |SkewRecord| instead of an |HList|:
 % using |hSkewEmpty| to construct a |SkewRecord|: \alberto{quien es |hSkewEmpty|?}
 
-%\alberto{yo capaz definiria un smart constructor que se llamara |hSkewEmpty| o por el estilo y lo pondria en lugar de HNil en la expresion de |rSkew|.}
-%
 \begin{code}
 rSkew =
   (l1  .=.  True     )  `hSkewExtendClass`
   (l2  .=.  9        )  `hSkewExtendClass`
-  (l3  .=.  "bla"    )  `hSkewExtendClass`
+  (l3  .=.  "bla"    )  `hSkewExtendSing`
   (l4  .=.  'c'      )  `hSkewExtendClass`
   (l5  .=.  Nothing  )  `hSkewExtendClass`
   (l6  .=.  [4,5]    )  `hSkewExtendClass`
-  (l7  .=.  "last"   )  `hSkewExtendClass`
+  (l7  .=.  "last"   )  `hSkewExtendSing`
   hSkewEmpty
 lastSkewSing = hSkewGetSing l7 rSkew
 lastSkewClass = hSkewGetClass l7 rSkew
