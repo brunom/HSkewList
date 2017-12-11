@@ -928,7 +928,7 @@ from the recursive call.
 $(singletons [d|
     makePathTree :: Eq l => l -> Tree (l, v) -> Maybe PathTree
     makePathTree l Empty = Nothing
-    makePathTree l (Node (l2, v) t1 t2) = if l == l2 then Just PathTreeRoot else maybeMap PathTreeRight (makePathTree l t1) `plus` maybeMap PathTreeLeft (makePathTree l t2)
+    makePathTree l (Node (l2, v) t1 t2) = if l == l2 then Just PathTreeRoot else maybeMap PathTreeLeft (makePathTree l t1) `plus` maybeMap PathTreeRight (makePathTree l t2)
     |])
 \end{code}
 
