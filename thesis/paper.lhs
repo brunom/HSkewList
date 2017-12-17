@@ -964,19 +964,19 @@ newtype SkewRecord fs = SkewRecord (Spine (Skew fs))
 
 \subsubsection{Construction}
 
-We define a smart constructor |hSkewEmpty| for empty skew lists, i.e. an empty list of trees.
+We define a smart constructor |hSkewEmpty| for empty skew lists, i.e. an empty spine of trees.
 \begin{code}    
 hSkewEmpty :: SkewRecord !!![]
 hSkewEmpty = SkewRecord SpineNil
 \end{code}
-    
+
+|hSkewExtendClass| or |hSkewExtendSing| can interchangeably add a field to a record.
+Their type is the same except for the constraint.
+|hSkewExtendSing| requires the compiler to compute the height of all trees in the spine,
+but actually only uses the first two,
+which is efficient thanks to the language laziness.
 \begin{code}
-
-hSkewExtendClass :: HSkewExtend' (Skew fs) => Field l v -> SkewRecord fs -> SkewRecord (!!!(l, v) !!!: fs)
-hSkewExtendClass f (SkewRecord ts) = SkewRecord $ hSkewExtend' f ts
-infixr 2 `hSkewExtendClass`
-
-hSkewExtendSing :: forall l v (fs::[(k, Type)]) s. (s ~ (Map HeightSym0 (Skew fs)), SingI s) => Field l v -> SkewRecord fs -> SkewRecord (!!!(l, v) !!!: fs)
+hSkewExtendSing :: forall l v fs s. (s ~ (Map HeightSym0 (Skew fs)), SingI s) => Field l v -> SkewRecord fs -> SkewRecord (!!!(l, v) !!!: fs)
 hSkewExtendSing (Field v) r = SkewRecord $ case r of
     (SkewRecord SpineNil) -> hLeaf v `SpineCons` SpineNil
     (SkewRecord (a `SpineCons` SpineNil)) -> hLeaf v `SpineCons` a `SpineCons` SpineNil
@@ -986,6 +986,9 @@ hSkewExtendSing (Field v) r = SkewRecord $ case r of
             SFalse -> hLeaf v `SpineCons` ta `SpineCons` tb `SpineCons` ts
 infixr 2 `hSkewExtendSing`
 \end{code}
+We handle the base cases, when the input record is empty or a single field, directly.
+When the record already has two or more fields,
+we also inspect the heights.
 
 |HSkewExtend| looks like |HListGet| shown earlier.
 |HSkewCarry| is now responsible for discriminating
@@ -994,6 +997,10 @@ while |HListGet| used |HEq| on the two labels.
 %A smart test type-function saves on repetition.
 
 \begin{code}
+hSkewExtendClass :: HSkewExtend' (Skew fs) => Field l v -> SkewRecord fs -> SkewRecord (!!!(l, v) !!!: fs)
+hSkewExtendClass f (SkewRecord ts) = SkewRecord $ hSkewExtend' f ts
+infixr 2 `hSkewExtendClass`
+
 class HSkewExtend' ts where
     hSkewExtend' :: Field l v -> Spine ts -> Spine (Skew' '(l, v) ts)
 instance
