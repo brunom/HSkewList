@@ -989,13 +989,16 @@ infixr 2 `hSkewExtendSing`
 We handle the base cases, when the input record is empty or a single field, directly.
 When the record already has two or more fields,
 we also inspect the heights.
+Having the compiler compute the heights is necessary
+to keep the runtime of the function constant.
+If the height was computed at runtime, the function would run in logarithmic time.
+But comparing heights at runtime is not optimal either.
+It would be better to push that also to compile-time and have a simple |SBool| to steer the last case.
+We don't do that because we need a total function from type list of trees to bool.
+The cases with fewer than two elements need to be defined, which is ugly.
 
-|HSkewExtend| looks like |HListGet| shown earlier.
-|HSkewCarry| is now responsible for discriminating
-the current case,
-while |HListGet| used |HEq| on the two labels.
-%A smart test type-function saves on repetition.
-
+|hSkewExtendClass| just calls into custom class |HSkewExtend'|,
+which mirrors |Skew'|.
 \begin{code}
 hSkewExtendClass :: HSkewExtend' (Skew fs) => Field l v -> SkewRecord fs -> SkewRecord (!!!(l, v) !!!: fs)
 hSkewExtendClass f (SkewRecord ts) = SkewRecord $ hSkewExtend' f ts
