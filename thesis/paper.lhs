@@ -896,6 +896,96 @@ $(promote [d|
 \end{code}
 %endif
 
+We arrive at the nicest piece of code.
+The |SkewRecord| type parameter is a list of fields, of label-value pairs.
+But |Skew| computes the skew tree of the list,
+which |SkewRecord| stores,
+so it's well formed by construction.
+\begin{code}    
+newtype SkewRecord fs = SkewRecord (Spine (Skew fs))
+\end{code}
+
+%% $ fix emacs color highlighting
+
+\subsubsection{Construction}
+
+We define a smart constructor |hSkewEmpty| for empty skew lists, i.e. an empty spine of trees.
+\begin{code}    
+hSkewEmpty :: SkewRecord !!![]
+hSkewEmpty = SkewRecord SpineNil
+\end{code}
+
+|hSkewExtendClass| or |hSkewExtendSing| can interchangeably add a field to a record.
+Their type is the same except for the constraint.
+|hSkewExtendSing| requires the compiler to compute the height of all trees in the spine,
+but actually only uses the first two,
+which is efficient thanks to the language laziness.
+\begin{code}
+hSkewExtendSing :: forall l v fs s. (s ~ (Map HeightSym0 (Skew fs)), SingI s) => Field l v -> SkewRecord fs -> SkewRecord (!!!(l, v) !!!: fs)
+hSkewExtendSing (Field v) r = SkewRecord $ case r of
+    (SkewRecord SpineNil) -> hLeaf v `SpineCons` SpineNil
+    (SkewRecord (a `SpineCons` SpineNil)) -> hLeaf v `SpineCons` a `SpineCons` SpineNil
+    (SkewRecord (ta `SpineCons` tb `SpineCons` ts)) -> case sing :: Sing s of
+        (ha `SCons` (hb `SCons` _)) -> case ha %:== hb of
+            STrue -> HNode v ta tb `SpineCons` ts
+            SFalse -> hLeaf v `SpineCons` ta `SpineCons` tb `SpineCons` ts
+infixr 2 `hSkewExtendSing`
+\end{code}
+We handle the base cases, when the input record is empty or a single field, directly.
+When the record already has two or more fields,
+we also inspect the heights.
+Having the compiler compute the heights is necessary
+to keep the runtime of the function constant.
+If the height was computed at runtime, the function would run in logarithmic time.
+But comparing heights at runtime is not optimal either.
+It would be better to push that also to compile-time and have a simple |SBool| to steer the last case.
+We don't do that because we need a total function from type list of trees to bool.
+The cases with fewer than two elements need to be defined, which is ugly.
+
+|hSkewExtendClass| just calls into custom class |HSkewExtend'|,
+which mirrors |Skew'|.
+|HSkewExtend'| delegates the cases when the spine has at least two elements to |HSkewExtend''| in turn.
+
+\begin{code}
+hSkewExtendClass :: HSkewExtend' (Skew fs) => Field l v -> SkewRecord fs -> SkewRecord (!!!(l, v) !!!: fs)
+hSkewExtendClass f (SkewRecord ts) = SkewRecord $ hSkewExtend' f ts
+infixr 2 `hSkewExtendClass`
+
+class HSkewExtend' ts where
+    hSkewExtend' :: Field l v -> Spine ts -> Spine (Skew' '(l, v) ts)
+instance
+    HSkewExtend' '[] where
+    hSkewExtend' (Field v) SpineNil = hLeaf v `SpineCons` SpineNil
+instance
+    HSkewExtend' '[f] where
+    hSkewExtend' (Field v) ts = hLeaf v `SpineCons` ts
+instance
+    ((Height ta :== Height tb) ~ b
+    ,HSkewExtend'' b ta tb) =>
+    HSkewExtend' (ta ': tb ': ts) where
+    hSkewExtend' f ts = hSkewExtend'' (undefined :: Proxy b) f ts
+\end{code}
+
+|HSkewExtend''| is tricky.
+The boolean argument decides what to do with the new field.
+There's a case for |True| and another for |False|.
+But for the return type to resolve correctly,
+the compiler needs to know what the bool actually refers to.
+It needs to confirm that the manipulations we are doing at runtime match |Skew'| at compile-time.
+To that end, we make |ta| and |tb|, the first two trees in the spine class parameters too.
+With instance contraints we assert that the heights match or not depending on the case.
+Finnaly a method constraint, |ts ~ (ta ': tb ': ts')|, allows |hSkewExtend''| to accept the whole spine without destruction into its parts.
+\begin{code}
+class HSkewExtend'' (b::Bool) ta tb where
+    hSkewExtend'' :: ts ~ (ta ': tb ': ts') => proxy b -> Field l v -> Spine ts -> Spine (Skew' !!!(l, v) ts)
+instance (Height ta :== Height tb) ~ !!!True => HSkewExtend'' !!!True ta tb where
+    hSkewExtend'' _ (Field v) (ta `SpineCons` tb `SpineCons` ts) = HNode v ta tb `SpineCons` ts
+instance (Height ta :== Height tb) ~ !!!False => HSkewExtend'' !!!False ta tb where
+    hSkewExtend'' _ (Field v) (ta `SpineCons` tb `SpineCons` ts) = hLeaf v `SpineCons` ta `SpineCons` tb `SpineCons` ts
+\end{code}
+
+\subsubsection{Lookup}
+
 |PathSpine| and |PathTree| mirror earlier |PathList| for linear lists,
 and encode the steps to get to a field.
 |PathTree| has three options.
@@ -950,92 +1040,6 @@ $(singletons [d|
     walkTree (Node (l,v) t1 t2) (PathTreeRight p) = walkTree t2 p
     |])
 \end{code}
-
-We arrive at the nicest piece of code.
-The |SkewRecord| type parameter is a list of fields, of label-value pairs.
-But |Skew| computes the skew tree of the list,
-which |SkewRecord| stores,
-so it's well formed by construction.
-\begin{code}    
-newtype SkewRecord fs = SkewRecord (Spine (Skew fs))
-\end{code}
-
-%% $ fix emacs color highlighting
-
-\subsubsection{Construction}
-
-We define a smart constructor |hSkewEmpty| for empty skew lists, i.e. an empty spine of trees.
-\begin{code}    
-hSkewEmpty :: SkewRecord !!![]
-hSkewEmpty = SkewRecord SpineNil
-\end{code}
-
-|hSkewExtendClass| or |hSkewExtendSing| can interchangeably add a field to a record.
-Their type is the same except for the constraint.
-|hSkewExtendSing| requires the compiler to compute the height of all trees in the spine,
-but actually only uses the first two,
-which is efficient thanks to the language laziness.
-\begin{code}
-hSkewExtendSing :: forall l v fs s. (s ~ (Map HeightSym0 (Skew fs)), SingI s) => Field l v -> SkewRecord fs -> SkewRecord (!!!(l, v) !!!: fs)
-hSkewExtendSing (Field v) r = SkewRecord $ case r of
-    (SkewRecord SpineNil) -> hLeaf v `SpineCons` SpineNil
-    (SkewRecord (a `SpineCons` SpineNil)) -> hLeaf v `SpineCons` a `SpineCons` SpineNil
-    (SkewRecord (ta `SpineCons` tb `SpineCons` ts)) -> case sing :: Sing s of
-        (ha `SCons` (hb `SCons` _)) -> case ha %:== hb of
-            STrue -> HNode v ta tb `SpineCons` ts
-            SFalse -> hLeaf v `SpineCons` ta `SpineCons` tb `SpineCons` ts
-infixr 2 `hSkewExtendSing`
-\end{code}
-We handle the base cases, when the input record is empty or a single field, directly.
-When the record already has two or more fields,
-we also inspect the heights.
-Having the compiler compute the heights is necessary
-to keep the runtime of the function constant.
-If the height was computed at runtime, the function would run in logarithmic time.
-But comparing heights at runtime is not optimal either.
-It would be better to push that also to compile-time and have a simple |SBool| to steer the last case.
-We don't do that because we need a total function from type list of trees to bool.
-The cases with fewer than two elements need to be defined, which is ugly.
-
-|hSkewExtendClass| just calls into custom class |HSkewExtend'|,
-which mirrors |Skew'|.
-\begin{code}
-hSkewExtendClass :: HSkewExtend' (Skew fs) => Field l v -> SkewRecord fs -> SkewRecord (!!!(l, v) !!!: fs)
-hSkewExtendClass f (SkewRecord ts) = SkewRecord $ hSkewExtend' f ts
-infixr 2 `hSkewExtendClass`
-
-class HSkewExtend' ts where
-    hSkewExtend' :: Field l v -> Spine ts -> Spine (Skew' '(l, v) ts)
-instance
-    HSkewExtend' '[] where
-    hSkewExtend' (Field v) SpineNil = hLeaf v `SpineCons` SpineNil
-instance
-    HSkewExtend' '[f] where
-    hSkewExtend' (Field v) ts = hLeaf v `SpineCons` ts
-instance
-    ((Height ta :== Height tb) ~ b
-    ,HSkewExtend'' b ta tb) =>
-    HSkewExtend' (ta ': tb ': ts) where
-    hSkewExtend' f ts = hSkewExtend'' (undefined :: Proxy b) f ts
-
-class HSkewExtend'' (b::Bool) ta tb where
-    hSkewExtend'' :: ts ~ (ta ': tb ': ts') => proxy b -> Field l v -> Spine ts -> Spine (Skew' !!!(l, v) ts)
-instance (Height ta :== Height tb) ~ !!!True => HSkewExtend'' !!!True ta tb where
-    hSkewExtend'' _ (Field v) (ta `SpineCons` tb `SpineCons` ts) = HNode v ta tb `SpineCons` ts
-instance (Height ta :== Height tb) ~ !!!False => HSkewExtend'' !!!False ta tb where
-    hSkewExtend'' _ (Field v) (ta `SpineCons` tb `SpineCons` ts) = hLeaf v `SpineCons` ta `SpineCons` tb `SpineCons` ts
-\end{code}
-\noindent
-Here |HFalse| means that we should not add up the first two trees of the spine.
-Either the size of the two leading trees are different, or the spine is empty or a singleton.
-We just use |HLeaf| to insert a new tree at the beginning of the spine.
-
-%
-When |HSkewCarry| returns |HTrue|, however, we build a new tree reusing the two trees that were at the start of the spine.
-The length of the spine is reduced in one, since we take two elements but only add one.
-%
-
-\subsubsection{Lookup}
 
 %The missing piece is
 Now, we turn to the introduction of |HSkewGet|,
