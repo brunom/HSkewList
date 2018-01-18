@@ -248,7 +248,7 @@ that the operation failed.
 When lookup succeeds, |HJust| signals that fact at compile time
 and offers the value of the field at runtime.
 
-\subsection{List record}
+\subsection{List record} \label{sec:list_record}
 
 Records can be implemented with a list defined by
 \begin{code}
@@ -960,10 +960,9 @@ instance
     HSkewExtend' '[f] where
     hSkewExtend' (Field v) ts = hLeaf v `SpineCons` ts
 instance
-    ((Height ta :== Height tb) ~ b
-    ,HSkewExtend'' b ta tb) =>
+    HSkewExtend'' (Height ta :== Height tb) =>
     HSkewExtend' (ta ': tb ': ts) where
-    hSkewExtend' f ts = hSkewExtend'' (undefined :: Proxy b) f ts
+    hSkewExtend' f ts = hSkewExtend'' f ts
 \end{code}
 
 |HSkewExtend''| is tricky.
@@ -976,12 +975,12 @@ To that end, we make |ta| and |tb|, the first two trees in the spine class param
 With instance contraints we assert that the heights match or not depending on the case.
 Finnaly a method constraint, |ts ~ (ta ': tb ': ts')|, allows |hSkewExtend''| to accept the whole spine without destruction into its parts.
 \begin{code}
-class HSkewExtend'' (b::Bool) ta tb where
-    hSkewExtend'' :: ts ~ (ta ': tb ': ts') => proxy b -> Field l v -> Spine ts -> Spine (Skew' !!!(l, v) ts)
-instance (Height ta :== Height tb) ~ !!!True => HSkewExtend'' !!!True ta tb where
-    hSkewExtend'' _ (Field v) (ta `SpineCons` tb `SpineCons` ts) = HNode v ta tb `SpineCons` ts
-instance (Height ta :== Height tb) ~ !!!False => HSkewExtend'' !!!False ta tb where
-    hSkewExtend'' _ (Field v) (ta `SpineCons` tb `SpineCons` ts) = hLeaf v `SpineCons` ta `SpineCons` tb `SpineCons` ts
+class HSkewExtend'' (b::Bool) where
+    hSkewExtend'' :: (b ~ (Height ta :== Height tb), ts ~ (ta ': tb ': ts')) => Field l v -> Spine ts -> Spine (Skew' !!!(l, v) ts)
+instance HSkewExtend'' !!!True where
+    hSkewExtend'' (Field v) (ta `SpineCons` tb `SpineCons` ts) = HNode v ta tb `SpineCons` ts
+instance  HSkewExtend'' !!!False where
+    hSkewExtend'' (Field v) (ta `SpineCons` tb `SpineCons` ts) = hLeaf v `SpineCons` ta `SpineCons` tb `SpineCons` ts
 \end{code}
 
 \subsubsection{Lookup}
@@ -1014,7 +1013,9 @@ from the recursive call.
 $(singletons [d|
     makePathTree :: Eq l => l -> Tree (l, v) -> Maybe PathTree
     makePathTree l Empty = Nothing
-    makePathTree l (Node (l2, v) t1 t2) = if l == l2 then Just PathTreeRoot else maybeMap PathTreeLeft (makePathTree l t1) `plus` maybeMap PathTreeRight (makePathTree l t2)
+    makePathTree l (Node (l2, v) t1 t2) = if l == l2 then Just PathTreeRoot else
+        maybeMap PathTreeLeft (makePathTree l t1) `plus`
+        maybeMap PathTreeRight (makePathTree l t2)
     |])
 \end{code}
 
@@ -1023,7 +1024,9 @@ $(singletons [d|
 $(singletons [d|
     makePathSpine :: Eq l => l -> [Tree (l, v)] -> Maybe PathSpine
     makePathSpine l [] = Nothing
-    makePathSpine l (t : ts) = maybeMap PathSpineHead (makePathTree l t) `plus` maybeMap PathSpineTail (makePathSpine l ts)
+    makePathSpine l (t : ts) = 
+        maybeMap PathSpineHead (makePathTree l t) `plus` 
+        maybeMap PathSpineTail (makePathSpine l ts)
     |])
 \end{code}
 
@@ -1041,10 +1044,10 @@ $(singletons [d|
     |])
 \end{code}
 
-%The missing piece is
-Now, we turn to the introduction of |HSkewGet|,
-which explores all paths at compile time
-but follows only the right one at run time.
+We have the pieces to define the type of |hSkewGetSing|.
+It receives the label and the record.
+The result of |MakePathSpine| becomes a singleton constraint,
+and also contributes to the return type.
 
 \begin{code}
 hSkewGetSing ::
@@ -1055,7 +1058,12 @@ hSkewGetSing ::
     SkewRecord fs ->
     HMaybe (MaybeMap (WalkSpineSym1 (Skew fs)) p)
 hSkewGetSing l (SkewRecord ts) = hWalkSpineSing ts (sing :: Sing p)
+\end{code}
 
+The body just converts the singleton contraint to an actual singleton object and delegates to |hWalkSpineSing|,
+which just follows |WalkSpine| defined earlier.
+
+\begin{code}
 hWalkSpineSing :: Spine ts -> Sing p -> HMaybe (MaybeMap (WalkSpineSym1 ts) p)
 hWalkSpineSing ts SNothing = HNothing
 hWalkSpineSing ts (SJust p) = HJust $ hWalkSpine'Sing ts p
@@ -1068,8 +1076,14 @@ hWalkTreeSing :: HTree t -> Sing p -> WalkTree t p
 hWalkTreeSing (HNode v t1 t2) SPathTreeRoot = v
 hWalkTreeSing (HNode _ t1 t2) (SPathTreeLeft p) = hWalkTreeSing t1 p
 hWalkTreeSing (HNode _ t1 t2) (SPathTreeRight p) = hWalkTreeSing t2 p
+\end{code}
 
+As before, we define a class version, |HWalkSpineClass|.
+In |hSkewGetClass|, the singleton constraint of |hSkewGetSing| becomes a custom |HWalkSpineClass| constraint,
+and instead of |sing| providing a singleton object, |undefined| suffices to select the correct class instance,
+without any term level computation at all.
 
+\begin{code}
 hSkewGetClass ::
     forall p fs proxy l.
     (p ~ (MakePathSpine l (Skew fs))
@@ -1078,73 +1092,40 @@ hSkewGetClass ::
     SkewRecord fs ->
     HMaybe (MaybeMap (WalkSpineSym1 (Skew fs)) p)
 hSkewGetClass l (SkewRecord ts) = hWalkSpineClass (undefined :: Proxy p) ts
+\end{code}
 
+|HWalkSpineClass|/|hWalkSpineClass|, |HWalkSpine'Class|/|hWalkSpine'Class| and |HWalkTreeClass|/|hWalkTreeClass|
+just mirror |hWalkSpineSing|, |hWalkSpine'Sing| and |hWalkTreeSing|
+save that the instance heads do the pattern matching, entirely at compile-time. 
+
+\begin{code}
 class HWalkSpineClass p where
     hWalkSpineClass :: proxy p -> Spine ts -> HMaybe (MaybeMap (WalkSpineSym1 ts) p)
-instance HWalkSpineClass 'Nothing where
+instance HWalkSpineClass !!!Nothing where
     hWalkSpineClass _ _ = HNothing
-instance HWalkSpine'Class p => HWalkSpineClass ('Just p) where
+instance HWalkSpine'Class p => HWalkSpineClass (!!!Just p) where
     hWalkSpineClass _ ts = HJust $ hWalkSpine'Class (undefined :: Proxy p) ts
 
 class HWalkSpine'Class p where
     hWalkSpine'Class :: proxy p -> Spine ts -> WalkSpine ts p
-instance HWalkTreeClass p => HWalkSpine'Class ('PathSpineHead p) where
+instance HWalkTreeClass p => HWalkSpine'Class (!!!PathSpineHead p) where
     hWalkSpine'Class _ (t `SpineCons` ts) = hWalkTreeClass (undefined :: Proxy p) t
-instance HWalkSpine'Class p => HWalkSpine'Class ('PathSpineTail p) where
+instance HWalkSpine'Class p => HWalkSpine'Class (!!!PathSpineTail p) where
     hWalkSpine'Class _ (t `SpineCons` ts) = hWalkSpine'Class (undefined :: Proxy p) ts
 
 class HWalkTreeClass p where
     hWalkTreeClass :: proxy p -> HTree t -> WalkTree t p
 instance HWalkTreeClass !!!PathTreeRoot where
     hWalkTreeClass _ (HNode v t1 t2) = v
-instance HWalkTreeClass p => HWalkTreeClass ('PathTreeLeft p) where
+instance HWalkTreeClass p => HWalkTreeClass (!!!PathTreeLeft p) where
     hWalkTreeClass _ (HNode _ t1 t2) = hWalkTreeClass (undefined :: Proxy p) t1
-instance HWalkTreeClass p => HWalkTreeClass ('PathTreeRight p) where
+instance HWalkTreeClass p => HWalkTreeClass (!!!PathTreeRight p) where
     hWalkTreeClass _ (HNode _ t1 t2) = hWalkTreeClass (undefined :: Proxy p) t2
 
 \end{code}
 
-Deciding on the path to the desired field
-is now more involved.
-The cases that both the test function and the worker function must consider
-are more numerous and long.
-Thus, we merge both functions.
-|HSkewGet| returns a type level and value level Maybe,
-that is,
-|HNothing| when no field with the label is found,
-and |HJust| of the field's type/value otherwise.
-For branching constructors |HCons| and |HNode|,
-|HPlus| (presented in subsection~\ref{sec:hlist}) chooses the correct path for us.
-
-We will run |HSkewGet| on both the spine and each tree, so we have two base cases.
-|HNil| is encountered at the end of the spine, and |HEmpty| at the bottom of trees.
-In both cases, the field was not found, so we return |HNothing|.
-The |HCons| case must consider that the field may be found on the current tree or further down the spine.
-A recursive call is made for each sub-case, and the results are combined with |HPlus|.
-If the field is found in the current tree,
-|HPlus| returns it, otherwise, it returns what the search down the spine did.
-
-Observe that when doing |hSkewGet r l `hPlus` hSkewGet r' l| if the label is not present in |r| then
-the type system chooses the second instance of |HPlus|  (|HPlus HNothing b b|).
-Thus, by lazy evaluation, the subexpression |hSkewGet r l| is not evaluated
-since |hPlus| in that case simply returns its second argument.
-
-\noindent The |HNode| case is a bigger version of the |HCons| case.
-Here three recursive calls are made,
-for the current field, the left tree, and the right tree.
-Thus two |HPlus| calls are needed to combine the result.
-
-Finally, the |Field| case, when a field is found, is the case
-%\alberto{cual, la que sigue o la anterior? no queda bien arrancar la orcion con And.....}
-that may actually build a |HJust| result.
-As in |HListGet| for linked lists, |HEq| compares both labels.
-We call |HMakeMaybe| with the result of the comparison,
-and |HNothing| or |HJust| is returned as appropriate.
-%
-
-When we repeat the experiment at the end of subsection \ref{sec:extensiblerecords},
-but constructing a |SkewRecord| instead of an |HList|:
-% using |hSkewEmpty| to construct a |SkewRecord|: \alberto{quien es |hSkewEmpty|?}
+When we repeat the experiment at the end of subsection \ref{sec:list_record},
+but constructing a |SkewRecord| instead of a |ListRecord|:
 
 \begin{code}
 rSkew =
@@ -1159,7 +1140,7 @@ rSkew =
 lastSkewSing = hSkewGetSing l7 rSkew
 lastSkewClass = hSkewGetClass l7 rSkew
 \end{code}
-the resulting core code is:
+the resulting core code is equivalent to:
 
 \begin{code}
 lastSkewCore = case rSkew of
@@ -1172,150 +1153,6 @@ lastSkewCore = case rSkew of
 Thus, getting to |l7| at run time only traverses a (logarithmic length) fraction of the elements,
 as we have seen in Figure~\ref{fig:search-skew}.
 Later we will examine runtime benchmarks.
-
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
-
-\subsubsection{Update}\label{sec:update}
-
-%a type-function |HSkewUpdate|
-We now define an update operation that makes it possible to change
-a field of some label with a new field with possibly new label and value.
-%
-\begin{code}
-class HSkewUpdate l e ts ts' | l e ts -> ts' where
-    hSkewUpdate :: proxy l -> e -> Spine ts -> Spine ts'
-class HSkewUpdateTree l e t t' | l e t -> t' where
-    hSkewUpdateTree :: proxy l -> e -> HTree t -> HTree t'
-class HSkewUpdateField l e l' v' l'' v'' | l e l' v' -> l'' v'' where
-    hSkewUpdateField :: proxy l -> e -> Field l' v' -> Field l'' v''
-\end{code}
-%
-We use the lookup operation |HSkewGet| to discriminate at type-level
-whether the field with the searched label is present or not in the skew list.
-%
-%
-In case the label is not present we have nothing to do than just returning the
-structure unchanged.
-%
-%\begin{code}
-%instance HSkewUpdate' 'Nothing l e r r  where
-%    hSkewUpdate' _ l e r = r
-%\end{code}
-%
-In the other cases (i.e. when lookup results in |HJust v|) we call |hSkewUpdate| recursively on all subparts in order to apply the update when necessary.
-Because of the previous instance (when lookup returns |HNothing|), at run time recursion will not enter in those cases where the label is not present.
-We start the process in the spine.
-%
-%\begin{code}
-%instance
-%    (  HSkewUpdateTree l e t t'
-%    ,  HSkewUpdate l e ts ts') =>
-%    HSkewUpdate' ('Just v) l e  (t ': ts)
-%                                (t' ': ts')
-%    where
-%    hSkewUpdate' _ l e (t `SpineCons` ts) =
-%        hSkewUpdateTree l e t `SpineCons`
-%               hSkewUpdate l e ts
-%\end{code}
-%
-On a |HNode|, |hSkewUpdate| is recursively called on
-the left and right sub-trees as well as on the element of the node.
-%\begin{code}
-%instance
-%    (  HSkewUpdateField l e l' v' l'' v''
-%    ,  HSkewUpdateTree l e tl tl'
-%    ,  HSkewUpdateTree l e tr tr') =>
-%    HSkewUpdateTree' ('Just v) l e  ('Node '(l', v') tl tr)
-%                                ('Node '(l'', v'') tl' tr')
-%    where
-%    hSkewUpdateTree' _ l e (HNode e' tl tr) =
-%        HNode  (hSkewUpdateField l e e')
-%               (hSkewUpdateTree l e tl)
-%               (hSkewUpdateTree l e tr)
-%\end{code}
-%
-Finally, when we arrive to a |Field| and we know the label is the one we
-are searching for (because we are considering the case |HJust v|), we simply return the updated field.
-%
-%\begin{code}
-%instance
-%    HSkewUpdateField' ('Just v) l e l v l e
-%     where
-%       hSkewUpdateField' _ l e e' = Field e
-%\end{code}
-
-At run time, this implementation of |hSkewUpdate| only
-rebuilds the path to the field to update,
-keeping all other sub-trees intact.
-% Due to lazy evaluation, the searches of the label are performed only at compile time.
-Thus the operation runs in time logarithmic in the size of the record.
-
-\subsubsection{Remove}
-
-Removing a field is easy based on updating.
-We overwrite the field we want to eliminate with the first field in the skew list,
-and then we remove the first field from the list.
-Thus, we remove elements in logarithmic time while keeping the tree balanced.
-
-First, we need a helper to remove the first element of a skew list.
-%
-\begin{code}
-class HSkewTail ts ts' | ts -> ts' where
-    hSkewTail :: Spine ts -> Spine ts'
-\end{code}
-
-\noindent
-In Figure~\ref{fig:tail} we show an example of the possible cases
-we can find.
-
-\begin{figure}[htp]
-\begin{center}
-\includegraphics[scale=0.5]{tail.pdf}
-\end{center}
-\caption{Tail in a Skew} \label{fig:tail}
-\end{figure}
-
-The easy case is when the spine begins with a leaf.
-We just return the tail of the spine list.
-\begin{code}
-instance HSkewTail (Leaf e : ts) ts where
-    hSkewTail (_ `SpineCons` ts) = ts
-\end{code}
-
-\noindent
-The other case is when the spine begins with a tree of three or more elements.
-Since |HLeaf| is a synonym of |HNode| with |HEmpty| as sub-trees,
-we need to assert the case when the sub-trees of the root |HNode|
-are nonempty (i.e. |HNode|s themselves).
-By construction, both sub-trees have the same shape, but doing pattern matching on the first one only suffices to make sure this case does not overlap with the previous one.
-In this case we grow the spine with the sub-trees, throwing away the root.
-%
-\begin{code}
-instance
-    HSkewTail
-        ('Node e t ('Node e' t' t'') ': ts)
-        (t ': 'Node e' t' t'' ': ts)
-    where
-    hSkewTail (HNode _ t t' `SpineCons` ts) =
-        t `SpineCons` t' `SpineCons` ts
-\end{code}
-
-
-Last, |hSkewRemove| takes the first node and calls |hSkewUpdate|
-to duplicate it where the label we want gone was.
-Then |hSkewTail| removes the original occurrence,
-at the start of the list.
-%\begin{code}
-%-- hSkewRemove :: (HSkewUpdate l e (ListRecord (HTree (Node e t t') ': ts)) (ListRecord ts'), HSkewTail ts' ts'') => Sing l -> ListRecord (HTree (Node e t t') ': ts) -> ListRecord ts''
-%-- hSkewRemove l (H (HNode e t t') ts) =
-%    -- hSkewTail $
-%    -- hSkewUpdate l e (HNode e t t' `HCons` ts)
-%\end{code}
-
-%% $ fix emacs color highlighting
-
-%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%%
 
 \section{Efficiency}\label{sec:efficiency}
 
