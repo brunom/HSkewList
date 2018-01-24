@@ -196,7 +196,7 @@ with the H prefix honoring HList.
 Notice that |HJust| wraps a naked |e|,
 not a |Sing e| like |SJust|.
 Both |SMaybe| and |HMaybe| can force term and type level
-copmutations to run in-sync.
+computations to run in-sync.
 
 %if style==newcode
 \begin{code}
@@ -237,7 +237,7 @@ instance HPlusClass (!!!Just a) where
 |hPlusSing| inspects the first argument at runtime
 to take one path or the other,
 while |hPlusClass| just needs the types.
-If the first argument of |hPlusSing| is |undefined|
+If the first argument of |hPlusSing| is |undefined|,
 |hPlusSing| returns |undefined|.
 But |hPlusClass| works when the first argument is |undefined :: HNothing|.
 
@@ -571,7 +571,7 @@ So our idea is to maintain the fields stored unordered, but
 in a structure that allows fast random access and depend on the compiler to
 hardcode the path to our fields.
 
-We will present two variants of faster records.
+We will present three variants of faster records.
 To make code listing shorter and easier to understand,
 we implement each variant with independent interfaces.
 However, it would be possible to provide a common class-based interface
@@ -591,7 +591,11 @@ we will use an array instead, coercing field values to type |Any|.
 This implementation supports linear time insertions
 and constant time lookups.
 
-The second variant is tree-like,
+The second variant is a simple search tree
+without balancing.
+We take care to elide expensive operations at runtime.
+
+The third variant is tree-like,
 based on Skew Binary Random-Access Lists~\cite{OkaThesis}, a structure with constant time insertion
 and logarithmic time access to any element.
 We could have chosen other, perhaps simpler, data structures
@@ -763,6 +767,8 @@ lastArray = hArrayGet l7 rArray
 \end{code}
 %endif  
 %
+
+
 
 \subsection{Skew Binary Random-Access List}\label{sec:skew}
 
@@ -1154,9 +1160,119 @@ Thus, getting to |l7| at run time only traverses a (logarithmic length) fraction
 as we have seen in Figure~\ref{fig:search-skew}.
 Later we will examine runtime benchmarks.
 
+\subsection{Binary search tree}
+
+For completeness, we develop also a binary search tree variant of records.
+We insert new fields where they fall.
+We never re-balance the tree to keep height in check.
+If labels are inserted in order,
+the tree degenerates into a list and operations cease to be logarithmic.
+
+The |BstRecord| type is just a wrapper to the already defined |HTree|.
+The type checker doesn't enforce that the tree is ordered,
+like |SkewRecord| which by construction always had the right shape.
+A balancing implementation could also try to enlist the type checker into enforcing balance.
+\begin{code}
+newtype BstRecord t = BstRecord (HTree t)
+
+hBstEmpty :: BstRecord !!!Empty
+hBstEmpty = BstRecord HEmpty
+\end{code}
+
+|bstExtend| descends the tree heeding the order of labels until it reaches |Empty|
+and replaces it with a new |Node|.
+In the way up, it rebuilds that branch.
+\begin{code}
+$(singletons [d|
+    bstExtend :: Ord l => l -> v -> Tree (l, v) -> Tree (l, v)
+    bstExtend l v Empty = Node (l, v) Empty Empty
+    bstExtend l v (Node (l2, v2) t1 t2) =
+        if l < l2 then Node (l2, v2) (bstExtend l v t1) t2
+        else Node (l2, v2) t1 (bstExtend l v t2)
+    |])
+\end{code}
+
+|hBstExtend| unpacks and repacks the |BstRecord| around a call to |hBstExtend'|.
+The class handles the |Empty| base class and dispatches to |HBstExtend''|
+with the result of comparing the labels otherwise.
+The class needs |l| as a parameter for the |HBstExtend''| constraint.
+Still, a functional dependency is not needed because the return type is fully specified with (promoted) type functions.
+\begin{code}
+hBstExtend :: HBstExtend' l t => Field l v -> BstRecord t -> BstRecord (BstExtend l v t)
+hBstExtend f (BstRecord t) = BstRecord (hBstExtend' f t)
+infixr 2 `hBstExtend`
+
+class HBstExtend' l t where
+    hBstExtend' :: Field l v -> HTree t -> HTree (BstExtend l v t)
+instance HBstExtend' l 'Empty where
+    hBstExtend' (Field v) HEmpty = hLeaf v
+instance HBstExtend'' l t1 t2 (l :< l2) => HBstExtend' l ('Node '(l2,v2) t1 t2) where
+    hBstExtend' = hBstExtend''
+\end{code}
+
+|hBstExtend''| has the same type as |hBstExtend'|, save for equality constraints.
+At this point we know that the tree is non empty and that the class parameter |b| must be the result of comparing |l| and |l2|.
+|b| needs to be a parameter to allow as to dispatch on it in the instances.
+The |HBstExtend'| constraint requires the rest of the parameters. 
+\begin{code}
+class HBstExtend'' l t1 t2 b where
+    hBstExtend'' :: (b ~ (l :< l2), t ~ ('Node '(l2, v2) t1 t2)) => Field l v -> HTree t -> HTree (BstExtend l v t)
+instance HBstExtend' l t1 => HBstExtend'' l t1 t2 'True where
+    hBstExtend'' f (HNode v2 t1 t2) = HNode v2 (hBstExtend' f t1) t2
+instance HBstExtend' l t2 => HBstExtend'' l t1 t2 'False where
+    hBstExtend'' f (HNode v2 t1 t2) = HNode v2 t1 (hBstExtend' f t2)
+\end{code}
+
+Lookup follows the model of other implementations.
+We first build the path to the field,
+and then just walk the path.
+\begin{code}
+$(singletons [d|
+    makePathBst :: Ord l => l -> Tree (l, v) -> Maybe PathTree
+    makePathBst l Empty = Nothing
+    makePathBst l (Node (l2, v) t1 t2) =
+        if l < l2 then maybeMap PathTreeLeft (makePathBst l t1) else
+        if l2 < l then maybeMap PathTreeRight (makePathBst l t2) else
+        Just PathTreeRoot
+    |])
+\end{code}
+
+We reuse |hWalkTreeClass| from the skew implementation,
+but need also |hWalkMTreeClass| for when there's no field in the record.
+The skew implementation only needs to handle |Nothing| at the spine level.
+\begin{code}
+class HWalkMTreeClass p where
+    hWalkMTreeClass :: proxy p -> HTree t -> HMaybe (MaybeMap (WalkTreeSym1 t) p)
+instance HWalkMTreeClass 'Nothing where
+    hWalkMTreeClass _ _ = HNothing
+instance HWalkTreeClass p => HWalkMTreeClass ('Just p) where
+    hWalkMTreeClass _ t = HJust $ hWalkTreeClass (undefined :: Proxy p) t
+
+hBstGetClass :: forall proxy l t p. (p ~ MakePathBst l t, HWalkMTreeClass p) => proxy l -> BstRecord t -> HMaybe (MaybeMap (WalkTreeSym1 t) p)
+hBstGetClass _ (BstRecord t) = hWalkMTreeClass (undefined :: Proxy p) t
+\end{code}
+
+We reorder our running sample
+to prevent only right children in our tree.
+\begin{code}
+rBst =
+  (l1  .=.  True     )  `hBstExtend`
+  (l7  .=.  "last"   )  `hBstExtend`
+  (l2  .=.  9        )  `hBstExtend`
+  (l3  .=.  "bla"    )  `hBstExtend`
+  (l4  .=.  'c'      )  `hBstExtend`
+  (l5  .=.  Nothing  )  `hBstExtend`
+  (l6  .=.  [4,5]    )  `hBstExtend`
+  hBstEmpty
+
+lastBstClass = hBstGetClass l7 rBst
+\end{code}
+
+
+
 \section{Efficiency}\label{sec:efficiency}
 
-In order to chose the best implementation in practice and as a sanity check,
+In order to choose the best implementation in practice and as a sanity check,
 we did some synthetic benchmarks of the code.
 We compile and run the programs in a 4 core 2.2 Ghz second genertion (Sandy Bridge) Intel i7 MacBook Pro Notebook with 8 GB of RAM.
 We use GHC version 7.6.1 64 bits under OS X 10.8 Mountain Lion.
@@ -1566,6 +1682,7 @@ main =
     print lastListClass >>
     print lastListClassCore >>
     print lastArray >>
+    print lastBstClass >>
     print lastSkewSing >>
     print lastSkewClass >>
     return ()
