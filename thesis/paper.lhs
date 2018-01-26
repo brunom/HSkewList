@@ -540,9 +540,9 @@ grammars, uses extensible records to encode the collection of
 attributes associated to each non-terminal.
 To use records to implement a system with a big number of attributes (e.g. a compiler),
 we would need an efficient structure.
-After increasing the size of GHC's context reduction stack,
-the program compiles,
-but it runs slowly due to the linear time lookup algorithm.
+After increasing GHC's reduction depth,
+programs compile,
+but run slowly due to the linear time lookup algorithm.
 The usual replacement when lookup in a linked list is slow
 is a search tree.
 The need to compare labels at compile-time
