@@ -3,17 +3,19 @@ import System.Process
 import System.IO
 import Control.Monad
 
-main = bench_update
---ghcs = ["ghc-7.4.2", "ghc-7.6.1"]
-ghcs = ["ghc"]
-iters = [0]
+main = bench_get
+ghcs = ["ghc-7.6.1", "ghc-8.2.2", "ghc-8.4.1"]
+--ghcs = ["ghc"]
+--iters = [0]
+iters = [200]
 --iters = [0, 25..200]
 
 data Record = Record { name :: String, cons :: String, nil :: String, get :: String, update :: String }
-records = [Record "Record" "HCons" "HNil" "hListGet" "hListUpdate"
-          --,Record "ArrayRecord" "hArrayExtend" "emptyArrayRecord" "hArrayGet" "hArrayUpdate"           
-          --,Record "SkewRecord" "hSkewExtend" "emptySkewRecord" "\\r f -> case hSkewGet r f of HJust b -> b" "hSkewUpdate"          
-          ] 
+records =
+    --Record "Record" "HCons" "HNil" "hListGet" "hListUpdate" :
+    Record "ArrayRecord" "hArrayExtend" "emptyArrayRecord" "hArrayGet" "hArrayUpdate" :
+    --Record "SkewRecord" "hSkewExtend" "emptySkewRecord" "\\r f -> case hSkewGet r f of HJust b -> b" "hSkewUpdate" :
+    []
 dir = "bench/"
 
 call ghc file = system $ ghc ++ " --make " ++ file ++ " -O -fcontext-stack=9999 " ++
@@ -22,14 +24,14 @@ call ghc file = system $ ghc ++ " --make " ++ file ++ " -O -fcontext-stack=9999 
                       " >&2"
 
 bench_get = do
-  system "make paper.hs >&2"
+  system "make Paper.hs >&2"
   system $ "rm -rf " ++ dir
   system $ "mkdir " ++ dir
   
 
   -- precompile dependencies
   forM_ ghcs $ \ghc -> do
-    call ghc "paper.hs"
+    call ghc "Paper.hs"
     
     -- headers
   putStr "iterations"
@@ -45,7 +47,7 @@ bench_get = do
     forM_  ghcs $ \ghc -> forM_ records $ \record -> do
       let run = dir ++ "get_" ++ show iter ++ "_" ++ ghc ++ "_" ++ name record ++ ".hs"
       writeFile run $ "\
-\{-# LANGUAGE NoMonomorphismRestriction #-}\n\
+\{-# LANGUAGE NoMonomorphismRestriction, FlexibleContexts #-}\n\
 \import Paper\n\
 \\n\
 \main = go (9999999::Int) where\n\
@@ -76,14 +78,14 @@ bench_get = do
     putChar '\n'
 
 bench_update = do
-  system "make paper.hs >&2"
+  system "make Paper.hs >&2"
   system $ "rm -rf " ++ dir
   system $ "mkdir " ++ dir
   
 
   -- precompile dependencies
   forM_ ghcs $ \ghc -> do
-    call ghc "paper.hs"
+    call ghc "Paper.hs"
     
     -- headers
   putStr "iterations"
@@ -131,13 +133,13 @@ bench_update = do
     putChar '\n'
 
 bench_extend = do
-  system "make paper.hs >&2"
+  system "make Paper.hs >&2"
   system $ "rm -rf " ++ dir
   system $ "mkdir " ++ dir
   
   -- precompile dependencies
   forM_ ghcs $ \ghc -> do
-    call ghc "paper.hs"
+    call ghc "Paper.hs"
     
     -- headers
   putStr "iterations"

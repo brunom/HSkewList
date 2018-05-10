@@ -626,7 +626,7 @@ there's still one indirection left,
 but it's still less indirections than the alternatives.
 
 An Array Record has two components:
-an runtime array containing the values of the fields, 
+a runtime array containing the values of the fields, 
 and a compile-time list used to find a field's type and its ordinal for lookup in the array.
 To allow the storage of elements of different types in the array, 
 we use element type |Any|, a placeholder type that documents our intention,

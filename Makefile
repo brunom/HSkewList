@@ -1,28 +1,28 @@
-all: paper.pdf paper.exe
+all: Paper.pdf Paper.exe
 
-run : paper.exe
-	time ./paper.exe
+run : Paper.exe
+	time ./Paper.exe
 
 GHC=ghc
 %GHC=ghc-7.6.1
 %GHC=ghc-7.4.2
 
-paper.exe : paper.hs
-	time $(GHC) -O -fcontext-stack=999 --make paper.hs -o paper.exe 2>&1
+Paper.exe : Paper.hs
+	time $(GHC) -O -fcontext-stack=999 --make Paper.hs -o Paper.exe 2>&1
 
-paper.hs : paper.lhs
-	lhs2TeX paper.lhs -o paper.hs --newcode
+Paper.hs : Paper.lhs
+	lhs2TeX Paper.lhs -o Paper.hs --newcode
 
-paper.tex : paper.lhs
-	lhs2TeX paper.lhs -o paper.tex
+Paper.tex : Paper.lhs
+	lhs2TeX Paper.lhs -o Paper.tex
 
 upperbound=4
 LTX_OPTS=-halt-on-error
 
-paper.pdf : paper.tex  biblio.bib
-	pdflatex $(LTX_OPTS) paper.tex
-	bibtex paper
-	pdflatex $(LTX_OPTS) paper.tex
+Paper.pdf : Paper.tex  biblio.bib
+	pdflatex $(LTX_OPTS) Paper.tex
+	bibtex Paper
+	pdflatex $(LTX_OPTS) Paper.tex
 
 clean :
-	rm -f *.aux *.bbl *blg *.log *.ptb *.tex paper.pdf
+	rm -f *.aux *.bbl *blg *.log *.ptb *.tex Paper.pdf

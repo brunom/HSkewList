@@ -56,7 +56,7 @@ that some programmers may have trouble
 imagining working without them.
 Placing fields accessed together
 close by in memory improves performance,
-because accusing a field also brings
+because accessing a field also brings
 nearby fields closer to the processor.
 The same is true when working with a collection of record instances.
 If only a subset of fields is needed, it’s best to partition data into
